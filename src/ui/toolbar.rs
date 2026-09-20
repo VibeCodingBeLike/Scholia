@@ -1,3 +1,4 @@
+use crate::fonts::icons;
 use crate::keybinds::{Action, KeybindConfig};
 use crate::mla_rules::MlaLinter;
 use crate::model::MlaDocument;
@@ -55,7 +56,7 @@ pub fn render_toolbar(
         // --- File Menu Actions ---
         let new_sc = keybinds.get_shortcut(Action::NewDocument).display_string();
         if ui
-            .button(RichText::new("📄 New").color(text_col))
+            .button(RichText::new(format!("{} New", icons::FILE_NEW)).color(text_col))
             .on_hover_text(format!("Create new document ({})", new_sc))
             .clicked()
         {
@@ -64,7 +65,7 @@ pub fn render_toolbar(
 
         let open_sc = keybinds.get_shortcut(Action::OpenDocument).display_string();
         if ui
-            .button(RichText::new("📂 Open").color(text_col))
+            .button(RichText::new(format!("{} Open", icons::FOLDER_OPEN)).color(text_col))
             .on_hover_text(format!("Open .mladoc file ({})", open_sc))
             .clicked()
         {
@@ -73,7 +74,7 @@ pub fn render_toolbar(
 
         let save_sc = keybinds.get_shortcut(Action::SaveDocument).display_string();
         if ui
-            .button(RichText::new("💾 Save").color(text_col))
+            .button(RichText::new(format!("{} Save", icons::SAVE)).color(text_col))
             .on_hover_text(format!("Save document ({})", save_sc))
             .clicked()
         {
@@ -82,11 +83,19 @@ pub fn render_toolbar(
 
         // Export dropdown / buttons
         egui::ComboBox::from_id_salt("export_cb")
-            .selected_text(RichText::new("🚀 Export").strong().color(accent_col))
+            .selected_text(
+                RichText::new(format!("{} Export", icons::WORD_DOCX))
+                    .strong()
+                    .color(accent_col),
+            )
             .show_ui(ui, |ui| {
                 let docx_sc = keybinds.get_shortcut(Action::ExportDocx).display_string();
                 if ui
-                    .button(format!("Word Document (.docx)  [{}]", docx_sc))
+                    .button(format!(
+                        "{} Word Document (.docx)  [{}]",
+                        icons::WORD_DOCX,
+                        docx_sc
+                    ))
                     .clicked()
                 {
                     event = Some(ToolbarEvent::ExportDocx);
@@ -95,12 +104,19 @@ pub fn render_toolbar(
                     .get_shortcut(Action::ExportHtmlPdf)
                     .display_string();
                 if ui
-                    .button(format!("Printable HTML / PDF  [{}]", html_sc))
+                    .button(format!(
+                        "{} Printable HTML / PDF  [{}]",
+                        icons::HTML_PDF,
+                        html_sc
+                    ))
                     .clicked()
                 {
                     event = Some(ToolbarEvent::ExportHtml);
                 }
-                if ui.button("Plain Text / Markdown (.txt)").clicked() {
+                if ui
+                    .button(format!("{} Plain Text / Markdown (.txt)", icons::TEXT))
+                    .clicked()
+                {
                     event = Some(ToolbarEvent::ExportText);
                 }
             });
@@ -110,7 +126,7 @@ pub fn render_toolbar(
         // --- MLA Block Inserters ---
         let p_sc = keybinds.get_shortcut(Action::AddParagraph).display_string();
         if ui
-            .button(RichText::new("¶ Paragraph").color(text_col))
+            .button(RichText::new(format!("{} Paragraph", icons::PARAGRAPH)).color(text_col))
             .on_hover_text(format!(
                 "Add double-spaced 0.5\" indented body paragraph ({})",
                 p_sc
@@ -124,7 +140,7 @@ pub fn render_toolbar(
             .get_shortcut(Action::InsertBlockQuote)
             .display_string();
         if ui
-            .button(RichText::new("❝ Block Quote").color(text_col))
+            .button(RichText::new(format!("{} Block Quote", icons::QUOTE)).color(text_col))
             .on_hover_text(format!(
                 "Insert 0.5\" indented block quotation for >4 lines of prose ({})",
                 bq_sc
@@ -138,7 +154,7 @@ pub fn render_toolbar(
             .get_shortcut(Action::InsertHeading1)
             .display_string();
         if ui
-            .button(RichText::new("H1 Bold").color(text_col))
+            .button(RichText::new(format!("{} H1", icons::HEADING)).color(text_col))
             .on_hover_text(format!("Insert MLA Level 1 Section Heading ({})", h1_sc))
             .clicked()
         {
@@ -149,7 +165,7 @@ pub fn render_toolbar(
             .get_shortcut(Action::InsertHeading2)
             .display_string();
         if ui
-            .button(RichText::new("H2 Italic").color(text_col))
+            .button(RichText::new(format!("{} H2", icons::HEADING)).color(text_col))
             .on_hover_text(format!("Insert MLA Level 2 Section Heading ({})", h2_sc))
             .clicked()
         {
@@ -160,7 +176,7 @@ pub fn render_toolbar(
             .get_shortcut(Action::InsertCitation)
             .display_string();
         if ui
-            .button(RichText::new("📌 + Citation").color(accent_col))
+            .button(RichText::new(format!("{} Citation", icons::QUOTE)).color(accent_col))
             .on_hover_text(format!(
                 "Insert in-text citation e.g. (Author 42) ({})",
                 cite_sc
@@ -177,7 +193,7 @@ pub fn render_toolbar(
             .get_shortcut(Action::ConvertToMlaTitleCase)
             .display_string();
         if ui
-            .button(RichText::new("Aa Title Case").color(text_col))
+            .button(RichText::new(format!("{} Title Case", icons::TITLE_CASE)).color(text_col))
             .on_hover_text(format!(
                 "Format document title to MLA Capitalization rules ({})",
                 tc_sc
@@ -191,7 +207,11 @@ pub fn render_toolbar(
         let wc_sc = keybinds
             .get_shortcut(Action::ManageWorksCited)
             .display_string();
-        let wc_label = format!("📚 Works Cited ({})", doc.works_cited.len());
+        let wc_label = format!(
+            "{} Works Cited ({})",
+            icons::BOOK_CITATIONS,
+            doc.works_cited.len()
+        );
         if ui
             .button(RichText::new(wc_label).color(text_col))
             .on_hover_text(format!("Manage MLA Works Cited entries ({})", wc_sc))
@@ -205,11 +225,11 @@ pub fn render_toolbar(
         // MLA Compliance score pill
         let report = MlaLinter::inspect(doc);
         let (score_col, score_icon) = if report.score_percentage >= 95 {
-            (Color32::from_rgb(50, 200, 100), "✓")
+            (Color32::from_rgb(50, 200, 100), icons::CHECK)
         } else if report.score_percentage >= 75 {
-            (Color32::from_rgb(240, 170, 40), "⚠")
+            (Color32::from_rgb(240, 170, 40), icons::WARNING)
         } else {
-            (Color32::from_rgb(240, 70, 70), "✕")
+            (Color32::from_rgb(240, 70, 70), icons::TIMES)
         };
 
         let chk_sc = keybinds
@@ -229,13 +249,13 @@ pub fn render_toolbar(
             let focus_sc = keybinds
                 .get_shortcut(Action::ToggleFocusMode)
                 .display_string();
-            let focus_icon = if focus_mode {
-                "🗗 Exit Zen"
+            let focus_text = if focus_mode {
+                format!("{} Exit Zen", icons::FOCUS_MODE)
             } else {
-                "🗖 Zen Mode"
+                format!("{} Zen Mode", icons::FOCUS_MODE)
             };
             if ui
-                .button(RichText::new(focus_icon).color(text_col))
+                .button(RichText::new(focus_text).color(text_col))
                 .on_hover_text(format!("Toggle Distraction-Free Zen Mode ({})", focus_sc))
                 .clicked()
             {
@@ -246,7 +266,7 @@ pub fn render_toolbar(
                 .get_shortcut(Action::OpenPreferences)
                 .display_string();
             if ui
-                .button(RichText::new("⚙ Preferences").color(text_col))
+                .button(RichText::new(format!("{} Preferences", icons::SETTINGS)).color(text_col))
                 .on_hover_text(format!(
                     "Customize Transparency, Themes & Keybinds ({})",
                     pref_sc

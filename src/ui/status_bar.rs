@@ -1,3 +1,4 @@
+use crate::fonts::icons;
 use crate::model::MlaDocument;
 use crate::theme::ThemeConfig;
 use egui::{Color32, Ui};
@@ -16,9 +17,15 @@ pub fn render_status_bar(ui: &mut Ui, doc: &MlaDocument, theme: &ThemeConfig) {
 
         // Save state indicator
         if doc.is_dirty {
-            ui.colored_label(Color32::from_rgb(240, 160, 50), "● Unsaved Changes");
+            ui.colored_label(
+                Color32::from_rgb(240, 160, 50),
+                format!("{} Unsaved", icons::WARNING),
+            );
         } else {
-            ui.colored_label(Color32::from_rgb(80, 200, 120), "✓ Saved");
+            ui.colored_label(
+                Color32::from_rgb(80, 200, 120),
+                format!("{} Saved", icons::CHECK),
+            );
         }
 
         if let Some(path) = &doc.file_path {
@@ -26,7 +33,9 @@ pub fn render_status_bar(ui: &mut Ui, doc: &MlaDocument, theme: &ThemeConfig) {
                 .file_name()
                 .and_then(|f| f.to_str())
                 .unwrap_or("Document");
-            ui.label(egui::RichText::new(format!("📁 {}", filename)).color(text_col));
+            ui.label(
+                egui::RichText::new(format!("{} {}", icons::FOLDER_OPEN, filename)).color(text_col),
+            );
         }
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -41,7 +50,8 @@ pub fn render_status_bar(ui: &mut Ui, doc: &MlaDocument, theme: &ThemeConfig) {
 
             ui.label(
                 egui::RichText::new(format!(
-                    "📄 ~{} Page{}",
+                    "{} ~{} Page{}",
+                    icons::FILE_NEW,
                     est_pages,
                     if est_pages == 1 { "" } else { "s" }
                 ))
@@ -53,7 +63,7 @@ pub fn render_status_bar(ui: &mut Ui, doc: &MlaDocument, theme: &ThemeConfig) {
             ui.separator();
 
             ui.label(
-                egui::RichText::new(format!("🔤 {} chars", char_count))
+                egui::RichText::new(format!("{} {} chars", icons::TEXT, char_count))
                     .color(text_col)
                     .size(11.5),
             );
@@ -61,7 +71,7 @@ pub fn render_status_bar(ui: &mut Ui, doc: &MlaDocument, theme: &ThemeConfig) {
             ui.separator();
 
             ui.label(
-                egui::RichText::new(format!("📝 {} words", word_count))
+                egui::RichText::new(format!("{} {} words", icons::EDIT, word_count))
                     .color(theme.text_color())
                     .strong()
                     .size(12.0),

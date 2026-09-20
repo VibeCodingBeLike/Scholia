@@ -3,6 +3,7 @@ use eframe::egui;
 use std::path::{Path, PathBuf};
 
 mod export;
+mod fonts;
 mod keybinds;
 mod mla_rules;
 mod model;
@@ -33,7 +34,10 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "TheBestMLAWriter",
         native_options,
-        Box::new(|_cc| Ok(Box::new(MlaApp::new()))),
+        Box::new(|cc| {
+            fonts::configure_fonts(&cc.egui_ctx);
+            Ok(Box::new(MlaApp::new()))
+        }),
     )
 }
 
@@ -48,7 +52,6 @@ struct MlaApp {
     compliance_state: ComplianceModalState,
     settings_state: SettingsModalState,
 
-    active_block_index: Option<usize>,
     focus_mode: bool,
     vibrancy_dirty: bool,
     notification: Option<(String, std::time::Instant)>,
@@ -67,7 +70,6 @@ impl MlaApp {
             citation_state: CitationModalState::default(),
             compliance_state: ComplianceModalState::default(),
             settings_state: SettingsModalState::default(),
-            active_block_index: None,
             focus_mode: false,
             vibrancy_dirty: true, // Apply vibrancy on first frame
             notification: None,
@@ -158,19 +160,38 @@ impl MlaApp {
                 }
             }
             Action::AddParagraph => {
-                self.doc.add_paragraph(self.active_block_index);
+                if !self.doc.body.ends_with("\n\n") && !self.doc.body.is_empty() {
+                    self.doc.body.push_str("\n\n");
+                }
+                self.doc.sync_blocks_from_body();
+                self.doc.is_dirty = true;
             }
             Action::InsertBlockQuote => {
-                self.doc.add_blockquote(self.active_block_index);
+                if !self.doc.body.ends_with("\n\n") && !self.doc.body.is_empty() {
+                    self.doc.body.push_str("\n\n");
+                }
+                self.doc.body.push_str("> Blockquote quotation here...\n\n");
+                self.doc.sync_blocks_from_body();
+                self.doc.is_dirty = true;
             }
             Action::InsertHeading1 => {
-                self.doc.add_heading(1, self.active_block_index);
+                if !self.doc.body.ends_with("\n\n") && !self.doc.body.is_empty() {
+                    self.doc.body.push_str("\n\n");
+                }
+                self.doc.body.push_str("# Section Heading\n\n");
+                self.doc.sync_blocks_from_body();
+                self.doc.is_dirty = true;
             }
             Action::InsertHeading2 => {
-                self.doc.add_heading(2, self.active_block_index);
+                if !self.doc.body.ends_with("\n\n") && !self.doc.body.is_empty() {
+                    self.doc.body.push_str("\n\n");
+                }
+                self.doc.body.push_str("## Subheading\n\n");
+                self.doc.sync_blocks_from_body();
+                self.doc.is_dirty = true;
             }
             Action::InsertCitation => {
-                self.citation_state.open(self.active_block_index);
+                self.citation_state.open(None);
             }
             Action::ManageWorksCited => {
                 self.works_cited_state.open_new();
@@ -290,17 +311,12 @@ impl eframe::App for MlaApp {
                 }
 
                 // Core Editor Canvas
-                let editor_action = render_editor_page(
-                    ui,
-                    &mut self.doc,
-                    &self.theme,
-                    &mut self.active_block_index,
-                );
+                let editor_action = render_editor_page(ui, &mut self.doc, &self.theme);
 
                 if let Some(ea) = editor_action {
                     match ea {
-                        EditorAction::OpenCitationModal(block_idx) => {
-                            self.citation_state.open(Some(block_idx));
+                        EditorAction::OpenCitationModal(target) => {
+                            self.citation_state.open(target);
                         }
                         EditorAction::OpenWorksCitedModal(maybe_idx) => {
                             if let Some(idx) = maybe_idx {
@@ -310,7 +326,6 @@ impl eframe::App for MlaApp {
                                 self.works_cited_state.open_new();
                             }
                         }
-                        EditorAction::RequestRepaint => {}
                     }
                 }
 
@@ -331,17 +346,17 @@ impl eframe::App for MlaApp {
             &mut citation_insert,
         );
 
-        if let Some((target_block_idx, cite_str)) = citation_insert {
-            if target_block_idx < self.doc.blocks.len() {
-                let block = &mut self.doc.blocks[target_block_idx];
-                let t = block.text_mut();
-                if !t.is_empty() && !t.ends_with(' ') {
-                    t.push(' ');
-                }
-                t.push_str(&cite_str);
-                self.doc.is_dirty = true;
-                self.set_notification("Citation inserted.");
+        if let Some(cite_str) = citation_insert {
+            if !self.doc.body.is_empty()
+                && !self.doc.body.ends_with(' ')
+                && !self.doc.body.ends_with('\n')
+            {
+                self.doc.body.push(' ');
             }
+            self.doc.body.push_str(&cite_str);
+            self.doc.sync_blocks_from_body();
+            self.doc.is_dirty = true;
+            self.set_notification("Citation inserted.");
         }
 
         render_works_cited_modal(

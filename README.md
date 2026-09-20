@@ -52,10 +52,15 @@ It gives you a rich, fluent text editing canvas, but **it is fundamentally impos
 
 ## 🌟 Key Features
 
-- **Strict MLA 9 Enforcement**: 1-inch margins, 2.0 double-spacing throughout, 12pt standard serif fonts, 0.5-inch paragraph indents, 0.5-inch block quote indents, and right-aligned running headers.
+- **Authentic Physical Paper Sheet Canvas**:
+  - No forms or boxes—type directly onto authentic 8.5" × 11" US Letter frosted glass pages with standard 1-inch margins and running headers.
+  - Manuscript typography is rendered in authentic **Times New Roman** (12pt, double-spaced).
+- **Nerd Font Iconography**:
+  - Automatically discovers user-installed Nerd Fonts (e.g. *Symbols Nerd Font*, *JetBrains Mono Nerd Font*) for crisp vector glyphs across all toolbars, buttons, and status indicators.
 - **Translucent Frosted Glass UI**:
   - Native OS background blur (Windows 11 Mica, Windows 10/11 Acrylic, macOS Vibrancy).
   - The **writing paper sheet itself is transparent** with a customizable opacity slider—letting your desktop wallpaper softly glow through your manuscript.
+- **Strict MLA 9 Enforcement**: 1-inch margins, 2.0 double-spacing throughout, 12pt standard serif fonts, 0.5-inch paragraph indents, 0.5-inch block quote indents, and right-aligned running headers.
 - **MLA 9 Compliance Inspector**: Real-time document linter with a live compliance score (0–100%) and 1-click auto-fix buttons for non-compliant dates, titles, and headers.
 - **Works Cited Manager**: Interactive builder implementing MLA 9's *Nine Core Elements* container model with automatic alphabetical sorting and true hanging indents.
 - **In-Text Citation Assistant**: Instant insertion dialog linking Works Cited entries directly to your active writing paragraph.

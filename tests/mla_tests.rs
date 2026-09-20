@@ -114,3 +114,19 @@ fn test_document_exporters() {
     assert!(txt_path.exists());
     let _ = std::fs::remove_file(&txt_path);
 }
+
+#[test]
+fn test_font_configuration_and_nerd_icons() {
+    let ctx = egui::Context::default();
+    the_best_mla_writer::fonts::configure_fonts(&ctx);
+
+    // Verify Nerd Font icon constants are valid UTF-8
+    assert!(!the_best_mla_writer::fonts::icons::FILE_NEW.is_empty());
+    assert!(!the_best_mla_writer::fonts::icons::SAVE.is_empty());
+    assert!(!the_best_mla_writer::fonts::icons::CALENDAR.is_empty());
+    assert!(!the_best_mla_writer::fonts::icons::BOOK_CITATIONS.is_empty());
+
+    let doc_font = the_best_mla_writer::fonts::doc_font(16.0);
+    assert_eq!(doc_font.size, 16.0);
+}
+

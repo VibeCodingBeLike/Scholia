@@ -92,6 +92,9 @@ impl MlaHeader {
 pub struct MlaDocument {
     pub header: MlaHeader,
     pub title: String,
+    #[serde(default)]
+    pub body: String,
+    #[serde(default)]
     pub blocks: Vec<MlaBlock>,
     pub works_cited: Vec<WorksCitedEntry>,
     #[serde(default)]
@@ -102,36 +105,19 @@ pub struct MlaDocument {
 
 impl Default for MlaDocument {
     fn default() -> Self {
+        let starter_text = "Writing an academic paper in accordance with Modern Language Association (MLA) 9th edition standards requires meticulous adherence to structural formatting. Every element of the document—from the one-inch margins to the standardized double spacing—serves to establish academic rigor and uniformity across scholarly discourse. This text editor is engineered specifically to eliminate formatting errors at the source, constraining input so that margin variations, irregular paragraph spacing, and inconsistent typefaces are impossible to introduce.\n\nIn MLA format, all body paragraphs must be indented exactly one-half inch (0.5 in.) from the left margin, without any extra vertical blank space between paragraphs. The running head in the upper right-hand corner displays the author's last name followed by a single space and the current page number, positioned one-half inch from the top edge and flush with the right margin (Smith 42).\n\nWhen quoting prose that extends beyond four lines, or verse that extends beyond three lines, the quotation must be set off as a block quotation. It begins on a new line, is indented an additional half-inch from the left margin, maintains strict double line spacing, omits quotation marks, and places the parenthetical citation outside the concluding punctuation mark (MLA Handbook 120).\n\nThe Works Cited list begins on a separate page at the conclusion of the manuscript. Entries are formatted with a hanging indent of one-half inch, alphabetized by author or primary title, and constructed using the nine core container elements prescribed in the MLA ninth edition.";
+
         let mut doc = Self {
             header: MlaHeader::default(),
             title: "The Rhetorical Construction of Identity in Modern Literature".to_string(),
+            body: starter_text.to_string(),
             blocks: Vec::new(),
             works_cited: Vec::new(),
             file_path: None,
             is_dirty: false,
         };
 
-        // Populate with helpful, instructional MLA-compliant starter content
-        doc.blocks.push(MlaBlock::Paragraph {
-            id: generate_block_id(1),
-            text: "Writing an academic paper in accordance with Modern Language Association (MLA) 9th edition standards requires meticulous adherence to structural formatting. Every element of the document—from the one-inch margins to the standardized double spacing—serves to establish academic rigor and uniformity across scholarly discourse. This text editor is engineered specifically to eliminate formatting errors at the source, constraining input so that margin variations, irregular paragraph spacing, and inconsistent typefaces are impossible to introduce.".to_string(),
-        });
-
-        doc.blocks.push(MlaBlock::Paragraph {
-            id: generate_block_id(2),
-            text: "In MLA format, all body paragraphs must be indented exactly one-half inch (0.5 in.) from the left margin, without any extra vertical blank space between paragraphs. The running head in the upper right-hand corner displays the author's last name followed by a single space and the current page number, positioned one-half inch from the top edge and flush with the right margin (Smith 42).".to_string(),
-        });
-
-        doc.blocks.push(MlaBlock::BlockQuote {
-            id: generate_block_id(3),
-            text: "When quoting prose that extends beyond four lines, or verse that extends beyond three lines, the quotation must be set off as a block quotation. It begins on a new line, is indented an additional half-inch from the left margin, maintains strict double line spacing, omits quotation marks, and places the parenthetical citation outside the concluding punctuation mark.".to_string(),
-            citation: "(MLA Handbook 120)".to_string(),
-        });
-
-        doc.blocks.push(MlaBlock::Paragraph {
-            id: generate_block_id(4),
-            text: "The Works Cited list begins on a separate page at the conclusion of the manuscript. Entries are formatted with a hanging indent of one-half inch, alphabetized by author or primary title, and constructed using the nine core container elements prescribed in the MLA ninth edition.".to_string(),
-        });
+        doc.sync_blocks_from_body();
 
         // Sample works cited entry
         let mut entry = WorksCitedEntry::new_empty();
@@ -152,6 +138,7 @@ impl MlaDocument {
         Self {
             header: MlaHeader::default(),
             title: "Untitled MLA Paper".to_string(),
+            body: String::new(),
             blocks: vec![MlaBlock::Paragraph {
                 id: generate_block_id(100),
                 text: String::new(),
@@ -160,6 +147,71 @@ impl MlaDocument {
             file_path: None,
             is_dirty: false,
         }
+    }
+
+    pub fn ensure_body_synced(&mut self) {
+        if self.body.trim().is_empty() && !self.blocks.is_empty() {
+            let parts: Vec<String> = self
+                .blocks
+                .iter()
+                .map(|b| match b {
+                    MlaBlock::Paragraph { text, .. } => text.clone(),
+                    MlaBlock::BlockQuote { text, citation, .. } => {
+                        if citation.trim().is_empty() {
+                            format!("> {}", text)
+                        } else {
+                            format!("> {} {}", text, citation.trim())
+                        }
+                    }
+                    MlaBlock::SectionHeading { level, text, .. } => {
+                        format!("{} {}", "#".repeat(*level as usize), text)
+                    }
+                })
+                .collect();
+            self.body = parts.join("\n\n");
+        }
+    }
+
+    pub fn sync_blocks_from_body(&mut self) {
+        let mut new_blocks = Vec::new();
+        let paragraphs = self.body.split("\n\n");
+        for (i, p) in paragraphs.enumerate() {
+            let trimmed = p.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if let Some(stripped) = trimmed.strip_prefix("> ") {
+                new_blocks.push(MlaBlock::BlockQuote {
+                    id: generate_block_id(i + 1),
+                    text: stripped.to_string(),
+                    citation: String::new(),
+                });
+            } else if let Some(stripped) = trimmed.strip_prefix("## ") {
+                new_blocks.push(MlaBlock::SectionHeading {
+                    id: generate_block_id(i + 1),
+                    level: 2,
+                    text: stripped.to_string(),
+                });
+            } else if let Some(stripped) = trimmed.strip_prefix("# ") {
+                new_blocks.push(MlaBlock::SectionHeading {
+                    id: generate_block_id(i + 1),
+                    level: 1,
+                    text: stripped.to_string(),
+                });
+            } else {
+                new_blocks.push(MlaBlock::Paragraph {
+                    id: generate_block_id(i + 1),
+                    text: trimmed.to_string(),
+                });
+            }
+        }
+        if new_blocks.is_empty() {
+            new_blocks.push(MlaBlock::Paragraph {
+                id: generate_block_id(1),
+                text: String::new(),
+            });
+        }
+        self.blocks = new_blocks;
     }
 
     pub fn total_word_count(&self) -> usize {

@@ -24,7 +24,7 @@ pub fn render_citation_modal(
     state: &mut CitationModalState,
     works_cited: &[WorksCitedEntry],
     theme: &ThemeConfig,
-    on_insert: &mut Option<(usize, String)>,
+    on_insert: &mut Option<String>,
 ) {
     if !state.is_open {
         return;
@@ -153,9 +153,7 @@ pub fn render_citation_modal(
                     .button(RichText::new("📌 Insert Into Document").strong())
                     .clicked()
                 {
-                    if let Some(target_idx) = state.target_block_index {
-                        *on_insert = Some((target_idx, formatted_citation.clone()));
-                    }
+                    *on_insert = Some(formatted_citation.clone());
                     close_modal = true;
                 }
 
