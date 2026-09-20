@@ -1,0 +1,37 @@
+[package]
+name = "the_best_mla_writer"
+version = "0.1.0"
+edition = "2021"
+authors = ["TheBestMLAWriter Authors"]
+description = "The ultimate distraction-free, strictly formatted MLA document editor with frosted glass transparency"
+
+[[bin]]
+name = "the_best_mla_writer"
+path = "src/main.rs"
+
+[lib]
+name = "the_best_mla_writer"
+path = "src/lib.rs"
+
+[dependencies]
+chrono = { version = "0.4.45", features = ["serde"] }
+docx-rs = "0.4.22"
+eframe = { version = "0.36.2", default-features = false, features = ["default_fonts", "wgpu", "wayland", "x11"] }
+egui = "0.36.2"
+rfd = "0.17.2"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+window-vibrancy = "0.8.0"
+winit = "0.30.13"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.portable]
+inherits = "release"
+opt-level = 3
+strip = true

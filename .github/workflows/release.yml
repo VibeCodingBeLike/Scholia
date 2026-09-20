@@ -1,0 +1,83 @@
+name: Release & Package Installers
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-release:
+    name: Build Release Asset (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: TheBestMLAWriter-windows-x64.zip
+            use_inno: true
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: TheBestMLAWriter-macOS-x64.zip
+            use_inno: false
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: TheBestMLAWriter-linux-x64.tar.gz
+            use_inno: false
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Linux Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libasound2-dev libgtk-3-dev
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build Optimized Release Binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      # Packaging on Windows
+      - name: Package Windows Artifacts
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "dist\bundle" -Force
+          Copy-Item "target\${{ matrix.target }}\release\the_best_mla_writer.exe" -Destination "dist\bundle\"
+          Copy-Item "README.md", "LICENSE", "sample_mla_paper.mladoc" -Destination "dist\bundle\"
+          Compress-Archive -Path "dist\bundle\*" -DestinationPath "dist\${{ matrix.artifact_name }}" -Force
+
+      # Packaging on macOS
+      - name: Package macOS Artifacts
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p dist/bundle
+          cp target/${{ matrix.target }}/release/the_best_mla_writer dist/bundle/
+          cp README.md LICENSE sample_mla_paper.mladoc dist/bundle/
+          cd dist && zip -r "${{ matrix.artifact_name }}" bundle/
+
+      # Packaging on Linux
+      - name: Package Linux Artifacts
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p dist/bundle
+          cp target/${{ matrix.target }}/release/the_best_mla_writer dist/bundle/
+          cp README.md LICENSE sample_mla_paper.mladoc dist/bundle/
+          cd dist && tar -czvf "${{ matrix.artifact_name }}" bundle/
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ matrix.artifact_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

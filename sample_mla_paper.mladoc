@@ -1,0 +1,69 @@
+{
+  "header": {
+    "student_name": "Jane Doe",
+    "instructor_name": "Professor Robert Smith",
+    "course": "ENG 201: Critical Inquiry & Composition",
+    "date": "20 September 2026",
+    "running_header_last_name": "Doe"
+  },
+  "title": "The Rhetorical Construction of Identity in Modern Literature",
+  "blocks": [
+    {
+      "Paragraph": {
+        "id": "blk_1_init",
+        "text": "Writing an academic paper in accordance with Modern Language Association (MLA) 9th edition standards requires meticulous adherence to structural formatting. Every element of the document—from the one-inch margins to the standardized double spacing—serves to establish academic rigor and uniformity across scholarly discourse. This text editor is engineered specifically to eliminate formatting errors at the source, constraining input so that margin variations, irregular paragraph spacing, and inconsistent typefaces are impossible to introduce."
+      }
+    },
+    {
+      "Paragraph": {
+        "id": "blk_2_init",
+        "text": "In MLA format, all body paragraphs must be indented exactly one-half inch (0.5 in.) from the left margin, without any extra vertical blank space between paragraphs. The running head in the upper right-hand corner displays the author's last name followed by a single space and the current page number, positioned one-half inch from the top edge and flush with the right margin (Smith 42)."
+      }
+    },
+    {
+      "BlockQuote": {
+        "id": "blk_3_init",
+        "text": "When quoting prose that extends beyond four lines, or verse that extends beyond three lines, the quotation must be set off as a block quotation. It begins on a new line, is indented an additional half-inch from the left margin, maintains strict double line spacing, omits quotation marks, and places the parenthetical citation outside the concluding punctuation mark.",
+        "citation": "(MLA Handbook 120)"
+      }
+    },
+    {
+      "Paragraph": {
+        "id": "blk_4_init",
+        "text": "The Works Cited list begins on a separate page at the conclusion of the manuscript. Entries are formatted with a hanging indent of one-half inch, alphabetized by author or primary title, and constructed using the nine core container elements prescribed in the MLA ninth edition."
+      }
+    }
+  ],
+  "works_cited": [
+    {
+      "id": "wc_1_init",
+      "source_type": "BookOrStandalone",
+      "author": "Modern Language Association of America",
+      "title_of_source": "MLA Handbook",
+      "container_title": "",
+      "other_contributors": "",
+      "version": "9th ed.",
+      "number": "",
+      "publisher": "Modern Language Association of America",
+      "pub_date": "2021",
+      "location": "",
+      "raw_text": ""
+    },
+    {
+      "id": "wc_2_init",
+      "source_type": "BookOrStandalone",
+      "author": "Morrison, Toni",
+      "title_of_source": "Beloved",
+      "container_title": "",
+      "other_contributors": "",
+      "version": "",
+      "number": "",
+      "publisher": "Alfred A. Knopf",
+      "pub_date": "1987",
+      "location": "",
+      "raw_text": ""
+    }
+  ],
+  "file_path": null,
+  "is_dirty": false
+}

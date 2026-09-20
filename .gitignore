@@ -1,0 +1,46 @@
+# Rust Build Artifacts
+/target
+Cargo.lock.backup
+
+# Distribution & Package Outputs
+/dist
+/installers/windows/Output
+*.exe
+*.dll
+*.so
+*.dylib
+*.zip
+*.tar.gz
+*.deb
+*.dmg
+*.msi
+*.app
+
+# Local Runtime User Configurations
+mla_config.json
+*.log
+
+# Scratch & Temporary Testing Directories
+scratch_test/
+*.tmp
+*.bak
+
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+
+# IDE & Editor Configurations
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+.project
+.settings/

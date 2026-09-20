@@ -1,0 +1,397 @@
+#![allow(dead_code)]
+use eframe::egui;
+use std::path::{Path, PathBuf};
+
+mod export;
+mod keybinds;
+mod mla_rules;
+mod model;
+mod theme;
+mod ui;
+
+use export::{export_to_docx, export_to_html, export_to_text};
+use keybinds::{Action, KeybindConfig};
+use model::{to_mla_title_case, MlaDocument};
+use theme::ThemeConfig;
+use ui::{
+    render_citation_modal, render_compliance_modal, render_editor_page, render_settings_modal,
+    render_status_bar, render_toolbar, render_works_cited_modal, CitationModalState,
+    ComplianceModalState, EditorAction, SettingsModalState, ToolbarEvent, WorksCitedModalState,
+};
+
+fn main() -> eframe::Result<()> {
+    let native_options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_transparent(true)
+            .with_decorations(true)
+            .with_inner_size([1120.0, 860.0])
+            .with_min_inner_size([720.0, 500.0])
+            .with_title("TheBestMLAWriter - MLA 9th Edition Standard Document Editor"),
+        ..Default::default()
+    };
+
+    eframe::run_native(
+        "TheBestMLAWriter",
+        native_options,
+        Box::new(|_cc| Ok(Box::new(MlaApp::new()))),
+    )
+}
+
+struct MlaApp {
+    doc: MlaDocument,
+    theme: ThemeConfig,
+    keybinds: KeybindConfig,
+
+    // Modal states
+    works_cited_state: WorksCitedModalState,
+    citation_state: CitationModalState,
+    compliance_state: ComplianceModalState,
+    settings_state: SettingsModalState,
+
+    active_block_index: Option<usize>,
+    focus_mode: bool,
+    vibrancy_dirty: bool,
+    notification: Option<(String, std::time::Instant)>,
+}
+
+impl MlaApp {
+    pub fn new() -> Self {
+        // Load saved theme & keybinds if present
+        let (theme, keybinds) = load_config();
+
+        Self {
+            doc: MlaDocument::default(),
+            theme,
+            keybinds,
+            works_cited_state: WorksCitedModalState::default(),
+            citation_state: CitationModalState::default(),
+            compliance_state: ComplianceModalState::default(),
+            settings_state: SettingsModalState::default(),
+            active_block_index: None,
+            focus_mode: false,
+            vibrancy_dirty: true, // Apply vibrancy on first frame
+            notification: None,
+        }
+    }
+
+    pub fn set_notification(&mut self, msg: impl Into<String>) {
+        self.notification = Some((msg.into(), std::time::Instant::now()));
+    }
+
+    fn handle_action(&mut self, action: Action) {
+        match action {
+            Action::NewDocument => {
+                self.doc = MlaDocument::new_blank();
+                self.set_notification("Created new blank MLA document.");
+            }
+            Action::OpenDocument => {
+                if let Some(path) = rfd::FileDialog::new()
+                    .add_filter("MLA Document (*.mladoc)", &["mladoc"])
+                    .add_filter("JSON Document (*.json)", &["json"])
+                    .pick_file()
+                {
+                    match std::fs::read_to_string(&path) {
+                        Ok(content) => match serde_json::from_str::<MlaDocument>(&content) {
+                            Ok(mut doc) => {
+                                doc.file_path = Some(path.to_string_lossy().to_string());
+                                doc.is_dirty = false;
+                                self.doc = doc;
+                                self.set_notification("Document opened successfully.");
+                            }
+                            Err(e) => {
+                                self.set_notification(format!("Error parsing document: {}", e))
+                            }
+                        },
+                        Err(e) => self.set_notification(format!("Error reading file: {}", e)),
+                    }
+                }
+            }
+            Action::SaveDocument => {
+                let target_path = self.doc.file_path.clone().map(PathBuf::from).or_else(|| {
+                    rfd::FileDialog::new()
+                        .set_file_name("paper.mladoc")
+                        .add_filter("MLA Document (*.mladoc)", &["mladoc"])
+                        .save_file()
+                });
+
+                if let Some(path) = target_path {
+                    match serde_json::to_string_pretty(&self.doc) {
+                        Ok(json) => match std::fs::write(&path, json) {
+                            Ok(_) => {
+                                self.doc.file_path = Some(path.to_string_lossy().to_string());
+                                self.doc.is_dirty = false;
+                                self.set_notification("Document saved.");
+                            }
+                            Err(e) => self.set_notification(format!("Error saving file: {}", e)),
+                        },
+                        Err(e) => self.set_notification(format!("Error serializing: {}", e)),
+                    }
+                }
+            }
+            Action::ExportDocx => {
+                if let Some(path) = rfd::FileDialog::new()
+                    .set_file_name("MLA_Paper.docx")
+                    .add_filter("Word Document (*.docx)", &["docx"])
+                    .save_file()
+                {
+                    match export_to_docx(&self.doc, &path) {
+                        Ok(_) => {
+                            self.set_notification(format!("Exported to Word: {}", path.display()))
+                        }
+                        Err(e) => self.set_notification(format!("Word export error: {}", e)),
+                    }
+                }
+            }
+            Action::ExportHtmlPdf => {
+                if let Some(path) = rfd::FileDialog::new()
+                    .set_file_name("MLA_Paper_Printable.html")
+                    .add_filter("Printable HTML (*.html)", &["html"])
+                    .save_file()
+                {
+                    match export_to_html(&self.doc, &path) {
+                        Ok(_) => self.set_notification(format!(
+                            "Exported Printable HTML: {}",
+                            path.display()
+                        )),
+                        Err(e) => self.set_notification(format!("HTML export error: {}", e)),
+                    }
+                }
+            }
+            Action::AddParagraph => {
+                self.doc.add_paragraph(self.active_block_index);
+            }
+            Action::InsertBlockQuote => {
+                self.doc.add_blockquote(self.active_block_index);
+            }
+            Action::InsertHeading1 => {
+                self.doc.add_heading(1, self.active_block_index);
+            }
+            Action::InsertHeading2 => {
+                self.doc.add_heading(2, self.active_block_index);
+            }
+            Action::InsertCitation => {
+                self.citation_state.open(self.active_block_index);
+            }
+            Action::ManageWorksCited => {
+                self.works_cited_state.open_new();
+            }
+            Action::ConvertToMlaTitleCase => {
+                self.doc.title = to_mla_title_case(&self.doc.title);
+                self.doc.is_dirty = true;
+                self.set_notification("Formatted title to MLA Title Case.");
+            }
+            Action::OpenPreferences => {
+                self.settings_state.is_open = true;
+            }
+            Action::ToggleComplianceCheck => {
+                self.compliance_state.is_open = true;
+            }
+            Action::ToggleFocusMode => {
+                self.focus_mode = !self.focus_mode;
+            }
+        }
+    }
+}
+
+impl eframe::App for MlaApp {
+    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
+        // Transparent clear color allows OS acrylic / mica / blur to shine through
+        [0.0, 0.0, 0.0, 0.0]
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+        // Handle vibrancy application
+        if self.vibrancy_dirty {
+            if let Some(window) = frame.winit_window() {
+                self.theme.apply_vibrancy_to_window(window.as_ref());
+                self.vibrancy_dirty = false;
+            }
+        }
+
+        // Check global custom shortcuts
+        let input = ui.input(|i| i.clone());
+        for &action in Action::all() {
+            if self.keybinds.check_action(action, &input) {
+                self.handle_action(action);
+                break;
+            }
+        }
+
+        // Outer App Container with customizable window opacity & tint
+        egui::Frame::new()
+            .fill(self.theme.window_fill_color())
+            .inner_margin(egui::Margin::symmetric(14, 10))
+            .show(ui, |ui| {
+                // Top Toolbar (hidden in Focus Mode for total immersion)
+                if !self.focus_mode {
+                    if let Some(tb_event) =
+                        render_toolbar(ui, &self.doc, &self.theme, &self.keybinds, self.focus_mode)
+                    {
+                        match tb_event {
+                            ToolbarEvent::NewDoc => self.handle_action(Action::NewDocument),
+                            ToolbarEvent::OpenDoc => self.handle_action(Action::OpenDocument),
+                            ToolbarEvent::SaveDoc => self.handle_action(Action::SaveDocument),
+                            ToolbarEvent::ExportDocx => self.handle_action(Action::ExportDocx),
+                            ToolbarEvent::ExportHtml => self.handle_action(Action::ExportHtmlPdf),
+                            ToolbarEvent::ExportText => {
+                                if let Some(path) = rfd::FileDialog::new()
+                                    .set_file_name("MLA_Paper.txt")
+                                    .add_filter("Text File (*.txt)", &["txt"])
+                                    .save_file()
+                                {
+                                    let _ = export_to_text(&self.doc, &path);
+                                    self.set_notification("Exported plain text.");
+                                }
+                            }
+                            ToolbarEvent::AddParagraph => self.handle_action(Action::AddParagraph),
+                            ToolbarEvent::AddBlockquote => {
+                                self.handle_action(Action::InsertBlockQuote)
+                            }
+                            ToolbarEvent::AddHeading(level) => {
+                                if level == 1 {
+                                    self.handle_action(Action::InsertHeading1);
+                                } else {
+                                    self.handle_action(Action::InsertHeading2);
+                                }
+                            }
+                            ToolbarEvent::InsertCitation => {
+                                self.handle_action(Action::InsertCitation)
+                            }
+                            ToolbarEvent::FormatTitleCase => {
+                                self.handle_action(Action::ConvertToMlaTitleCase)
+                            }
+                            ToolbarEvent::OpenWorksCited => {
+                                self.handle_action(Action::ManageWorksCited)
+                            }
+                            ToolbarEvent::OpenCompliance => {
+                                self.handle_action(Action::ToggleComplianceCheck)
+                            }
+                            ToolbarEvent::OpenSettings => {
+                                self.handle_action(Action::OpenPreferences)
+                            }
+                            ToolbarEvent::ToggleFocusMode => {
+                                self.handle_action(Action::ToggleFocusMode)
+                            }
+                        }
+                    }
+                    ui.add_space(4.0);
+                }
+
+                // Temporary notification toast banner
+                if let Some((msg, created)) = &self.notification {
+                    if created.elapsed().as_secs() < 4 {
+                        ui.horizontal(|ui| {
+                            ui.colored_label(
+                                egui::Color32::from_rgb(100, 200, 255),
+                                format!("ℹ {}", msg),
+                            );
+                        });
+                    }
+                }
+
+                // Core Editor Canvas
+                let editor_action = render_editor_page(
+                    ui,
+                    &mut self.doc,
+                    &self.theme,
+                    &mut self.active_block_index,
+                );
+
+                if let Some(ea) = editor_action {
+                    match ea {
+                        EditorAction::OpenCitationModal(block_idx) => {
+                            self.citation_state.open(Some(block_idx));
+                        }
+                        EditorAction::OpenWorksCitedModal(maybe_idx) => {
+                            if let Some(idx) = maybe_idx {
+                                let entry = self.doc.works_cited[idx].clone();
+                                self.works_cited_state.open_edit(idx, &entry);
+                            } else {
+                                self.works_cited_state.open_new();
+                            }
+                        }
+                        EditorAction::RequestRepaint => {}
+                    }
+                }
+
+                // Bottom Status Bar
+                if !self.focus_mode {
+                    ui.separator();
+                    render_status_bar(ui, &self.doc, &self.theme);
+                }
+            });
+
+        // --- Render Modals ---
+        let mut citation_insert = None;
+        render_citation_modal(
+            ui.ctx(),
+            &mut self.citation_state,
+            &self.doc.works_cited,
+            &self.theme,
+            &mut citation_insert,
+        );
+
+        if let Some((target_block_idx, cite_str)) = citation_insert {
+            if target_block_idx < self.doc.blocks.len() {
+                let block = &mut self.doc.blocks[target_block_idx];
+                let t = block.text_mut();
+                if !t.is_empty() && !t.ends_with(' ') {
+                    t.push(' ');
+                }
+                t.push_str(&cite_str);
+                self.doc.is_dirty = true;
+                self.set_notification("Citation inserted.");
+            }
+        }
+
+        render_works_cited_modal(
+            ui.ctx(),
+            &mut self.works_cited_state,
+            &mut self.doc.works_cited,
+            &self.theme,
+        );
+
+        render_compliance_modal(
+            ui.ctx(),
+            &mut self.compliance_state,
+            &mut self.doc,
+            &self.theme,
+        );
+
+        render_settings_modal(
+            ui.ctx(),
+            &mut self.settings_state,
+            &mut self.theme,
+            &mut self.keybinds,
+            &mut self.vibrancy_dirty,
+        );
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+struct SavedConfig {
+    theme: Option<ThemeConfig>,
+    keybinds: Option<KeybindConfig>,
+}
+
+fn config_path() -> PathBuf {
+    // Portable config in current working directory first, fallback to user directory
+    let local = Path::new("mla_config.json");
+    if local.exists() {
+        return local.to_path_buf();
+    }
+    local.to_path_buf()
+}
+
+fn load_config() -> (ThemeConfig, KeybindConfig) {
+    let path = config_path();
+    if let Ok(content) = std::fs::read_to_string(&path) {
+        if let Ok(cfg) = serde_json::from_str::<SavedConfig>(&content) {
+            return (
+                cfg.theme.unwrap_or_default(),
+                cfg.keybinds.unwrap_or_default(),
+            );
+        }
+    }
+    (ThemeConfig::default(), KeybindConfig::default())
+}
