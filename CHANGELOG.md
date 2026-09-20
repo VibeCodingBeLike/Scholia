@@ -32,9 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Native OS blur/vibrancy: Windows 11 Mica, Windows 10/11 Acrylic, macOS Vibrancy.
   - Transparent writing paper sheet with independent opacity slider.
   - Presets: Frosted Obsidian, Frosted Parchment, Nordic Frost, Amber Glass, and Custom RGB palettes.
-- **Custom Keybindings**:
-  - Remappable shortcuts for all 15 editor actions.
-  - Full GUI shortcut customizer in Preferences.
+- **Custom Keybindings & Live Shortcut Preview**:
+  - Remappable shortcuts for all 15 editor actions with full GUI customizer.
+  - Live keybind preview sidebar on the left displaying custom shortcuts with styled keycap badges.
+  - Responsive layout: automatically collapses and hides the preview panel when the window is too narrow to fit both the sidebar and the manuscript page.
+- **Distraction-Free Zen Mode**:
+  - Fullscreen writing mode with multiple instant exit safeguards: `Escape` key, `F11`, and a floating frosted exit button.
 - **High-Fidelity Document Exporters**:
   - Microsoft Word `.docx` exporter with exact MLA margin and spacing twips.
   - Print-ready HTML exporter with embedded `@page` CSS for 1-click PDF printing.

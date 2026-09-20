@@ -129,4 +129,3 @@ fn test_font_configuration_and_nerd_icons() {
     let doc_font = the_best_mla_writer::fonts::doc_font(16.0);
     assert_eq!(doc_font.size, 16.0);
 }
-

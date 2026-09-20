@@ -209,6 +209,17 @@ impl ThemeConfig {
         )
     }
 
+    /// Color for floating cards, sidebars, and popups
+    pub fn card_fill_color(&self) -> egui::Color32 {
+        let a = ((self.page_opacity * 0.85).clamp(0.1, 0.95) * 255.0) as u8;
+        egui::Color32::from_rgba_premultiplied(
+            ((self.page_tint_rgb[0] as f32) * (a as f32 / 255.0)) as u8,
+            ((self.page_tint_rgb[1] as f32) * (a as f32 / 255.0)) as u8,
+            ((self.page_tint_rgb[2] as f32) * (a as f32 / 255.0)) as u8,
+            a,
+        )
+    }
+
     pub fn text_color(&self) -> egui::Color32 {
         egui::Color32::from_rgb(self.text_rgb[0], self.text_rgb[1], self.text_rgb[2])
     }

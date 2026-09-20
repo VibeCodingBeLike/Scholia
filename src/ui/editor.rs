@@ -1,4 +1,5 @@
 use crate::fonts::{doc_font, icons};
+use crate::keybinds::{Action, KeybindConfig};
 use crate::model::format_current_mla_date;
 use crate::model::MlaDocument;
 use crate::theme::ThemeConfig;
@@ -7,12 +8,15 @@ use egui::{RichText, Ui};
 pub enum EditorAction {
     OpenCitationModal(Option<usize>),
     OpenWorksCitedModal(Option<usize>),
+    TriggerAction(Action),
 }
 
 pub fn render_editor_page(
     ui: &mut Ui,
     doc: &mut MlaDocument,
     theme: &ThemeConfig,
+    keybinds: &KeybindConfig,
+    focus_mode: bool,
 ) -> Option<EditorAction> {
     let mut action = None;
     let text_col = theme.text_color();
@@ -27,15 +31,41 @@ pub fn render_editor_page(
         .show(ui, |ui| {
             ui.add_space(20.0);
 
-            // Compute centered page dimensions (Standard 8.5" x 11" Paper at 96 DPI: 816px wide)
+            // Compute dimensions
             let total_avail = ui.available_width();
             let page_width = 816.0f32.min(total_avail - 48.0).max(420.0);
-            let margin_left = ((total_avail - page_width) / 2.0).max(0.0);
+            let sidebar_width = 224.0f32;
+            let gap = 24.0f32;
+
+            // Disappear if window cannot comfortably fit both sidebar and page, or in Zen mode
+            let show_sidebar = !focus_mode && (total_avail >= page_width + sidebar_width + gap + 40.0);
+
+            let total_content_width = if show_sidebar {
+                page_width + sidebar_width + gap
+            } else {
+                page_width
+            };
+
+            let margin_left = ((total_avail - total_content_width) / 2.0).max(0.0);
 
             // Center container
-            ui.horizontal(|ui| {
+            ui.horizontal_top(|ui| {
                 if margin_left > 0.0 {
                     ui.add_space(margin_left);
+                }
+
+                // --- KEYBIND PREVIEW PANEL ON THE LEFT ---
+                if show_sidebar {
+                    ui.vertical(|ui| {
+                        ui.set_width(sidebar_width);
+                        ui.set_min_width(sidebar_width);
+                        ui.set_max_width(sidebar_width);
+                        if let Some(act) = render_keybind_preview_panel(ui, theme, keybinds, sidebar_width) {
+                            action = Some(EditorAction::TriggerAction(act));
+                        }
+                    });
+
+                    ui.add_space(gap);
                 }
 
                 // Vertical column holding the pages
@@ -318,4 +348,173 @@ pub fn render_editor_page(
         });
 
     action
+}
+
+fn render_keybind_preview_panel(
+    ui: &mut Ui,
+    theme: &ThemeConfig,
+    keybinds: &KeybindConfig,
+    sidebar_width: f32,
+) -> Option<Action> {
+    let mut triggered = None;
+    let accent_col = theme.accent_color();
+    let muted_col = theme.muted_text_color();
+
+    egui::Frame::new()
+        .fill(theme.card_fill_color())
+        .stroke(theme.page_stroke())
+        .corner_radius(8.0)
+        .inner_margin(egui::Margin::symmetric(12, 12))
+        .show(ui, |ui| {
+            ui.set_width(sidebar_width);
+            ui.set_min_width(sidebar_width);
+            ui.set_max_width(sidebar_width);
+            ui.spacing_mut().item_spacing.y = 5.0;
+
+            // Header
+            ui.horizontal(|ui| {
+                ui.label(
+                    RichText::new(format!("{} Shortcuts", icons::EDIT))
+                        .strong()
+                        .size(13.0)
+                        .color(accent_col),
+                );
+            });
+            ui.label(
+                RichText::new("Live custom keybinds")
+                    .size(10.5)
+                    .color(muted_col),
+            );
+
+            ui.add_space(2.0);
+            ui.separator();
+
+            // Group 1: Writing & MLA
+            ui.label(
+                RichText::new("WRITING & MLA")
+                    .size(9.5)
+                    .strong()
+                    .color(muted_col),
+            );
+
+            let actions_writing = [
+                (Action::AddParagraph, icons::PARAGRAPH, "Paragraph"),
+                (Action::InsertCitation, icons::QUOTE, "Citation"),
+                (Action::InsertBlockQuote, icons::QUOTE, "Block Quote"),
+                (
+                    Action::ConvertToMlaTitleCase,
+                    icons::TITLE_CASE,
+                    "Title Case",
+                ),
+                (Action::InsertHeading1, icons::HEADING, "Heading 1"),
+                (Action::InsertHeading2, icons::HEADING, "Heading 2"),
+            ];
+
+            for (act, icon, label) in actions_writing {
+                let sc = keybinds.get_shortcut(act).display_string();
+                if render_keybind_row(ui, theme, icon, label, &sc) {
+                    triggered = Some(act);
+                }
+            }
+
+            ui.add_space(3.0);
+            ui.separator();
+
+            // Group 2: File & Sources
+            ui.label(
+                RichText::new("FILE & SOURCES")
+                    .size(9.5)
+                    .strong()
+                    .color(muted_col),
+            );
+
+            let actions_file = [
+                (Action::SaveDocument, icons::SAVE, "Save"),
+                (
+                    Action::ManageWorksCited,
+                    icons::BOOK_CITATIONS,
+                    "Works Cited",
+                ),
+                (Action::ExportDocx, icons::WORD_DOCX, "Export Word"),
+                (Action::ExportHtmlPdf, icons::HTML_PDF, "Export HTML"),
+                (Action::NewDocument, icons::FILE_NEW, "New Paper"),
+                (Action::OpenDocument, icons::FOLDER_OPEN, "Open Paper"),
+            ];
+
+            for (act, icon, label) in actions_file {
+                let sc = keybinds.get_shortcut(act).display_string();
+                if render_keybind_row(ui, theme, icon, label, &sc) {
+                    triggered = Some(act);
+                }
+            }
+
+            ui.add_space(3.0);
+            ui.separator();
+
+            // Group 3: View & Tools
+            ui.label(
+                RichText::new("VIEW & TOOLS")
+                    .size(9.5)
+                    .strong()
+                    .color(muted_col),
+            );
+
+            let actions_tools = [
+                (Action::ToggleFocusMode, icons::FOCUS_MODE, "Zen Mode"),
+                (Action::ToggleComplianceCheck, icons::CHECK, "MLA Linter"),
+                (Action::OpenPreferences, icons::SETTINGS, "Preferences"),
+            ];
+
+            for (act, icon, label) in actions_tools {
+                let sc = keybinds.get_shortcut(act).display_string();
+                if render_keybind_row(ui, theme, icon, label, &sc) {
+                    triggered = Some(act);
+                }
+            }
+        });
+
+    triggered
+}
+
+fn render_keybind_row(ui: &mut Ui, theme: &ThemeConfig, icon: &str, label: &str, sc: &str) -> bool {
+    let mut clicked = false;
+    let text_col = theme.text_color();
+
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        let btn = ui.add(
+            egui::Button::new(
+                RichText::new(format!("{} {}", icon, label))
+                    .size(11.0)
+                    .color(text_col),
+            )
+            .frame(false),
+        );
+        if btn.clicked() {
+            clicked = true;
+        }
+
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let badge = egui::Frame::new()
+                .fill(egui::Color32::from_black_alpha(45))
+                .stroke(egui::Stroke::new(1.0, egui::Color32::from_white_alpha(30)))
+                .corner_radius(4.0)
+                .inner_margin(egui::Margin::symmetric(4, 2));
+
+            let badge_resp = badge.show(ui, |ui| {
+                ui.label(
+                    RichText::new(sc)
+                        .size(10.0)
+                        .monospace()
+                        .color(theme.accent_color())
+                        .strong(),
+                );
+            });
+            if badge_resp.response.interact(egui::Sense::click()).clicked() {
+                clicked = true;
+            }
+        });
+    });
+
+    clicked
 }

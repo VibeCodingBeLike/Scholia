@@ -238,6 +238,49 @@ impl eframe::App for MlaApp {
             }
         }
 
+        // If in Zen / Focus Mode, Escape key or F11 unconditionally exits!
+        if self.focus_mode {
+            let input = ui.input(|i| i.clone());
+            if input.key_pressed(egui::Key::Escape) || input.key_pressed(egui::Key::F11) {
+                self.focus_mode = false;
+                self.set_notification("Exited Zen Mode.");
+            }
+        }
+
+        // Floating Exit Zen Mode button when in Zen Mode
+        if self.focus_mode {
+            egui::Area::new(egui::Id::new("zen_mode_floating_exit_pill"))
+                .anchor(egui::Align2::RIGHT_TOP, [-24.0, 16.0])
+                .order(egui::Order::Foreground)
+                .show(ui.ctx(), |ui| {
+                    egui::Frame::new()
+                        .fill(self.theme.card_fill_color())
+                        .stroke(self.theme.page_stroke())
+                        .corner_radius(20.0)
+                        .inner_margin(egui::Margin::symmetric(14, 8))
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                if ui
+                                    .button(
+                                        egui::RichText::new(format!(
+                                            "{} Exit Zen Mode (Esc)",
+                                            fonts::icons::FOCUS_MODE
+                                        ))
+                                        .strong()
+                                        .size(12.5)
+                                        .color(self.theme.accent_color()),
+                                    )
+                                    .on_hover_text("Click or press Escape / F11 to exit Zen Mode")
+                                    .clicked()
+                                {
+                                    self.focus_mode = false;
+                                    self.set_notification("Exited Zen Mode.");
+                                }
+                            });
+                        });
+                });
+        }
+
         // Outer App Container with customizable window opacity & tint
         egui::Frame::new()
             .fill(self.theme.window_fill_color())
@@ -311,7 +354,13 @@ impl eframe::App for MlaApp {
                 }
 
                 // Core Editor Canvas
-                let editor_action = render_editor_page(ui, &mut self.doc, &self.theme);
+                let editor_action = render_editor_page(
+                    ui,
+                    &mut self.doc,
+                    &self.theme,
+                    &self.keybinds,
+                    self.focus_mode,
+                );
 
                 if let Some(ea) = editor_action {
                     match ea {
@@ -325,6 +374,9 @@ impl eframe::App for MlaApp {
                             } else {
                                 self.works_cited_state.open_new();
                             }
+                        }
+                        EditorAction::TriggerAction(act) => {
+                            self.handle_action(act);
                         }
                     }
                 }
