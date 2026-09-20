@@ -35,7 +35,7 @@ pub fn render_toolbar(
     let accent_col = theme.accent_color();
 
     ui.horizontal_wrapped(|ui| {
-        ui.spacing_mut().item_spacing.x = 6.0;
+        ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
 
         // Brand / Title
         ui.label(
@@ -244,38 +244,44 @@ pub fn render_toolbar(
             event = Some(ToolbarEvent::OpenCompliance);
         }
 
-        // Right-aligned settings & focus mode
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let focus_sc = keybinds
-                .get_shortcut(Action::ToggleFocusMode)
-                .display_string();
-            let focus_text = if focus_mode {
-                format!("{} Exit Zen", icons::FOCUS_MODE)
-            } else {
-                format!("{} Zen Mode", icons::FOCUS_MODE)
-            };
-            if ui
-                .button(RichText::new(focus_text).color(text_col))
-                .on_hover_text(format!("Toggle Distraction-Free Zen Mode ({})", focus_sc))
-                .clicked()
-            {
-                event = Some(ToolbarEvent::ToggleFocusMode);
-            }
+        // Push Zen Mode & Preferences to the right when space allows, with guaranteed padding and no overlap
+        let right_buttons_width = 240.0;
+        let avail = ui.available_width();
+        if avail > right_buttons_width + 16.0 {
+            ui.add_space(avail - right_buttons_width - 8.0);
+        } else {
+            ui.add_space(8.0);
+        }
 
-            let pref_sc = keybinds
-                .get_shortcut(Action::OpenPreferences)
-                .display_string();
-            if ui
-                .button(RichText::new(format!("{} Preferences", icons::SETTINGS)).color(text_col))
-                .on_hover_text(format!(
-                    "Customize Transparency, Themes & Keybinds ({})",
-                    pref_sc
-                ))
-                .clicked()
-            {
-                event = Some(ToolbarEvent::OpenSettings);
-            }
-        });
+        let focus_sc = keybinds
+            .get_shortcut(Action::ToggleFocusMode)
+            .display_string();
+        let focus_text = if focus_mode {
+            format!("{} Exit Zen", icons::FOCUS_MODE)
+        } else {
+            format!("{} Zen Mode", icons::FOCUS_MODE)
+        };
+        if ui
+            .button(RichText::new(focus_text).color(text_col))
+            .on_hover_text(format!("Toggle Distraction-Free Zen Mode ({})", focus_sc))
+            .clicked()
+        {
+            event = Some(ToolbarEvent::ToggleFocusMode);
+        }
+
+        let pref_sc = keybinds
+            .get_shortcut(Action::OpenPreferences)
+            .display_string();
+        if ui
+            .button(RichText::new(format!("{} Preferences", icons::SETTINGS)).color(text_col))
+            .on_hover_text(format!(
+                "Customize Transparency, Themes & Keybinds ({})",
+                pref_sc
+            ))
+            .clicked()
+        {
+            event = Some(ToolbarEvent::OpenSettings);
+        }
     });
 
     event

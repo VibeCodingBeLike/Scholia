@@ -8,6 +8,7 @@ use egui::{RichText, Ui};
 pub enum EditorAction {
     OpenCitationModal(Option<usize>),
     OpenWorksCitedModal(Option<usize>),
+    OpenCalendar(egui::Pos2),
     TriggerAction(Action),
 }
 
@@ -162,9 +163,16 @@ pub fn render_editor_page(
                                     doc.is_dirty = true;
                                 }
 
-                                if ui.small_button(format!("{} Today", icons::CALENDAR)).on_hover_text("Insert current date in MLA format").clicked() {
+                                let today_btn = ui.small_button(format!("{} Today", icons::CALENDAR))
+                                    .on_hover_text("Left-click: Insert today's date\nRight-click: Open calendar date picker");
+
+                                if today_btn.clicked() {
                                     doc.header.date = format_current_mla_date();
                                     doc.is_dirty = true;
+                                }
+
+                                if today_btn.secondary_clicked() {
+                                    action = Some(EditorAction::OpenCalendar(today_btn.rect.left_bottom() + egui::vec2(0.0, 4.0)));
                                 }
                             });
                         });

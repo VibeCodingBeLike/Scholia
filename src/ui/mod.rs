@@ -1,3 +1,4 @@
+pub mod calendar_dialog;
 pub mod citation_dialog;
 pub mod compliance_dialog;
 pub mod editor;
@@ -6,6 +7,7 @@ pub mod status_bar;
 pub mod toolbar;
 pub mod works_cited_dialog;
 
+pub use calendar_dialog::{render_calendar_popup, CalendarModalState};
 pub use citation_dialog::{render_citation_modal, CitationModalState};
 pub use compliance_dialog::{render_compliance_modal, ComplianceModalState};
 pub use editor::{render_editor_page, EditorAction};

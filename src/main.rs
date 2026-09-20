@@ -15,9 +15,10 @@ use keybinds::{Action, KeybindConfig};
 use model::{to_mla_title_case, MlaDocument};
 use theme::ThemeConfig;
 use ui::{
-    render_citation_modal, render_compliance_modal, render_editor_page, render_settings_modal,
-    render_status_bar, render_toolbar, render_works_cited_modal, CitationModalState,
-    ComplianceModalState, EditorAction, SettingsModalState, ToolbarEvent, WorksCitedModalState,
+    render_calendar_popup, render_citation_modal, render_compliance_modal, render_editor_page,
+    render_settings_modal, render_status_bar, render_toolbar, render_works_cited_modal,
+    CalendarModalState, CitationModalState, ComplianceModalState, EditorAction, SettingsModalState,
+    ToolbarEvent, WorksCitedModalState,
 };
 
 fn main() -> eframe::Result<()> {
@@ -51,6 +52,7 @@ struct MlaApp {
     citation_state: CitationModalState,
     compliance_state: ComplianceModalState,
     settings_state: SettingsModalState,
+    calendar_state: CalendarModalState,
 
     focus_mode: bool,
     vibrancy_dirty: bool,
@@ -70,6 +72,7 @@ impl MlaApp {
             citation_state: CitationModalState::default(),
             compliance_state: ComplianceModalState::default(),
             settings_state: SettingsModalState::default(),
+            calendar_state: CalendarModalState::default(),
             focus_mode: false,
             vibrancy_dirty: true, // Apply vibrancy on first frame
             notification: None,
@@ -375,6 +378,9 @@ impl eframe::App for MlaApp {
                                 self.works_cited_state.open_new();
                             }
                         }
+                        EditorAction::OpenCalendar(pos) => {
+                            self.calendar_state.open_at(pos, &self.doc.header.date);
+                        }
                         EditorAction::TriggerAction(act) => {
                             self.handle_action(act);
                         }
@@ -431,6 +437,14 @@ impl eframe::App for MlaApp {
             &mut self.theme,
             &mut self.keybinds,
             &mut self.vibrancy_dirty,
+        );
+
+        render_calendar_popup(
+            ui.ctx(),
+            &mut self.calendar_state,
+            &mut self.doc.header.date,
+            &mut self.doc.is_dirty,
+            &self.theme,
         );
     }
 }

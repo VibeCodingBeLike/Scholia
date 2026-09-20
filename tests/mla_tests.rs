@@ -129,3 +129,38 @@ fn test_font_configuration_and_nerd_icons() {
     let doc_font = the_best_mla_writer::fonts::doc_font(16.0);
     assert_eq!(doc_font.size, 16.0);
 }
+
+#[test]
+fn test_calendar_modal_state() {
+    use the_best_mla_writer::ui::calendar_dialog::{month_number_to_name, CalendarModalState};
+
+    let mut state = CalendarModalState {
+        is_open: false,
+        current_year: 2026,
+        current_month: 9,
+        popup_pos: None,
+    };
+
+    assert_eq!(month_number_to_name(state.current_month), "September");
+
+    // Test next month
+    state.next_month();
+    assert_eq!(state.current_month, 10);
+    assert_eq!(state.current_year, 2026);
+
+    // Test prev month
+    state.prev_month();
+    assert_eq!(state.current_month, 9);
+
+    // Test year wrap-around
+    state.current_month = 1;
+    state.prev_month();
+    assert_eq!(state.current_month, 12);
+    assert_eq!(state.current_year, 2025);
+
+    // Test open_at with existing date string
+    state.open_at(egui::pos2(100.0, 100.0), "15 March 2027");
+    assert!(state.is_open);
+    assert_eq!(state.current_month, 3);
+    assert_eq!(state.current_year, 2027);
+}

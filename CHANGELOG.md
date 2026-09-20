@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Centered document title with intelligent MLA Title Case converter.
   - Dedicated Block Quote blocks (>4 lines) with 0.5 in left indentation.
   - MLA Section Headings (Level 1 Bold, Level 2 Italics, Level 3 Centered Bold).
+  - Interactive right-click calendar popup on the "Today" button with month/year navigation and 1-click MLA date formatting.
 - **Works Cited Manager**:
   - Full support for the MLA 9th Edition 9 Core Elements container model.
   - Automatic alphabetical sorting by author or primary title.
