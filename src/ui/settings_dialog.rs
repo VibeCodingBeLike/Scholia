@@ -12,7 +12,6 @@ pub struct SettingsModalState {
 pub enum SettingsTab {
     TransparencyAndTheme,
     Keybindings,
-    AboutMla,
 }
 
 impl Default for SettingsModalState {
@@ -58,11 +57,6 @@ pub fn render_settings_modal(
                     SettingsTab::Keybindings,
                     "⌨️ Custom Keybinds",
                 );
-                ui.selectable_value(
-                    &mut state.selected_tab,
-                    SettingsTab::AboutMla,
-                    "📖 MLA 9 Standards Guide",
-                );
             });
 
             ui.separator();
@@ -73,9 +67,6 @@ pub fn render_settings_modal(
                 }
                 SettingsTab::Keybindings => {
                     render_keybindings_tab(ui, keybinds, theme);
-                }
-                SettingsTab::AboutMla => {
-                    render_mla_guide_tab(ui, theme);
                 }
             }
 
@@ -342,25 +333,3 @@ fn render_keybindings_tab(ui: &mut egui::Ui, keybinds: &mut KeybindConfig, theme
     });
 }
 
-fn render_mla_guide_tab(ui: &mut egui::Ui, theme: &ThemeConfig) {
-    egui::ScrollArea::vertical().show(ui, |ui| {
-        ui.spacing_mut().item_spacing.y = 8.0;
-
-        ui.heading("Modern Language Association (MLA) 9th Edition Quick Rules");
-
-        ui.label(RichText::new("1. Document Geometry").strong().color(theme.accent_color()));
-        ui.label("• Margins: Exactly 1.0 inch (72 points) on all four sides.\n• Spacing: Strict double spacing throughout the entire paper—no extra space between paragraphs or headings.\n• Font: Legible standard serif (e.g. Times New Roman) strictly 12 pt throughout.");
-
-        ui.label(RichText::new("2. First-Page Identification & Header").strong().color(theme.accent_color()));
-        ui.label("• Student Name, Instructor Name, Course Title, and Date aligned flush left on four consecutive double-spaced lines.\n• Date format: Day Month Year (e.g., 20 September 2026).\n• Running Head: Student's last name + Page Number at top-right 0.5 in from top edge.");
-
-        ui.label(RichText::new("3. Paper Title").strong().color(theme.accent_color()));
-        ui.label("• Centered, standard 12pt font.\n• Not bolded, underlined, italicized, or placed in quotation marks.\n• Follows MLA Title Capitalization rules.");
-
-        ui.label(RichText::new("4. Body Paragraphs & Block Quotes").strong().color(theme.accent_color()));
-        ui.label("• First line of every body paragraph indented exactly 0.5 inches.\n• Quotations exceeding 4 lines of prose or 3 lines of verse are formatted as Block Quotes: indented 0.5 in from left margin, quotation marks omitted, and parenthetical citation outside the final period.");
-
-        ui.label(RichText::new("5. Works Cited Page").strong().color(theme.accent_color()));
-        ui.label("• Starts on a separate page at the end of the manuscript.\n• Centered heading 'Works Cited' (or 'Work Cited' if only one source).\n• 0.5-inch hanging indent for each entry.\n• Alphabetized by author's last name or title.");
-    });
-}

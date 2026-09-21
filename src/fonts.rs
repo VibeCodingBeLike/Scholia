@@ -1,5 +1,4 @@
 use egui::{FontData, FontDefinitions, FontFamily, FontId};
-use std::path::PathBuf;
 use std::sync::Arc;
 
 pub mod icons {
@@ -37,6 +36,10 @@ pub const MLA_DOC_FONT: &str = "TimesNewRoman";
 pub const EMBEDDED_NERD_FONT: &[u8] =
     include_bytes!("../assets/fonts/JetBrainsMonoNerdFont-Regular.ttf");
 
+/// Times New Roman bundled directly — ensures consistent MLA/PDF output across all machines
+pub const EMBEDDED_TIMES_NEW_ROMAN: &[u8] =
+    include_bytes!("../assets/fonts/TimesNewRoman-Regular.ttf");
+
 pub fn doc_font_family() -> FontFamily {
     FontFamily::Name(Arc::from(MLA_DOC_FONT))
 }
@@ -55,17 +58,11 @@ pub fn configure_fonts(ctx: &egui::Context) {
         Arc::new(FontData::from_static(EMBEDDED_NERD_FONT)),
     );
 
-    // 2. Locate and load Times New Roman for MLA paper manuscript if available
-    let mut times_loaded = false;
-    if let Some(times_path) = find_times_new_roman() {
-        if let Ok(bytes) = std::fs::read(&times_path) {
-            fonts.font_data.insert(
-                MLA_DOC_FONT.to_string(),
-                Arc::new(FontData::from_owned(bytes)),
-            );
-            times_loaded = true;
-        }
-    }
+    // 2. Bundled Times New Roman - always available, guarantees consistent MLA/PDF rendering
+    fonts.font_data.insert(
+        MLA_DOC_FONT.to_string(),
+        Arc::new(FontData::from_static(EMBEDDED_TIMES_NEW_ROMAN)),
+    );
 
     // 3. Use the Nerd Font for the ENTIRE APP (UI, buttons, menus, dialogs, badges) and icons
     if let Some(prop) = fonts.families.get_mut(&FontFamily::Proportional) {
@@ -75,53 +72,12 @@ pub fn configure_fonts(ctx: &egui::Context) {
         mono.insert(0, "NerdFont".to_string());
     }
 
-    // 4. Register MLA Document Family (Times New Roman with NerdFont fallback for symbols/icons)
-    let mut doc_family_list = Vec::new();
-    if times_loaded {
-        doc_family_list.push(MLA_DOC_FONT.to_string());
-    }
-    doc_family_list.push("NerdFont".to_string());
-    doc_family_list.push("Hack".to_string());
+    // 4. Register MLA Document Family: bundled Times New Roman + NerdFont for icon fallback
+    let doc_family_list = vec![
+        MLA_DOC_FONT.to_string(),
+        "NerdFont".to_string(),
+    ];
     fonts.families.insert(doc_font_family(), doc_family_list);
 
     ctx.set_fonts(fonts);
-}
-
-fn find_times_new_roman() -> Option<PathBuf> {
-    let mut candidates = vec![
-        PathBuf::from(r"C:\Windows\Fonts\times.ttf"),
-        PathBuf::from(r"C:\Windows\Fonts\timesi.ttf"),
-    ];
-
-    if let Ok(local) = std::env::var("LOCALAPPDATA") {
-        candidates.push(PathBuf::from(&local).join(r"Microsoft\Windows\Fonts\times.ttf"));
-        candidates.push(
-            PathBuf::from(&local).join(r"Microsoft\Windows\Fonts\TimesNewerRoman-Regular.otf"),
-        );
-    }
-
-    // macOS
-    candidates.push(PathBuf::from(
-        "/System/Library/Fonts/Supplemental/Times New Roman.ttf",
-    ));
-    candidates.push(PathBuf::from("/Library/Fonts/Times New Roman.ttf"));
-
-    // Linux
-    candidates.push(PathBuf::from(
-        "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf",
-    ));
-    candidates.push(PathBuf::from("/usr/share/fonts/TTF/times.ttf"));
-    candidates.push(PathBuf::from(
-        "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
-    ));
-    candidates.push(PathBuf::from(
-        "/usr/share/fonts/truetype/freefont/FreeSerif.ttf",
-    ));
-
-    for path in &candidates {
-        if path.exists() && path.is_file() {
-            return Some(path.clone());
-        }
-    }
-    None
 }

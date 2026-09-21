@@ -316,19 +316,18 @@ impl eframe::App for MlaApp {
             }
         }
 
-        // Outer App Container with ZERO top/bottom margin gap
+        // Outer App Container — 8px top/bottom padding for visual breathing room
         egui::Frame::NONE
             .fill(self.theme.window_fill_color())
             .inner_margin(egui::Margin {
                 left: 12,
                 right: 12,
-                top: 0,
-                bottom: 2,
+                top: 8,
+                bottom: 8,
             })
             .show(ui, |ui| {
                 // Top Toolbar (hidden in Focus Mode for total immersion)
                 if !self.focus_mode {
-                    ui.add_space(2.0);
                     if let Some(tb_event) =
                         render_toolbar(ui, &self.doc, &self.theme, &self.keybinds, self.focus_mode)
                     {
@@ -365,7 +364,6 @@ impl eframe::App for MlaApp {
                             }
                         }
                     }
-                    ui.add_space(2.0);
                 }
 
                 // Core Editor Canvas
@@ -401,7 +399,6 @@ impl eframe::App for MlaApp {
 
                 // Bottom Status Bar (no grey separator line, flush to bottom)
                 if !self.focus_mode {
-                    ui.add_space(2.0);
                     if let Some(StatusBarEvent::OpenCompliance) =
                         render_status_bar(ui, &self.doc, &self.theme)
                     {

@@ -263,7 +263,7 @@ fn test_block_deletion_focus_and_keybinds() {
 
     // Verify keybinds are registered
     let cfg = KeybindConfig::default();
-    assert_eq!(cfg.get_shortcut(Action::DeleteBlock).display_string(), "Ctrl+Del");
+    assert_eq!(cfg.get_shortcut(Action::DeleteBlock).display_string(), "Ctrl+Backspace");
     assert_eq!(cfg.get_shortcut(Action::MoveBlockUp).display_string(), "Alt+Up");
     assert_eq!(cfg.get_shortcut(Action::MoveBlockDown).display_string(), "Alt+Down");
     assert_eq!(cfg.get_shortcut(Action::InsertHeading3).display_string(), "Ctrl+Alt+3");
