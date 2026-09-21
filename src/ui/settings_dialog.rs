@@ -43,12 +43,16 @@ pub fn render_settings_modal(
     let mut open = true;
     let mut close_modal = false;
 
+    let screen_h = ctx.input(|i| i.viewport().inner_rect.map(|r| r.height()).unwrap_or(700.0));
+    let default_h = (screen_h * 0.80).round();
+
     Window::new("Preferences & Customization")
         .open(&mut open)
         .resizable(true)
         .frame(theme.modal_frame())
-        .default_width(640.0)
-        .default_height(540.0)
+        .default_width(650.0)
+        .default_height(default_h)
+        .max_height(default_h)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .show(ctx, |ui| {
             // Tab bar with version display
@@ -118,90 +122,11 @@ fn render_transparency_tab(
     egui::ScrollArea::vertical().show(ui, |ui| {
         ui.spacing_mut().item_spacing.y = 12.0;
 
-        // Theme Preset Cards Grid
+        // Themes
         ui.group(|ui| {
-            ui.label(RichText::new("Theme Presets:").strong());
+            ui.label(RichText::new("Themes:").strong());
             ui.label(
-                RichText::new("Select a curated aesthetic palette with transparent writing glass:")
-                    .size(11.5)
-                    .color(theme.muted_text_color()),
-            );
-            ui.add_space(4.0);
-
-            egui::Grid::new("presets_card_grid")
-                .num_columns(2)
-                .spacing([12.0, 8.0])
-                .show(ui, |ui| {
-                    for (i, &preset) in ThemePreset::all_presets().iter().enumerate() {
-                        let is_active = theme.preset == preset && theme.custom_name.is_none();
-                        let (win_rgb, page_rgb, txt_rgb, acc_rgb) = preset.preview_palette();
-
-                        let border_color = if is_active {
-                            theme.accent_color()
-                        } else {
-                            theme.text_color().gamma_multiply(0.20)
-                        };
-                        let bg_color = if is_active {
-                            theme.accent_color().gamma_multiply(0.18)
-                        } else {
-                            theme.modal_fill_color().gamma_multiply(0.60)
-                        };
-
-                        egui::Frame::new()
-                            .fill(bg_color)
-                            .stroke(egui::Stroke::new(if is_active { 2.0 } else { 1.0 }, border_color))
-                            .corner_radius(egui::CornerRadius::same(8))
-                            .inner_margin(egui::Margin::same(8))
-                            .show(ui, |ui| {
-                                ui.set_width(265.0);
-                                ui.horizontal(|ui| {
-                                    ui.label(RichText::new(preset.icon()).size(18.0));
-                                    ui.vertical(|ui| {
-                                        ui.horizontal(|ui| {
-                                            let name_col = if is_active {
-                                                theme.accent_color()
-                                            } else {
-                                                theme.text_color()
-                                            };
-                                            ui.label(RichText::new(preset.display_name()).size(12.0).strong().color(name_col));
-                                            let badge = if preset.is_dark() { "Dark" } else { "Light" };
-                                            ui.label(RichText::new(format!("({})", badge)).size(10.0).color(theme.muted_text_color()));
-                                        });
-
-                                        ui.horizontal(|ui| {
-                                            // Palette swatches: Window, Page, Text, Accent
-                                            for rgb in [win_rgb, page_rgb, txt_rgb, acc_rgb] {
-                                                let (rect, _) = ui.allocate_exact_size(egui::vec2(14.0, 14.0), egui::Sense::hover());
-                                                ui.painter().rect_filled(rect, 3.0, Color32::from_rgb(rgb[0], rgb[1], rgb[2]));
-                                            }
-
-                                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                                if is_active {
-                                                    ui.label(RichText::new("✓ Active").size(11.0).strong().color(theme.accent_color()));
-                                                } else if ui.small_button("Apply").clicked() {
-                                                    theme.apply_preset(preset);
-                                                    theme.custom_name = None;
-                                                    *vibrancy_dirty = true;
-                                                    state.theme_message = None;
-                                                }
-                                            });
-                                        });
-                                    });
-                                });
-                            });
-
-                        if i % 2 == 1 {
-                            ui.end_row();
-                        }
-                    }
-                });
-        });
-
-        // Themes Folder & Sharing Section
-        ui.group(|ui| {
-            ui.label(RichText::new("📁 Themes Folder & Sharing:").strong());
-            ui.label(
-                RichText::new("Save current theme palette, import shared .json themes, or manage installed custom styles:")
+                RichText::new("Choose from built-in frosted glass themes or import, save, and share custom .json styles:")
                     .size(11.5)
                     .color(theme.muted_text_color()),
             );
@@ -237,7 +162,7 @@ fn render_transparency_tab(
             // Save current theme row
             ui.horizontal(|ui| {
                 ui.label("Save current theme as:");
-                ui.add(egui::TextEdit::singleline(&mut state.new_theme_name).hint_text("My Theme").desired_width(140.0));
+                ui.add(egui::TextEdit::singleline(&mut state.new_theme_name).hint_text("My Custom Theme").desired_width(140.0));
                 if ui.button("💾 Save Theme").clicked() {
                     if state.new_theme_name.trim().is_empty() {
                         state.theme_message = Some(("Please enter a theme name first.".to_string(), true));
@@ -269,53 +194,115 @@ fn render_transparency_tab(
 
             ui.separator();
 
-            ui.label(RichText::new("Installed Custom Themes:").size(12.0).strong());
+            // Unified list of Themes (Default presets first without delete button, then custom themes with delete button)
+            egui::Grid::new("unified_themes_list_grid")
+                .num_columns(4)
+                .spacing([14.0, 6.0])
+                .striped(true)
+                .show(ui, |ui| {
+                    ui.label(RichText::new("Theme").strong());
+                    ui.label(RichText::new("Palette").strong());
+                    ui.label(RichText::new("Status").strong());
+                    ui.label(RichText::new("Options").strong());
+                    ui.end_row();
 
-            let custom_themes = crate::theme::list_custom_themes();
-            if custom_themes.is_empty() {
-                ui.label(
-                    RichText::new("No custom theme files found in themes/ folder.")
-                        .italics()
-                        .color(theme.muted_text_color()),
-                );
-            } else {
-                egui::Grid::new("custom_themes_list_grid")
-                    .num_columns(3)
-                    .spacing([12.0, 6.0])
-                    .striped(true)
-                    .show(ui, |ui| {
-                        for (name, path) in custom_themes {
-                            let is_current = theme.custom_name.as_deref() == Some(&name);
-                            let label_text = if is_current {
-                                RichText::new(format!("★ {}", name)).strong().color(theme.accent_color())
+                    // 1. Default built-in theme presets
+                    for &preset in ThemePreset::all_presets() {
+                        let is_active = theme.preset == preset && theme.custom_name.is_none();
+                        let (win_rgb, page_rgb, txt_rgb, acc_rgb) = preset.preview_palette();
+
+                        // Theme Name + Icon
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new(preset.icon()).size(14.0));
+                            let name_col = if is_active {
+                                theme.accent_color()
                             } else {
-                                RichText::new(&name).color(theme.text_color())
+                                theme.text_color()
                             };
-                            ui.label(label_text);
+                            ui.label(RichText::new(preset.display_name()).color(name_col).strong());
+                            let badge = if preset.is_dark() { "Dark" } else { "Light" };
+                            ui.label(RichText::new(format!("({})", badge)).size(10.0).color(theme.muted_text_color()));
+                        });
 
-                            if is_current {
-                                ui.label(RichText::new("✓ Active").size(11.0).strong().color(theme.accent_color()));
-                            } else if ui.button("Apply").clicked() {
-                                match crate::theme::load_theme_file(&path) {
-                                    Ok(loaded) => {
-                                        *theme = loaded;
-                                        *vibrancy_dirty = true;
-                                        state.theme_message = Some((format!("Applied theme: {}", name), false));
-                                    }
-                                    Err(e) => {
-                                        state.theme_message = Some((format!("Failed to load {}: {}", name, e), true));
-                                    }
+                        // Swatches
+                        ui.horizontal(|ui| {
+                            for rgb in [win_rgb, page_rgb, txt_rgb, acc_rgb] {
+                                let (rect, _) = ui.allocate_exact_size(egui::vec2(13.0, 13.0), egui::Sense::hover());
+                                ui.painter().rect_filled(rect, 2.5, Color32::from_rgb(rgb[0], rgb[1], rgb[2]));
+                            }
+                        });
+
+                        // Status / Apply
+                        if is_active {
+                            ui.label(RichText::new("✓ Active").size(11.5).strong().color(theme.accent_color()));
+                        } else if ui.button("Apply").clicked() {
+                            theme.apply_preset(preset);
+                            theme.custom_name = None;
+                            *vibrancy_dirty = true;
+                            state.theme_message = None;
+                        }
+
+                        // Built-in presets do not have a delete button
+                        ui.label(RichText::new("Preset").size(10.5).color(theme.muted_text_color()));
+                        ui.end_row();
+                    }
+
+                    // 2. Installed custom themes (from themes/ directory)
+                    let custom_themes = crate::theme::list_custom_themes();
+                    for (name, path) in custom_themes {
+                        let is_current = theme.custom_name.as_deref() == Some(&name);
+
+                        // Theme Name + Icon
+                        ui.horizontal(|ui| {
+                            ui.label("🎨");
+                            let name_col = if is_current {
+                                theme.accent_color()
+                            } else {
+                                theme.text_color()
+                            };
+                            ui.label(RichText::new(&name).color(name_col).strong());
+                            ui.label(RichText::new("(Custom)").size(10.0).color(theme.muted_text_color()));
+                        });
+
+                        // Swatches preview
+                        let preview_colors = crate::theme::load_theme_file(&path).ok().map(|t| {
+                            (t.window_tint_rgb, t.page_tint_rgb, t.text_rgb, t.accent_rgb)
+                        });
+                        ui.horizontal(|ui| {
+                            if let Some((w, p, t, a)) = preview_colors {
+                                for rgb in [w, p, t, a] {
+                                    let (rect, _) = ui.allocate_exact_size(egui::vec2(13.0, 13.0), egui::Sense::hover());
+                                    ui.painter().rect_filled(rect, 2.5, Color32::from_rgb(rgb[0], rgb[1], rgb[2]));
+                                }
+                            } else {
+                                ui.label("-");
+                            }
+                        });
+
+                        // Status / Apply
+                        if is_current {
+                            ui.label(RichText::new("✓ Active").size(11.5).strong().color(theme.accent_color()));
+                        } else if ui.button("Apply").clicked() {
+                            match crate::theme::load_theme_file(&path) {
+                                Ok(loaded) => {
+                                    *theme = loaded;
+                                    *vibrancy_dirty = true;
+                                    state.theme_message = Some((format!("Applied theme: {}", name), false));
+                                }
+                                Err(e) => {
+                                    state.theme_message = Some((format!("Failed to load {}: {}", name, e), true));
                                 }
                             }
-
-                            if ui.button("🗑 Delete").clicked() {
-                                let _ = std::fs::remove_file(&path);
-                                state.theme_message = Some((format!("Deleted theme: {}", name), false));
-                            }
-                            ui.end_row();
                         }
-                    });
-            }
+
+                        // Custom themes have a delete button
+                        if ui.button("🗑 Delete").clicked() {
+                            let _ = std::fs::remove_file(&path);
+                            state.theme_message = Some((format!("Deleted theme: {}", name), false));
+                        }
+                        ui.end_row();
+                    }
+                });
         });
 
         // Window Blur & Native Vibrancy

@@ -225,7 +225,7 @@ Every action in Scholia is bound to an ergonomic shortcut and can be customized 
 Scholia features a dual-layer transparency model:
 1. **Window Background Vibrancy**: Utilizes native OS blur APIs (Windows 11 Mica / Acrylic, macOS `NSVisualEffectView`).
 2. **Transparent Writing Page**: Features a **Page Sheet Opacity slider (5% to 100%)** allowing your desktop wallpaper to softly shine through your manuscript canvas.
-3. **90% Opaque Modal Windows**: Dialog windows (Preferences, Unsaved Changes, Citations, Works Cited, MLA Compliance, Date Picker) feature a 90% opaque / 10% transparent background (`alpha = 230`), ensuring high contrast and legibility while keeping the main workspace and page completely transparent.
+3. **90% Opaque Modal Windows & 80% Viewport Height**: Dialog windows (Preferences, Unsaved Changes, Citations, Works Cited, MLA Compliance, Date Picker) feature a 90% opaque / 10% transparent background (`alpha = 230`), ensuring high contrast and legibility while keeping the main workspace and page completely transparent. The Preferences modal automatically sizes to 80% of vertical screen height with smooth internal scrolling.
 4. **Seven Curated Theme Presets**:
    - **Frosted Obsidian**: Dark obsidian glass with frost-cyan accents.
    - **Frosted Parchment**: Translucent light paper with deep sapphire accents.
@@ -235,11 +235,12 @@ Scholia features a dual-layer transparency model:
    - **Rosé Pine Moon**: Deep violet dark variation with muted pastel highlights.
    - **Rosé Pine Dawn**: Warm parchment pastel daylight variant with delicate rose accents.
    - **Custom**: Granular RGB pickers for window tint, page sheet tint, text, accent, and borders.
-5. **Themes Folder & Sharing (`themes/`)**:
-   - Save your custom color themes as portable `.json` files.
+5. **Unified Themes Management (`themes/`)**:
+   - Unified Themes table displaying all built-in presets alongside user-installed custom themes.
+   - Save your current color theme as a portable `.json` file in `themes/`.
    - Import community themes with one click.
    - Open the dedicated `themes/` folder in OS File Explorer (`explorer`, `open`, or `xdg-open`) to easily share themes with colleagues.
-   - Pre-bundled with sample community themes (**Catppuccin Mocha** and **Tokyo Night**).
+   - Clean default installation with zero custom theme clutter.
 
 ---
 

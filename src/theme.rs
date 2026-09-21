@@ -564,56 +564,6 @@ pub fn ensure_sample_themes() {
     if !dir.exists() {
         let _ = std::fs::create_dir_all(&dir);
     }
-
-    // Catppuccin Mocha sample
-    let mocha_path = dir.join("Catppuccin Mocha.json");
-    if !mocha_path.exists() {
-        let mocha = ThemeConfig {
-            preset: ThemePreset::Custom,
-            custom_name: Some("Catppuccin Mocha".to_string()),
-            blur_mode: BlurMode::Acrylic,
-            window_opacity: 0.65,
-            page_opacity: 0.40,
-            window_tint_rgb: [30, 30, 46],      // Base
-            page_tint_rgb: [24, 24, 37],        // Mantle
-            text_rgb: [205, 214, 244],          // Text
-            muted_text_rgb: [147, 154, 183],    // Overlay0
-            accent_rgb: [203, 166, 247],        // Mauve
-            page_border_rgb: [69, 71, 90],      // Surface1
-            page_border_alpha: 0.40,
-            font_choice: MlaFontChoice::TimesNewRoman,
-            show_window_controls: true,
-            show_shortcuts_panel: true,
-        };
-        if let Ok(json) = serde_json::to_string_pretty(&mocha) {
-            let _ = std::fs::write(&mocha_path, json);
-        }
-    }
-
-    // Tokyo Night sample
-    let tokyo_path = dir.join("Tokyo Night.json");
-    if !tokyo_path.exists() {
-        let tokyo = ThemeConfig {
-            preset: ThemePreset::Custom,
-            custom_name: Some("Tokyo Night".to_string()),
-            blur_mode: BlurMode::Acrylic,
-            window_opacity: 0.65,
-            page_opacity: 0.40,
-            window_tint_rgb: [26, 27, 38],      // Dark background
-            page_tint_rgb: [22, 22, 30],        // Dark paper
-            text_rgb: [192, 202, 245],          // Text
-            muted_text_rgb: [122, 162, 247],    // Blue muted
-            accent_rgb: [187, 154, 247],        // Magenta accent
-            page_border_rgb: [65, 72, 104],     // Border
-            page_border_alpha: 0.40,
-            font_choice: MlaFontChoice::TimesNewRoman,
-            show_window_controls: true,
-            show_shortcuts_panel: true,
-        };
-        if let Ok(json) = serde_json::to_string_pretty(&tokyo) {
-            let _ = std::fs::write(&tokyo_path, json);
-        }
-    }
 }
 
 pub fn list_custom_themes() -> Vec<(String, std::path::PathBuf)> {
