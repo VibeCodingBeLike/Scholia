@@ -1,11 +1,11 @@
-; Inno Setup Script for TheBestMLAWriter
+; Inno Setup Script for Scholia
 ; Produces a modern, professional Windows installer (.exe) with file associations and shortcuts
 
-#define MyAppName "TheBestMLAWriter"
+#define MyAppName "Scholia"
 #define MyAppVersion "0.1.0"
-#define MyAppPublisher "TheBestMLAWriter Authors"
-#define MyAppURL "https://github.com/TheBestMLAWriter"
-#define MyAppExeName "the_best_mla_writer.exe"
+#define MyAppPublisher "Scholia Authors"
+#define MyAppURL "https://github.com/Scholia/Scholia"
+#define MyAppExeName "scholia.exe"
 
 [Setup]
 AppId={{C7892341-B890-4A61-9876-1234567890AB}
@@ -19,7 +19,7 @@ DefaultDirName={autopf}\{#MyAppName}
 ChangesAssociations=yes
 DisableProgramGroupPage=yes
 LicenseFile=..\..\LICENSE
-OutputBaseFilename=TheBestMLAWriter-Setup-v{#MyAppVersion}
+OutputBaseFilename=Scholia-Setup-v{#MyAppVersion}
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -30,7 +30,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "associate"; Description: "Associate .mladoc files with TheBestMLAWriter"; GroupDescription: "File Associations:"
+Name: "associate"; Description: "Associate .mladoc files with Scholia"; GroupDescription: "File Associations:"
 
 [Files]
 Source: "..\..\target\release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
@@ -39,10 +39,10 @@ Source: "..\..\sample_mla_paper.mladoc"; DestDir: "{app}"; Flags: ignoreversion
 
 [Registry]
 ; Register .mladoc file extension
-Root: HKA; Subkey: "Software\Classes\.mladoc"; ValueType: string; ValueName: ""; ValueData: "TheBestMLAWriter.Document"; Flags: uninsdeletevalue; Tasks: associate
-Root: HKA; Subkey: "Software\Classes\TheBestMLAWriter.Document"; ValueType: string; ValueName: ""; ValueData: "MLA 9th Edition Document"; Flags: uninsdeletekey; Tasks: associate
-Root: HKA; Subkey: "Software\Classes\TheBestMLAWriter.Document\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: associate
-Root: HKA; Subkey: "Software\Classes\TheBestMLAWriter.Document\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: associate
+Root: HKA; Subkey: "Software\Classes\.mladoc"; ValueType: string; ValueName: ""; ValueData: "Scholia.Document"; Flags: uninsdeletevalue; Tasks: associate
+Root: HKA; Subkey: "Software\Classes\Scholia.Document"; ValueType: string; ValueName: ""; ValueData: "MLA 9th Edition Document"; Flags: uninsdeletekey; Tasks: associate
+Root: HKA; Subkey: "Software\Classes\Scholia.Document\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: associate
+Root: HKA; Subkey: "Software\Classes\Scholia.Document\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: associate
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

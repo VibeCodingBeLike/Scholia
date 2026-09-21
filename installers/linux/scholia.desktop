@@ -1,11 +1,11 @@
 [Desktop Entry]
-Name=TheBestMLAWriter
+Name=Scholia
 Comment=Strict MLA 9th Edition Document Editor with Frosted Glass Transparency
-Exec=the_best_mla_writer %F
-Icon=the-best-mla-writer
+Exec=scholia %F
+Icon=scholia
 Terminal=false
 Type=Application
 Categories=Office;WordProcessor;TextEditor;Education;
 MimeType=application/x-mladoc;text/plain;
-Keywords=MLA;Document;Editor;Paper;Writing;WordProcessor;
+Keywords=MLA;Document;Editor;Paper;Writing;WordProcessor;Scholia;
 StartupNotify=true

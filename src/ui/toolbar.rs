@@ -39,7 +39,7 @@ pub fn render_toolbar(
 
         // Brand / Title
         ui.label(
-            RichText::new("MLA Writer")
+            RichText::new("Scholia")
                 .strong()
                 .size(15.0)
                 .color(accent_col),

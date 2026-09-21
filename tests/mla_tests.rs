@@ -1,6 +1,6 @@
-use the_best_mla_writer::export::{export_to_docx, export_to_html, export_to_text};
-use the_best_mla_writer::mla_rules::MlaLinter;
-use the_best_mla_writer::model::{
+use scholia::export::{export_to_docx, export_to_html, export_to_text};
+use scholia::mla_rules::MlaLinter;
+use scholia::model::{
     format_current_mla_date, to_mla_title_case, MlaDocument, SourceType, WorksCitedEntry,
 };
 
@@ -118,21 +118,21 @@ fn test_document_exporters() {
 #[test]
 fn test_font_configuration_and_nerd_icons() {
     let ctx = egui::Context::default();
-    the_best_mla_writer::fonts::configure_fonts(&ctx);
+    scholia::fonts::configure_fonts(&ctx);
 
     // Verify Nerd Font icon constants are valid UTF-8
-    assert!(!the_best_mla_writer::fonts::icons::FILE_NEW.is_empty());
-    assert!(!the_best_mla_writer::fonts::icons::SAVE.is_empty());
-    assert!(!the_best_mla_writer::fonts::icons::CALENDAR.is_empty());
-    assert!(!the_best_mla_writer::fonts::icons::BOOK_CITATIONS.is_empty());
+    assert!(!scholia::fonts::icons::FILE_NEW.is_empty());
+    assert!(!scholia::fonts::icons::SAVE.is_empty());
+    assert!(!scholia::fonts::icons::CALENDAR.is_empty());
+    assert!(!scholia::fonts::icons::BOOK_CITATIONS.is_empty());
 
-    let doc_font = the_best_mla_writer::fonts::doc_font(16.0);
+    let doc_font = scholia::fonts::doc_font(16.0);
     assert_eq!(doc_font.size, 16.0);
 }
 
 #[test]
 fn test_calendar_modal_state() {
-    use the_best_mla_writer::ui::calendar_dialog::{month_number_to_name, CalendarModalState};
+    use scholia::ui::calendar_dialog::{month_number_to_name, CalendarModalState};
 
     let mut state = CalendarModalState {
         is_open: false,

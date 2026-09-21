@@ -2,9 +2,9 @@
 set -e
 
 # Build script for macOS .app bundle and .dmg installer
-echo "=== Building TheBestMLAWriter for macOS ==="
+echo "=== Building Scholia for macOS ==="
 
-APP_NAME="TheBestMLAWriter"
+APP_NAME="Scholia"
 VERSION="0.1.0"
 BUNDLE_DIR="target/release/bundle/osx/${APP_NAME}.app"
 CONTENTS_DIR="${BUNDLE_DIR}/Contents"
@@ -18,7 +18,7 @@ rm -rf "${BUNDLE_DIR}"
 mkdir -p "${MACOS_DIR}"
 mkdir -p "${RESOURCES_DIR}"
 
-cp "target/release/the_best_mla_writer" "${MACOS_DIR}/${APP_NAME}"
+cp "target/release/scholia" "${MACOS_DIR}/${APP_NAME}"
 chmod +x "${MACOS_DIR}/${APP_NAME}"
 
 cp "installers/macos/Info.plist" "${CONTENTS_DIR}/Info.plist"

@@ -1,9 +1,9 @@
 # build_release.ps1
-# Builds TheBestMLAWriter for Release (both Portable and Installer)
+# Builds Scholia for Release (both Portable and Installer)
 
 $ErrorActionPreference = "Stop"
 Write-Host "=================================================" -ForegroundColor Cyan
-Write-Host "  TheBestMLAWriter - Production Release Build    " -ForegroundColor Cyan
+Write-Host "       Scholia - Production Release Build        " -ForegroundColor Cyan
 Write-Host "=================================================" -ForegroundColor Cyan
 
 # 1. Run cargo tests first to verify integrity

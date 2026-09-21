@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest an idea or improvement for TheBestMLAWriter
+about: Suggest an idea or improvement for Scholia
 title: '[ENHANCEMENT] '
 labels: enhancement
 assignees: ''

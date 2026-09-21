@@ -1,6 +1,6 @@
-# Contributing to TheBestMLAWriter
+# Contributing to Scholia
 
-Thank you for your interest in contributing to **TheBestMLAWriter**! We welcome contributions from developers, technical writers, and academic researchers who want to make MLA writing seamless, beautiful, and strictly compliant.
+Thank you for your interest in contributing to **Scholia**! We welcome contributions from developers, technical writers, and academic researchers who want to make MLA writing seamless, beautiful, and strictly compliant.
 
 ---
 
@@ -31,8 +31,8 @@ When contributing new features or UI controls:
 ### Building & Running Locally
 ```bash
 # Clone the repository
-git clone https://github.com/TheBestMLAWriter/TheBestMLAWriter.git
-cd TheBestMLAWriter
+git clone https://github.com/Scholia/Scholia.git
+cd Scholia
 
 # Run the app locally in development mode
 cargo run

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
-echo "=== Building TheBestMLAWriter Debian (.deb) Package ==="
+echo "=== Building Scholia Debian (.deb) Package ==="
 
-PACKAGE_NAME="the-best-mla-writer"
+PACKAGE_NAME="scholia"
 VERSION="0.1.0"
 ARCH="amd64"
 DEB_DIR="target/debian/${PACKAGE_NAME}_${VERSION}_${ARCH}"
@@ -16,10 +16,10 @@ mkdir -p "${DEB_DIR}/usr/bin"
 mkdir -p "${DEB_DIR}/usr/share/applications"
 mkdir -p "${DEB_DIR}/usr/share/doc/${PACKAGE_NAME}"
 
-cp "target/release/the_best_mla_writer" "${DEB_DIR}/usr/bin/"
-chmod 755 "${DEB_DIR}/usr/bin/the_best_mla_writer"
+cp "target/release/scholia" "${DEB_DIR}/usr/bin/"
+chmod 755 "${DEB_DIR}/usr/bin/scholia"
 
-cp "installers/linux/the-best-mla-writer.desktop" "${DEB_DIR}/usr/share/applications/"
+cp "installers/linux/scholia.desktop" "${DEB_DIR}/usr/share/applications/"
 cp "README.md" "${DEB_DIR}/usr/share/doc/${PACKAGE_NAME}/"
 cp "LICENSE" "${DEB_DIR}/usr/share/doc/${PACKAGE_NAME}/copyright"
 
@@ -29,9 +29,9 @@ Version: ${VERSION}
 Section: editors
 Priority: optional
 Architecture: ${ARCH}
-Maintainer: TheBestMLAWriter Authors <info@thebestmlawriter.org>
+Maintainer: Scholia Authors <info@scholia.editor>
 Description: Modern, distraction-free MLA 9th edition document editor
- TheBestMLAWriter enforces strict adherence to MLA 9 guidelines while providing
+ Scholia enforces strict adherence to MLA 9 guidelines while providing
  a customizable frosted glass interface, custom keybindings, and high-fidelity
  export to DOCX, HTML/PDF, and Markdown.
 EOF

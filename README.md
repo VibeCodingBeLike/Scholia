@@ -1,8 +1,8 @@
 <div align="center">
 
-# 📜 TheBestMLAWriter
+# 📜 Scholia
 
-### *The distraction-free, strictly formatted MLA document editor with frosted glass transparency.*
+### *The distraction-free, strictly formatted MLA 9 document editor with frosted glass transparency.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Rust: 1.80+](https://img.shields.io/badge/Rust-1.80%2B-orange.svg?logo=rust)](https://www.rust-lang.org/)
@@ -13,7 +13,7 @@
 
 <p align="center">
   <b>Built from scratch in 100% pure Rust using <code>egui</code> and native OS window vibrancy.</b><br>
-  Engineered so that students and academics can focus entirely on writing without fear of formatting penalties.
+  Engineered so that students, scholars, and researchers can focus entirely on writing without fear of formatting penalties.
 </p>
 
 </div>
@@ -21,7 +21,7 @@
 ---
 
 ## 📑 Table of Contents
-- [Why TheBestMLAWriter?](#-why-thebestmlawriter)
+- [Why Scholia?](#-why-scholia)
 - [Key Features](#-key-features)
 - [MLA 9th Edition Rules Enforced](#-mla-9th-edition-rules-enforced)
 - [Architecture & Design](#-architecture--design)
@@ -35,7 +35,7 @@
 
 ---
 
-## 💡 Why TheBestMLAWriter?
+## 💡 Why Scholia?
 
 Traditional word processors like Microsoft Word, Google Docs, and LibreOffice are *unconstrained general-purpose editors*. In those apps, small accidental clicks lead to severe academic formatting penalties:
 - Accidentally using 1.15 line spacing or adding hidden 8pt margins between paragraphs.
@@ -45,7 +45,7 @@ Traditional word processors like Microsoft Word, Google Docs, and LibreOffice ar
 - Forgetting to alphabetize Works Cited entries or formatting hanging indents incorrectly.
 - Putting citation punctuation inside quotes instead of after the parenthetical reference.
 
-**TheBestMLAWriter eliminates formatting errors by construction**:
+**Scholia eliminates formatting errors by construction**:
 It gives you a rich, fluent text editing canvas, but **it is fundamentally impossible to break MLA formatting**. All margins, font sizes, running headers, paragraph indents, block quotes, and Works Cited entries are locked to MLA 9th Edition standards.
 
 ---
@@ -88,7 +88,7 @@ flowchart TD
     Doc --> WC[Works Cited\nSeparate page, centered title, 0.5 in hanging indent, A-Z sorted]
 ```
 
-| Element | MLA 9th Edition Standard | TheBestMLAWriter Enforcement |
+| Element | MLA 9th Edition Standard | Scholia Enforcement |
 |---|---|---|
 | **Margins** | Exactly 1.0 inch (72 pt) all sides | Locked to 1.0 in (cannot be altered) |
 | **Typeface** | Legible serif (e.g. Times New Roman) | Locked to approved MLA serifs |
@@ -139,34 +139,34 @@ graph LR
 
 ## ⌨️ Custom Keybindings
 
-All keybindings are fully remappable in `Preferences (Ctrl+,)`:
+Every major action in Scholia is bound to an ergonomic shortcut:
 
-| Action | Default Shortcut (Windows/Linux) | Default Shortcut (macOS) | Description |
-|---|---|---|---|
-| **New Document** | `Ctrl + N` | `Cmd + N` | Create a new blank MLA paper |
-| **Open Document** | `Ctrl + O` | `Cmd + O` | Open an existing `.mladoc` document |
-| **Save Document** | `Ctrl + S` | `Cmd + S` | Save current document to disk |
-| **Export to Word** | `Ctrl + E` | `Cmd + E` | Export authentic Microsoft Word `.docx` |
-| **Export HTML / PDF** | `Ctrl + Shift + E` | `Cmd + Shift + E` | Export printable HTML for 1-click PDF save |
-| **Add Paragraph** | `Ctrl + Enter` | `Cmd + Enter` | Insert new double-spaced 0.5" indented paragraph |
-| **Insert Block Quote** | `Ctrl + Shift + B` | `Cmd + Shift + B` | Insert MLA block quotation (>4 lines) |
-| **Heading 1 (Bold)** | `Ctrl + Alt + 1` | `Cmd + Option + 1` | Insert MLA Level 1 Section Heading |
-| **Heading 2 (Italic)** | `Ctrl + Alt + 2` | `Cmd + Option + 2` | Insert MLA Level 2 Section Heading |
-| **Insert Citation** | `Ctrl + Shift + C` | `Cmd + Shift + C` | Open quick in-text citation modal |
-| **Works Cited Manager**| `Ctrl + Shift + W` | `Cmd + Shift + W` | Open MLA 9 Works Cited manager |
-| **Format Title Case** | `Ctrl + Shift + T` | `Cmd + Shift + T` | Convert title to MLA Title Capitalization |
-| **MLA Compliance** | `Ctrl + Shift + V` | `Cmd + Shift + V` | Run MLA 9th Edition Compliance Inspector |
-| **Preferences / Themes**| `Ctrl + ,` | `Cmd + ,` | Open Transparency, Theme & Keybind settings |
-| **Zen / Focus Mode** | `F11` | `F11` | Toggle distraction-free writing mode |
+| Action | Default Shortcut | Description |
+|---|---|---|
+| **New Document** | `Ctrl+N` | Start a clean MLA document |
+| **Open Document** | `Ctrl+O` | Load an existing `.mladoc` project |
+| **Save Document** | `Ctrl+S` | Save current document to disk |
+| **Export DOCX** | `Ctrl+E` | Export to Microsoft Word (`.docx`) |
+| **Export HTML/PDF**| `Ctrl+P` | Export to print-ready HTML/PDF |
+| **Zen / Focus Mode**| `F11` | Toggle distraction-free full-screen writing |
+| **Insert Heading 1**| `Ctrl+1` | Insert Section Heading (Bold, flush left) |
+| **Insert Heading 2**| `Ctrl+2` | Insert Section Heading (Italics, flush left) |
+| **Insert Heading 3**| `Ctrl+3` | Insert Section Heading (Bold, centered) |
+| **Insert Blockquote**| `Ctrl+Q` | Insert block quotation (0.5 in indent) |
+| **Insert Citation** | `Ctrl+Shift+C`| Insert in-text parenthetical citation |
+| **Manage Citations**| `Ctrl+K` | Open Works Cited database |
+| **Check Compliance**| `Ctrl+Shift+L`| Open MLA 9 Compliance Inspector |
+| **Auto-Fix Compliance**| `Ctrl+Shift+F`| Fix capitalization and date formatting |
+| **Preferences** | `Ctrl+,` | Open theme, glass vibrancy & keymap settings |
 
 ---
 
-## 🎨 Frosted Glass & Transparency Engine
+## 🪟 Frosted Glass & Transparency Engine
 
-The application features full transparency throughout the entire interface:
-1. **Window Background Blur**: Native OS-level acrylic, mica, or vibrancy.
-2. **Transparent Writing Page**: Unlike normal editors that put an opaque white rectangle in the middle, TheBestMLAWriter features a **Page Sheet Opacity slider (5% to 100%)**. You can write directly on a translucent frosted glass parchment where your desktop wallpaper softly shines through.
-3. **Built-in Presets**:
+Scholia features a dual-layer transparency model:
+1. **Window Background Vibrancy**: Utilizes native OS blur APIs (Windows 11 Mica / Acrylic, macOS `NSVisualEffectView`).
+2. **Transparent Writing Page**: Unlike normal editors that put an opaque white rectangle in the middle, Scholia features a **Page Sheet Opacity slider (5% to 100%)**. You can write directly on a translucent frosted glass parchment where your desktop wallpaper softly shines through.
+3. **Four Built-in Presets**:
    - **Frosted Obsidian**: Dark obsidian glass with frost-cyan accents.
    - **Frosted Parchment**: Translucent light paper with deep sapphire accents.
    - **Nordic Frost**: Arctic midnight translucent glass.
@@ -190,15 +190,15 @@ In portable mode, the app compiles into a standalone, single executable with zer
 .\build_portable.ps1
 ```
 Creates:
-- `dist\TheBestMLAWriter-Portable\the_best_mla_writer.exe`
-- `dist\TheBestMLAWriter-v0.1.0-portable-windows-x64.zip`
+- `dist\Scholia-Portable\scholia.exe`
+- `dist\Scholia-v0.1.0-portable-windows-x64.zip`
 
 #### macOS / Linux
 ```bash
 ./build_portable.sh
 ```
 Creates:
-- `dist/TheBestMLAWriter-Portable/the_best_mla_writer`
+- `dist/Scholia-Portable/scholia`
 
 ---
 
@@ -212,19 +212,19 @@ This script:
 1. Executes the test suite to verify export and formatting integrity.
 2. Compiles an optimized release binary with Link-Time Optimization (`lto = true`), `codegen-units = 1`, and binary stripping.
 3. Generates the portable zip package.
-4. Compiles `installers\windows\installer.iss` with Inno Setup, generating `TheBestMLAWriter-Setup-v0.1.0.exe` with desktop icons, start menu shortcuts, and automatic `.mladoc` file associations.
+4. Compiles `installers\windows\installer.iss` with Inno Setup, generating `Scholia-Setup-v0.1.0.exe` with desktop icons, start menu shortcuts, and automatic `.mladoc` file associations.
 
 ### macOS App Bundle & DMG
 ```bash
 ./installers/macos/build_dmg.sh
 ```
-Builds the macOS `.app` bundle using `installers/macos/Info.plist` and generates `TheBestMLAWriter-v0.1.0-macOS.dmg`.
+Builds the macOS `.app` bundle using `installers/macos/Info.plist` and generates `Scholia-v0.1.0-macOS.dmg`.
 
 ### Linux Debian (.deb) Package
 ```bash
 ./installers/linux/build_deb.sh
 ```
-Builds `the-best-mla-writer_0.1.0_amd64.deb` complete with desktop file, icons, and MIME associations.
+Builds `scholia_0.1.0_amd64.deb` complete with desktop file, icons, and MIME associations.
 
 ---
 

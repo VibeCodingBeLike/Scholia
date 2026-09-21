@@ -29,12 +29,12 @@ fn main() -> eframe::Result<()> {
             .with_decorations(true)
             .with_inner_size([1120.0, 860.0])
             .with_min_inner_size([720.0, 500.0])
-            .with_title("TheBestMLAWriter - MLA 9th Edition Standard Document Editor"),
+            .with_title("Scholia — MLA 9th Edition Document Editor"),
         ..Default::default()
     };
 
     eframe::run_native(
-        "TheBestMLAWriter",
+        "Scholia",
         native_options,
         Box::new(|cc| {
             fonts::configure_fonts(&cc.egui_ctx);

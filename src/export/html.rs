@@ -283,7 +283,7 @@ pub fn generate_mla_html(doc: &MlaDocument) -> String {
 </head>
 <body>
     <div class="print-banner">
-        <span><strong>TheBestMLAWriter</strong> &bull; Print Preview (Exact MLA 9th Edition Standard)</span>
+        <span><strong>Scholia</strong> &bull; Print Preview (Exact MLA 9th Edition Standard)</span>
         <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
     </div>
 

@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Create a report to help us improve TheBestMLAWriter
+about: Create a report to help us improve Scholia
 title: '[BUG] '
 labels: bug
 assignees: ''
