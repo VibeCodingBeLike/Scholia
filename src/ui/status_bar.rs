@@ -61,7 +61,15 @@ pub fn render_status_bar(
 
             let comp_label = format!("{} MLA: {}%", score_icon, report.score_percentage);
             if ui
-                .button(RichText::new(comp_label).strong().size(11.5).color(score_col))
+                .add(
+                    egui::Button::new(
+                        RichText::new(comp_label)
+                            .strong()
+                            .size(11.5)
+                            .color(score_col),
+                    )
+                    .frame(false),
+                )
                 .on_hover_text("Open MLA 9 Compliance Inspector (Ctrl+Shift+C)")
                 .clicked()
             {

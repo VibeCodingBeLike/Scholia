@@ -66,6 +66,18 @@ pub struct ThemeConfig {
     pub page_border_alpha: f32,
 
     pub font_choice: MlaFontChoice,
+
+    /// Whether to show window navigation controls (Minimize, Maximize, Close) on the top right
+    #[serde(default = "default_true")]
+    pub show_window_controls: bool,
+
+    /// Whether to show the shortcuts helper panel alongside the document
+    #[serde(default = "default_true")]
+    pub show_shortcuts_panel: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -117,6 +129,8 @@ impl ThemeConfig {
             page_border_rgb: [90, 110, 140],
             page_border_alpha: 0.35,
             font_choice: MlaFontChoice::TimesNewRoman,
+            show_window_controls: true,
+            show_shortcuts_panel: true,
         }
     }
 
@@ -134,6 +148,8 @@ impl ThemeConfig {
             page_border_rgb: [180, 195, 210],
             page_border_alpha: 0.50,
             font_choice: MlaFontChoice::TimesNewRoman,
+            show_window_controls: true,
+            show_shortcuts_panel: true,
         }
     }
 
@@ -151,6 +167,8 @@ impl ThemeConfig {
             page_border_rgb: [76, 86, 106],
             page_border_alpha: 0.40,
             font_choice: MlaFontChoice::TimesNewRoman,
+            show_window_controls: true,
+            show_shortcuts_panel: true,
         }
     }
 
@@ -168,11 +186,15 @@ impl ThemeConfig {
             page_border_rgb: [120, 90, 50],
             page_border_alpha: 0.40,
             font_choice: MlaFontChoice::Georgia,
+            show_window_controls: true,
+            show_shortcuts_panel: true,
         }
     }
 
     pub fn apply_preset(&mut self, preset: ThemePreset) {
         let font = self.font_choice;
+        let win_ctrls = self.show_window_controls;
+        let sc_panel = self.show_shortcuts_panel;
         *self = match preset {
             ThemePreset::FrostedDark => Self::preset_frosted_dark(),
             ThemePreset::FrostedLight => Self::preset_frosted_light(),
@@ -185,6 +207,8 @@ impl ThemeConfig {
             }
         };
         self.font_choice = font;
+        self.show_window_controls = win_ctrls;
+        self.show_shortcuts_panel = sc_panel;
     }
 
     /// Color for the main outer app window fill

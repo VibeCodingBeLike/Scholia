@@ -21,6 +21,7 @@ fn test_mla_title_case_capitalization() {
     );
 }
 
+
 #[test]
 fn test_mla_current_date_format() {
     let d = format_current_mla_date();
@@ -266,4 +267,21 @@ fn test_block_deletion_focus_and_keybinds() {
     assert_eq!(cfg.get_shortcut(Action::MoveBlockUp).display_string(), "Alt+Up");
     assert_eq!(cfg.get_shortcut(Action::MoveBlockDown).display_string(), "Alt+Down");
     assert_eq!(cfg.get_shortcut(Action::InsertHeading3).display_string(), "Ctrl+Alt+3");
+}
+
+#[test]
+fn test_interface_options_and_removed_shortcuts() {
+    use scholia::keybinds::{Action, KeybindConfig};
+    use scholia::theme::ThemeConfig;
+
+    let theme = ThemeConfig::default();
+    assert!(theme.show_window_controls);
+    assert!(theme.show_shortcuts_panel);
+
+    // Verify shortcuts for AddParagraph and Exports are disabled in check_action
+    let cfg = KeybindConfig::default();
+    let input = egui::InputState::default();
+    assert!(!cfg.check_action(Action::AddParagraph, &input));
+    assert!(!cfg.check_action(Action::ExportDocx, &input));
+    assert!(!cfg.check_action(Action::ExportHtmlPdf, &input));
 }

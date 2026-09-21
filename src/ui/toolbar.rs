@@ -31,18 +31,20 @@ pub fn render_toolbar(
         ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
 
         // Brand / Title
-        ui.label(
+        let brand_resp = ui.label(
             RichText::new("Scholia")
                 .strong()
                 .size(15.0)
                 .color(accent_col),
         );
-        ui.label(
-            RichText::new("9th Ed.")
-                .size(10.0)
-                .italics()
-                .color(theme.muted_text_color()),
-        );
+        let brand_drag = ui.interact(brand_resp.rect, ui.id().with("brand_drag"), egui::Sense::click_and_drag());
+        if brand_drag.drag_started() {
+            ui.ctx().send_viewport_cmd(egui::ViewportCommand::StartDrag);
+        }
+        if brand_drag.double_clicked() {
+            let is_max = ui.input(|i| i.viewport().maximized.unwrap_or(false));
+            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!is_max));
+        }
 
         ui.separator();
 
@@ -74,7 +76,7 @@ pub fn render_toolbar(
             event = Some(ToolbarEvent::SaveDoc);
         }
 
-        // Export dropdown / buttons
+        // Export dropdown / buttons (shortcuts removed as requested)
         egui::ComboBox::from_id_salt("export_cb")
             .selected_text(
                 RichText::new(format!("{} Export", icons::WORD_DOCX))
@@ -82,26 +84,14 @@ pub fn render_toolbar(
                     .color(accent_col),
             )
             .show_ui(ui, |ui| {
-                let docx_sc = keybinds.get_shortcut(Action::ExportDocx).display_string();
                 if ui
-                    .button(format!(
-                        "{} Word Document (.docx)  [{}]",
-                        icons::WORD_DOCX,
-                        docx_sc
-                    ))
+                    .button(format!("{} Word Document (.docx)", icons::WORD_DOCX))
                     .clicked()
                 {
                     event = Some(ToolbarEvent::ExportDocx);
                 }
-                let html_sc = keybinds
-                    .get_shortcut(Action::ExportHtmlPdf)
-                    .display_string();
                 if ui
-                    .button(format!(
-                        "{} Printable HTML / PDF  [{}]",
-                        icons::HTML_PDF,
-                        html_sc
-                    ))
+                    .button(format!("{} Printable HTML / PDF", icons::HTML_PDF))
                     .clicked()
                 {
                     event = Some(ToolbarEvent::ExportHtml);
@@ -186,8 +176,10 @@ pub fn render_toolbar(
         // Draggable empty space between tools and window controls
         let avail_rect = ui.available_rect_before_wrap();
         let mut drag_rect = avail_rect;
-        if drag_rect.width() > 100.0 {
+        if theme.show_window_controls && drag_rect.width() > 100.0 {
             drag_rect.max.x -= 95.0;
+        }
+        if drag_rect.is_positive() {
             let drag_resp = ui.interact(
                 drag_rect,
                 ui.id().with("toolbar_drag_space"),
@@ -203,51 +195,53 @@ pub fn render_toolbar(
         }
 
         // Window Controls (Minimize, Maximize/Restore, Close) on the top right
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.spacing_mut().item_spacing.x = 4.0;
+        if theme.show_window_controls {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.spacing_mut().item_spacing.x = 4.0;
 
-            // Close button
-            let close_btn = ui.add(
-                egui::Button::new(
-                    RichText::new("✕")
-                        .size(12.0)
-                        .color(text_col)
-                        .strong(),
-                )
-                .min_size(egui::vec2(26.0, 22.0))
-            ).on_hover_text("Close");
-            if close_btn.clicked() {
-                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
-            }
+                // Close button
+                let close_btn = ui.add(
+                    egui::Button::new(
+                        RichText::new("✕")
+                            .size(12.0)
+                            .color(text_col)
+                            .strong(),
+                    )
+                    .min_size(egui::vec2(26.0, 22.0))
+                ).on_hover_text("Close");
+                if close_btn.clicked() {
+                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                }
 
-            // Maximize / Restore button
-            let is_max = ui.input(|i| i.viewport().maximized.unwrap_or(false));
-            let max_char = if is_max { "🗗" } else { "🗖" };
-            let max_btn = ui.add(
-                egui::Button::new(
-                    RichText::new(max_char)
-                        .size(11.0)
-                        .color(text_col),
-                )
-                .min_size(egui::vec2(26.0, 22.0))
-            ).on_hover_text(if is_max { "Restore" } else { "Maximize" });
-            if max_btn.clicked() {
-                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!is_max));
-            }
+                // Maximize / Restore button
+                let is_max = ui.input(|i| i.viewport().maximized.unwrap_or(false));
+                let max_char = if is_max { "🗗" } else { "🗖" };
+                let max_btn = ui.add(
+                    egui::Button::new(
+                        RichText::new(max_char)
+                            .size(11.0)
+                            .color(text_col),
+                    )
+                    .min_size(egui::vec2(26.0, 22.0))
+                ).on_hover_text(if is_max { "Restore" } else { "Maximize" });
+                if max_btn.clicked() {
+                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!is_max));
+                }
 
-            // Minimize button
-            let min_btn = ui.add(
-                egui::Button::new(
-                    RichText::new("🗕")
-                        .size(11.0)
-                        .color(text_col),
-                )
-                .min_size(egui::vec2(26.0, 22.0))
-            ).on_hover_text("Minimize");
-            if min_btn.clicked() {
-                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Minimized(true));
-            }
-        });
+                // Minimize button
+                let min_btn = ui.add(
+                    egui::Button::new(
+                        RichText::new("🗕")
+                            .size(11.0)
+                            .color(text_col),
+                    )
+                    .min_size(egui::vec2(26.0, 22.0))
+                ).on_hover_text("Minimize");
+                if min_btn.clicked() {
+                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+                }
+            });
+        }
     });
 
     event

@@ -339,6 +339,9 @@ impl KeybindConfig {
     }
 
     pub fn check_action(&self, action: Action, input: &egui::InputState) -> bool {
-        self.get_shortcut(action).matches(input)
+        match action {
+            Action::AddParagraph | Action::ExportDocx | Action::ExportHtmlPdf => false,
+            _ => self.get_shortcut(action).matches(input),
+        }
     }
 }

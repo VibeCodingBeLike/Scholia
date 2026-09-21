@@ -238,6 +238,19 @@ fn render_transparency_tab(ui: &mut egui::Ui, theme: &mut ThemeConfig, vibrancy_
                     );
                 });
         });
+
+        // Interface Preferences
+        ui.group(|ui| {
+            ui.label(RichText::new("Interface & Layout Options:").strong());
+            ui.checkbox(
+                &mut theme.show_window_controls,
+                "Show window navigation controls (Minimize, Maximize, Close) in top-right",
+            );
+            ui.checkbox(
+                &mut theme.show_shortcuts_panel,
+                "Show shortcuts helper panel alongside document page",
+            );
+        });
     });
 }
 

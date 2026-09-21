@@ -48,13 +48,22 @@ pub fn render_editor_page(
 
             let sidebar_width = 208.0f32;
 
-            // Show keybind sidebar ONLY if the left margin is wide enough to fit it comfortably
-            let show_sidebar = !focus_mode && (page_margin_left >= sidebar_width + 36.0);
+            // Show keybind sidebar ONLY if enabled in settings, not in focus mode, and left margin is wide enough
+            let show_sidebar = theme.show_shortcuts_panel
+                && !focus_mode
+                && (page_margin_left >= sidebar_width + 20.0);
+
+            let page_screen_x = ui.cursor().min.x + page_margin_left;
+            let page_screen_y = ui.cursor().min.y;
 
             if show_sidebar {
-                let sidebar_x = 24.0f32;
+                let gap_to_page = 14.0f32;
+                let sidebar_x = (page_screen_x - sidebar_width - gap_to_page).max(12.0);
+                let min_pinned_y = ui.clip_rect().min.y + 8.0;
+                let sidebar_y = page_screen_y.max(min_pinned_y);
+
                 egui::Area::new(egui::Id::new("editor_keybind_preview_sidebar"))
-                    .fixed_pos(egui::pos2(sidebar_x, 70.0))
+                    .fixed_pos(egui::pos2(sidebar_x, sidebar_y))
                     .show(ui.ctx(), |ui| {
                         if let Some(act) = render_keybind_preview_panel(ui, doc, theme, keybinds, sidebar_width) {
                             action = Some(EditorAction::TriggerAction(act));
@@ -157,17 +166,28 @@ pub fn render_editor_page(
 
                             // Date in MLA Format (Day Month Year)
                             ui.horizontal(|ui| {
+                                let font_id = doc_font(16.0);
+                                let display_str = if doc.header.date.is_empty() {
+                                    "Date (e.g. 20 September 2026)"
+                                } else {
+                                    &doc.header.date
+                                };
+                                let text_w = ui.painter().layout_no_wrap(display_str.to_string(), font_id.clone(), text_col).size().x;
+                                let date_w = (text_w + 10.0).max(60.0);
+
                                 let d_name = ui.add(
                                     egui::TextEdit::singleline(&mut doc.header.date)
-                                        .font(doc_font(16.0))
+                                        .font(font_id)
                                         .text_color(text_col)
                                         .frame(egui::Frame::NONE)
                                         .hint_text(RichText::new("Date (e.g. 20 September 2026)").italics().color(muted_col))
-                                        .desired_width(260.0),
+                                        .desired_width(date_w),
                                 );
                                 if d_name.changed() {
                                     doc.is_dirty = true;
                                 }
+
+                                ui.add_space(16.0);
 
                                 let today_btn = ui.small_button(format!("{} Today", icons::CALENDAR))
                                     .on_hover_text("Left-click: Insert today's date\nRight-click: Open calendar date picker");
@@ -207,6 +227,7 @@ pub fn render_editor_page(
                         let mut block_to_delete = None;
                         let mut block_splits: Vec<(usize, String, Vec<String>)> = Vec::new();
                         let mut focus_target_id = None;
+                        let mut focus_navigate: Option<(usize, bool)> = None;
                         let mut blocks_changed = false;
 
                         let total_blocks = doc.blocks.len();
@@ -260,6 +281,20 @@ pub fn render_editor_page(
                                         {
                                             block_to_delete = Some(b_idx);
                                         }
+
+                                        // Arrow navigation across paragraph boxes if cursor is at top/bottom
+                                        let cursor_idx = egui::text_edit::TextEditState::load(ui.ctx(), text_edit_id)
+                                            .and_then(|s| s.cursor.char_range())
+                                            .map(|r| r.primary.index.0)
+                                            .unwrap_or(0);
+                                        let is_at_top = cursor_idx == 0 || text.is_empty();
+                                        let is_at_bottom = cursor_idx >= text.len() || text.is_empty();
+
+                                        if ui.input(|i| i.key_pressed(egui::Key::ArrowUp)) && is_at_top && b_idx > 0 {
+                                            focus_navigate = Some((b_idx - 1, true));
+                                        } else if ui.input(|i| i.key_pressed(egui::Key::ArrowDown)) && is_at_bottom && b_idx + 1 < total_blocks {
+                                            focus_navigate = Some((b_idx + 1, false));
+                                        }
                                     }
                                 }
                                 MlaBlock::BlockQuote {
@@ -274,7 +309,7 @@ pub fn render_editor_page(
                                     egui::Frame::new()
                                         .fill(theme.card_fill_color())
                                         .stroke(egui::Stroke::new(
-                                            1.0,
+                                             1.0,
                                             accent_col.gamma_multiply(0.4),
                                         ))
                                         .corner_radius(6.0)
@@ -317,6 +352,19 @@ pub fn render_editor_page(
                                                     && ui.input(|i| i.key_pressed(egui::Key::Backspace))
                                                 {
                                                     block_to_delete = Some(b_idx);
+                                                }
+
+                                                let cursor_idx = egui::text_edit::TextEditState::load(ui.ctx(), q_edit_id)
+                                                    .and_then(|s| s.cursor.char_range())
+                                                    .map(|r| r.primary.index.0)
+                                                    .unwrap_or(0);
+                                                let is_at_top = cursor_idx == 0 || text.is_empty();
+                                                let is_at_bottom = cursor_idx >= text.len() || text.is_empty();
+
+                                                if ui.input(|i| i.key_pressed(egui::Key::ArrowUp)) && is_at_top && b_idx > 0 {
+                                                    focus_navigate = Some((b_idx - 1, true));
+                                                } else if ui.input(|i| i.key_pressed(egui::Key::ArrowDown)) && is_at_bottom && b_idx + 1 < total_blocks {
+                                                    focus_navigate = Some((b_idx + 1, false));
                                                 }
                                             }
 
@@ -417,9 +465,39 @@ pub fn render_editor_page(
                                                 {
                                                     block_to_delete = Some(b_idx);
                                                 }
+
+                                                let cursor_idx = egui::text_edit::TextEditState::load(ui.ctx(), h_edit_id)
+                                                    .and_then(|s| s.cursor.char_range())
+                                                    .map(|r| r.primary.index.0)
+                                                    .unwrap_or(0);
+                                                let is_at_top = cursor_idx == 0 || text.is_empty();
+                                                let is_at_bottom = cursor_idx >= text.len() || text.is_empty();
+
+                                                if ui.input(|i| i.key_pressed(egui::Key::ArrowUp)) && is_at_top && b_idx > 0 {
+                                                    focus_navigate = Some((b_idx - 1, true));
+                                                } else if ui.input(|i| i.key_pressed(egui::Key::ArrowDown)) && is_at_bottom && b_idx + 1 < total_blocks {
+                                                    focus_navigate = Some((b_idx + 1, false));
+                                                }
                                             }
                                         });
                                 }
+                            }
+                        }
+
+                        // Apply arrow navigation between blocks
+                        if let Some((target_idx, to_bottom)) = focus_navigate {
+                            if let Some(target_block) = doc.blocks.get(target_idx) {
+                                let (target_id, text_len) = match target_block {
+                                    MlaBlock::Paragraph { id, text } => (egui::Id::new("p_block").with(id), text.len()),
+                                    MlaBlock::BlockQuote { id, text, .. } => (egui::Id::new("bq_block").with(id), text.len()),
+                                    MlaBlock::SectionHeading { id, text, .. } => (egui::Id::new("h_block").with(id), text.len()),
+                                };
+                                let mut state = egui::text_edit::TextEditState::load(ui.ctx(), target_id).unwrap_or_default();
+                                let target_cursor = if to_bottom { text_len } else { 0 };
+                                state.cursor.set_char_range(Some(egui::text::CCursorRange::one(egui::text::CCursor::new(target_cursor))));
+                                state.store(ui.ctx(), target_id);
+                                ui.ctx().memory_mut(|m| m.request_focus(target_id));
+                                doc.active_block_idx = target_idx;
                             }
                         }
 
@@ -637,7 +715,6 @@ fn render_keybind_preview_panel(
             );
 
             let actions_writing = [
-                (Action::AddParagraph, icons::PARAGRAPH, "Paragraph"),
                 (Action::InsertCitation, icons::QUOTE, "Citation"),
                 (Action::InsertBlockQuote, icons::QUOTE, "Block Quote"),
                 (
@@ -678,8 +755,6 @@ fn render_keybind_preview_panel(
                     icons::BOOK_CITATIONS,
                     "Works Cited",
                 ),
-                (Action::ExportDocx, icons::WORD_DOCX, "Export Word"),
-                (Action::ExportHtmlPdf, icons::HTML_PDF, "Export HTML"),
                 (Action::NewDocument, icons::FILE_NEW, "New Paper"),
                 (Action::OpenDocument, icons::FOLDER_OPEN, "Open Paper"),
             ];

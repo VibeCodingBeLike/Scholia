@@ -29,7 +29,7 @@ fn main() -> eframe::Result<()> {
             .with_decorations(false)
             .with_inner_size([1120.0, 860.0])
             .with_min_inner_size([720.0, 500.0])
-            .with_title("Scholia — MLA 9th Edition Document Editor"),
+            .with_title("Scholia"),
         ..Default::default()
     };
 
@@ -283,6 +283,9 @@ impl eframe::App for MlaApp {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+        // Ensure no 1px white line / border is drawn on borderless window
+        ui.style_mut().visuals.window_stroke = egui::Stroke::NONE;
+
         // Handle vibrancy application
         if self.vibrancy_dirty {
             if let Some(window) = frame.winit_window() {
@@ -309,8 +312,8 @@ impl eframe::App for MlaApp {
             }
         }
 
-        // Outer App Container with customizable window opacity & tint
-        egui::Frame::new()
+        // Outer App Container with ZERO 1px stroke / border line
+        egui::Frame::NONE
             .fill(self.theme.window_fill_color())
             .inner_margin(egui::Margin::symmetric(14, 10))
             .show(ui, |ui| {
@@ -386,9 +389,9 @@ impl eframe::App for MlaApp {
                     }
                 }
 
-                // Bottom Status Bar
+                // Bottom Status Bar (no grey separator line)
                 if !self.focus_mode {
-                    ui.separator();
+                    ui.add_space(4.0);
                     if let Some(StatusBarEvent::OpenCompliance) =
                         render_status_bar(ui, &self.doc, &self.theme)
                     {
