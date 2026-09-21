@@ -32,31 +32,27 @@ pub fn render_editor_page(
         .show(ui, |ui| {
             ui.add_space(20.0);
 
-            // Compute dimensions
+            // Compute page dimensions - the manuscript page MUST ALWAYS be strictly centered!
             let total_avail = ui.available_width();
             let page_width = 816.0f32.min(total_avail - 48.0).max(420.0);
-            let sidebar_width = 224.0f32;
-            let gap = 24.0f32;
+            let page_margin_left = ((total_avail - page_width) / 2.0).max(0.0);
 
-            // Disappear if window cannot comfortably fit both sidebar and page, or in Zen mode
-            let show_sidebar = !focus_mode && (total_avail >= page_width + sidebar_width + gap + 40.0);
+            let sidebar_width = 208.0f32;
+            let gap = 16.0f32;
 
-            let total_content_width = if show_sidebar {
-                page_width + sidebar_width + gap
-            } else {
-                page_width
-            };
-
-            let margin_left = ((total_avail - total_content_width) / 2.0).max(0.0);
+            // Show keybind sidebar ONLY if the left margin is wide enough to fit it comfortably without displacing the centered page!
+            let show_sidebar = !focus_mode && (page_margin_left >= sidebar_width + gap + 10.0);
 
             // Center container
             ui.horizontal_top(|ui| {
-                if margin_left > 0.0 {
-                    ui.add_space(margin_left);
-                }
-
-                // --- KEYBIND PREVIEW PANEL ON THE LEFT ---
                 if show_sidebar {
+                    // Position sidebar within the left margin so page stays exactly centered
+                    let space_before_sidebar = page_margin_left - sidebar_width - gap;
+                    if space_before_sidebar > 0.0 {
+                        ui.add_space(space_before_sidebar);
+                    }
+
+                    // --- KEYBIND PREVIEW PANEL ON THE LEFT ---
                     ui.vertical(|ui| {
                         ui.set_width(sidebar_width);
                         ui.set_min_width(sidebar_width);
@@ -67,6 +63,9 @@ pub fn render_editor_page(
                     });
 
                     ui.add_space(gap);
+                } else if page_margin_left > 0.0 {
+                    // Page is strictly centered
+                    ui.add_space(page_margin_left);
                 }
 
                 // Vertical column holding the pages
@@ -349,8 +348,8 @@ pub fn render_editor_page(
                     ui.add_space(40.0);
                 });
 
-                if margin_left > 0.0 {
-                    ui.add_space(margin_left);
+                if page_margin_left > 0.0 {
+                    ui.add_space(page_margin_left);
                 }
             });
         });

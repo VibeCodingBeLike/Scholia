@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![windows_subsystem = "windows"]
 use eframe::egui;
 use std::path::{Path, PathBuf};
 
