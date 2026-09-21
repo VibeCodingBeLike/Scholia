@@ -93,6 +93,8 @@ pub struct ExplanatoryNote {
     pub id: String,
     pub index: usize,
     pub text: String,
+    #[serde(default)]
+    pub block_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -357,7 +359,10 @@ impl MlaDocument {
 
     pub fn remove_block(&mut self, index: usize) {
         if self.blocks.len() > 1 && index < self.blocks.len() {
+            let removed_id = self.blocks[index].id().to_string();
             self.blocks.remove(index);
+            self.notes.retain(|n| n.block_id != removed_id);
+            self.reindex_notes();
             self.is_dirty = true;
             self.sync_body_from_blocks();
         }
@@ -366,6 +371,7 @@ impl MlaDocument {
     pub fn move_block_up(&mut self, index: usize) {
         if index > 0 && index < self.blocks.len() {
             self.blocks.swap(index, index - 1);
+            self.reindex_notes();
             self.is_dirty = true;
             self.sync_body_from_blocks();
         }
@@ -374,6 +380,7 @@ impl MlaDocument {
     pub fn move_block_down(&mut self, index: usize) {
         if index + 1 < self.blocks.len() {
             self.blocks.swap(index, index + 1);
+            self.reindex_notes();
             self.is_dirty = true;
             self.sync_body_from_blocks();
         }
@@ -385,21 +392,67 @@ impl MlaDocument {
     }
 
     pub fn add_explanatory_note(&mut self, text: String) -> usize {
+        self.ensure_blocks_initialized();
+        let b_idx = self.active_block_idx.min(self.blocks.len().saturating_sub(1));
+        let block_id = self.blocks[b_idx].id().to_string();
+        self.add_note_to_block(&block_id, text)
+    }
+
+    pub fn add_note_to_block(&mut self, block_id: &str, text: String) -> usize {
         let next_idx = self.notes.len() + 1;
         self.notes.push(ExplanatoryNote {
             id: generate_block_id(next_idx),
             index: next_idx,
             text,
+            block_id: block_id.to_string(),
         });
+        self.reindex_notes();
         self.is_dirty = true;
-        next_idx
+        self.notes
+            .iter()
+            .rposition(|n| n.block_id == block_id)
+            .map(|pos| self.notes[pos].index)
+            .unwrap_or(next_idx)
     }
 
     pub fn delete_explanatory_note(&mut self, index: usize) {
         if let Some(pos) = self.notes.iter().position(|n| n.index == index) {
             self.notes.remove(pos);
-            self.sync_notes_with_body();
+            self.reindex_notes();
             self.is_dirty = true;
+        }
+    }
+
+    pub fn delete_note_by_id(&mut self, id: &str) {
+        if let Some(pos) = self.notes.iter().position(|n| n.id == id) {
+            self.notes.remove(pos);
+            self.reindex_notes();
+            self.is_dirty = true;
+        }
+    }
+
+    pub fn notes_for_block(&self, block_id: &str) -> Vec<&ExplanatoryNote> {
+        self.notes.iter().filter(|n| n.block_id == block_id).collect()
+    }
+
+    /// Re-indexes all notes sequentially based on document block order.
+    pub fn reindex_notes(&mut self) {
+        let block_order: std::collections::HashMap<&str, usize> = self
+            .blocks
+            .iter()
+            .enumerate()
+            .map(|(i, b)| (b.id(), i))
+            .collect();
+
+        self.notes.sort_by_key(|n| {
+            (
+                block_order.get(n.block_id.as_str()).copied().unwrap_or(usize::MAX),
+                n.index,
+            )
+        });
+
+        for (i, note) in self.notes.iter_mut().enumerate() {
+            note.index = i + 1;
         }
     }
 
@@ -436,85 +489,27 @@ impl MlaDocument {
         }
     }
 
-    /// Scans the body blocks for superscript note references (¹, ², etc.).
-    /// Re-indexes notes that exist in the body sequentially, deletes orphaned notes,
-    /// and updates the superscripts in the body text so they match the re-indexed notes.
     pub fn sync_notes_with_body(&mut self) {
-        let mut found_indices = Vec::new();
-        for block in &self.blocks {
-            let mut current_super = String::new();
-            for c in block.text().chars() {
-                if is_superscript_digit(c) {
-                    current_super.push(c);
-                } else {
-                    if !current_super.is_empty() {
-                        if let Some(num) = superscript_to_num(&current_super) {
-                            if !found_indices.contains(&num) {
-                                found_indices.push(num);
-                            }
-                        }
-                        current_super.clear();
-                    }
-                }
-            }
-            if !current_super.is_empty() {
-                if let Some(num) = superscript_to_num(&current_super) {
-                    if !found_indices.contains(&num) {
-                        found_indices.push(num);
-                    }
-                }
+        self.ensure_blocks_initialized();
+        let valid_block_ids: std::collections::HashSet<&str> =
+            self.blocks.iter().map(|b| b.id()).collect();
+
+        for (i, note) in self.notes.iter_mut().enumerate() {
+            if note.block_id.is_empty() || !valid_block_ids.contains(note.block_id.as_str()) {
+                let target_idx = i.min(self.blocks.len().saturating_sub(1));
+                note.block_id = self.blocks[target_idx].id().to_string();
             }
         }
 
-        let mut new_notes = Vec::new();
-        let mut index_mapping = std::collections::HashMap::new();
-
-        for old_idx in &found_indices {
-            if let Some(mut note) = self.notes.iter().find(|n| n.index == *old_idx).cloned() {
-                let new_idx = new_notes.len() + 1;
-                index_mapping.insert(*old_idx, new_idx);
-                note.index = new_idx;
-                new_notes.push(note);
-            }
-        }
-
-        self.notes = new_notes;
-
-        // If index mapping changed any numbers, rewrite the superscripts in body blocks
+        // Clean out any raw unicode superscripts from block text
         for block in &mut self.blocks {
-            let original = block.text().to_string();
-            let mut rewritten = String::new();
-            let mut current_super = String::new();
-
-            for c in original.chars() {
-                if is_superscript_digit(c) {
-                    current_super.push(c);
-                } else {
-                    if !current_super.is_empty() {
-                        if let Some(old_num) = superscript_to_num(&current_super) {
-                            let mapped_num = index_mapping.get(&old_num).copied().unwrap_or(old_num);
-                            rewritten.push_str(&num_to_superscript(mapped_num));
-                        } else {
-                            rewritten.push_str(&current_super);
-                        }
-                        current_super.clear();
-                    }
-                    rewritten.push(c);
-                }
-            }
-            if !current_super.is_empty() {
-                if let Some(old_num) = superscript_to_num(&current_super) {
-                    let mapped_num = index_mapping.get(&old_num).copied().unwrap_or(old_num);
-                    rewritten.push_str(&num_to_superscript(mapped_num));
-                } else {
-                    rewritten.push_str(&current_super);
-                }
-            }
-
-            if rewritten != original {
-                *block.text_mut() = rewritten;
+            let cleaned = clean_superscripts(block.text());
+            if cleaned != block.text() {
+                *block.text_mut() = cleaned;
             }
         }
+
+        self.reindex_notes();
     }
 }
 
@@ -654,6 +649,10 @@ pub fn superscript_to_num(s: &str) -> Option<usize> {
         }
     }
     num_str.parse().ok()
+}
+
+pub fn clean_superscripts(s: &str) -> String {
+    s.chars().filter(|c| !is_superscript_digit(*c)).collect()
 }
 
 /// Smart Typographical Cleaning on Export:

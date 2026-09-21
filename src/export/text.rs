@@ -35,12 +35,18 @@ pub fn generate_mla_text(doc: &MlaDocument) -> String {
 
     // Blocks
     for block in &doc.blocks {
+        let block_notes = doc.notes_for_block(block.id());
+        let sups: String = block_notes
+            .iter()
+            .map(|n| crate::model::num_to_superscript(n.index))
+            .collect();
+
         match block {
             MlaBlock::Paragraph { text, .. } => {
                 let trimmed = text.trim();
                 if !trimmed.is_empty() {
                     // 0.5 in indent is typically 5 spaces in plain text
-                    out.push_str(&format!("     {}\n\n", trimmed));
+                    out.push_str(&format!("     {}{}\n\n", trimmed, sups));
                 }
             }
             MlaBlock::BlockQuote { text, citation, .. } => {
@@ -51,7 +57,7 @@ pub fn generate_mla_text(doc: &MlaDocument) -> String {
                     } else {
                         format!(" {}", citation.trim())
                     };
-                    out.push_str(&format!("          {}{}\n\n", trimmed, cite));
+                    out.push_str(&format!("          {}{}{}\n\n", trimmed, sups, cite));
                 }
             }
             MlaBlock::SectionHeading { level, text, .. } => {

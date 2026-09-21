@@ -333,35 +333,68 @@ fn test_typographical_cleaning() {
 
 #[test]
 fn test_explanatory_notes_and_superscript_engine() {
-    use scholia::model::{num_to_superscript, MlaBlock, MlaDocument};
+    use scholia::model::{clean_superscripts, num_to_superscript, MlaBlock, MlaDocument};
 
     let mut doc = MlaDocument::new_blank();
     assert_eq!(num_to_superscript(1), "¹");
     assert_eq!(num_to_superscript(2), "²");
     assert_eq!(num_to_superscript(12), "¹²");
 
-    // Add note 1 and 2
+    // Body text is clean prose, no raw superscript characters
+    assert_eq!(clean_superscripts("Here is text¹ and more²."), "Here is text and more.");
+
+    let block_0_id = doc.blocks[0].id().to_string();
+    if let MlaBlock::Paragraph { text, .. } = &mut doc.blocks[0] {
+        *text = "Here is clean prose text without raw superscripts.".to_string();
+    }
+
+    // Add note 1 and 2 linked to active block 0
     let n1 = doc.add_explanatory_note("First definition".to_string());
     let n2 = doc.add_explanatory_note("Second definition".to_string());
     assert_eq!(n1, 1);
     assert_eq!(n2, 2);
     assert_eq!(doc.notes.len(), 2);
 
-    // Insert note marker into paragraph
-    if let MlaBlock::Paragraph { text, .. } = &mut doc.blocks[0] {
-        text.push_str("Here is a term¹ and another².");
-    }
+    // Verify notes are linked to block 0
+    let block_notes = doc.notes_for_block(&block_0_id);
+    assert_eq!(block_notes.len(), 2);
+    assert_eq!(block_notes[0].text, "First definition");
+    assert_eq!(block_notes[0].index, 1);
+    assert_eq!(block_notes[1].text, "Second definition");
+    assert_eq!(block_notes[1].index, 2);
 
-    // Deleting note 1 marker should re-index note 2 to note 1
-    if let MlaBlock::Paragraph { text, .. } = &mut doc.blocks[0] {
-        *text = "Here is a term and another².".to_string();
-    }
-    doc.sync_notes_with_body();
+    // Verify block text remains clean prose
+    assert_eq!(doc.blocks[0].text(), "Here is clean prose text without raw superscripts.");
+
+    // Deleting note 1 removes it and re-indexes note 2 to index 1
+    let note_1_id = doc.notes[0].id.clone();
+    doc.delete_note_by_id(&note_1_id);
 
     assert_eq!(doc.notes.len(), 1);
     assert_eq!(doc.notes[0].index, 1);
     assert_eq!(doc.notes[0].text, "Second definition");
-    assert_eq!(doc.blocks[0].text(), "Here is a term and another¹.");
+
+    let block_notes_after = doc.notes_for_block(&block_0_id);
+    assert_eq!(block_notes_after.len(), 1);
+    assert_eq!(block_notes_after[0].index, 1);
+    assert_eq!(block_notes_after[0].text, "Second definition");
+
+    // Adding a second block with its own note
+    let b1_idx = doc.add_paragraph(None);
+    let block_1_id = doc.blocks[b1_idx].id().to_string();
+    if let MlaBlock::Paragraph { text, .. } = &mut doc.blocks[b1_idx] {
+        *text = "Second paragraph prose.".to_string();
+    }
+    doc.add_note_to_block(&block_1_id, "Third definition on block 1".to_string());
+    assert_eq!(doc.notes.len(), 2);
+    assert_eq!(doc.notes[1].index, 2);
+    assert_eq!(doc.notes_for_block(&block_1_id).len(), 1);
+
+    // Deleting block 1 removes its linked notes automatically
+    doc.remove_block(b1_idx);
+    assert_eq!(doc.notes.len(), 1);
+    assert_eq!(doc.notes[0].text, "Second definition");
+    assert_eq!(doc.notes_for_block(&block_1_id).len(), 0);
 }
 
 #[test]

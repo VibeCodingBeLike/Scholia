@@ -110,30 +110,46 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
 
     // --- Body Blocks ---
     for block in &doc.blocks {
+        let block_notes = doc.notes_for_block(block.id());
+        let sups: String = block_notes
+            .iter()
+            .map(|n| crate::model::num_to_superscript(n.index))
+            .collect();
+
         match block {
             MlaBlock::Paragraph { text, .. } => {
                 let trimmed = text.trim();
                 if !trimmed.is_empty() {
+                    let formatted_text = if sups.is_empty() {
+                        trimmed.to_string()
+                    } else {
+                        format!("{}{}", trimmed, sups)
+                    };
                     // MLA First-Line Indent: 0.5 in (720 dxa)
                     let p = Paragraph::new()
                         .align(AlignmentType::Left)
                         .line_spacing(double_spacing())
                         .indent(None, Some(SpecialIndentType::FirstLine(720)), None, None);
 
-                    let p = append_formatted_runs(p, trimmed, font_name, font_size);
+                    let p = append_formatted_runs(p, &formatted_text, font_name, font_size);
                     docx = docx.add_paragraph(p);
                 }
             }
             MlaBlock::BlockQuote { text, citation, .. } => {
                 let trimmed = text.trim();
                 if !trimmed.is_empty() {
+                    let formatted_text = if sups.is_empty() {
+                        trimmed.to_string()
+                    } else {
+                        format!("{}{}", trimmed, sups)
+                    };
                     // MLA Blockquote: 0.5 in left margin, double spaced, citation outside
                     let mut p = Paragraph::new()
                         .align(AlignmentType::Left)
                         .line_spacing(double_spacing())
                         .indent(Some(720), None, None, None);
 
-                    p = append_formatted_runs(p, trimmed, font_name, font_size);
+                    p = append_formatted_runs(p, &formatted_text, font_name, font_size);
                     if !citation.trim().is_empty() {
                         p = p.add_run(
                             Run::new()

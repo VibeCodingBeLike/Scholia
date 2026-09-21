@@ -198,11 +198,22 @@ fn rebuild_lines(mla: &MlaDocument, sorted_wc: &[crate::model::WorksCitedEntry])
 
     // Body
     for block in &mla.blocks {
+        let block_notes = mla.notes_for_block(block.id());
+        let sups: String = block_notes
+            .iter()
+            .map(|n| crate::model::num_to_superscript(n.index))
+            .collect();
+
         match block {
             MlaBlock::Paragraph { text, .. } => {
                 let t = text.trim();
                 if t.is_empty() { continue; }
-                let cleaned = typographical_clean(t);
+                let base = typographical_clean(t);
+                let cleaned = if sups.is_empty() {
+                    base
+                } else {
+                    format!("{}{}", base, sups)
+                };
                 let wrapped = word_wrap(&cleaned, text_w_mm() - INDENT_MM);
                 for (i, w) in wrapped.into_iter().enumerate() {
                     if i == 0 {
@@ -215,12 +226,17 @@ fn rebuild_lines(mla: &MlaDocument, sorted_wc: &[crate::model::WorksCitedEntry])
             MlaBlock::BlockQuote { text, citation, .. } => {
                 let t = text.trim();
                 if t.is_empty() { continue; }
-                let full = if citation.trim().is_empty() {
+                let base = if citation.trim().is_empty() {
                     t.to_string()
                 } else {
                     format!("{} {}", t, citation.trim())
                 };
-                let cleaned = typographical_clean(&full);
+                let cleaned_base = typographical_clean(&base);
+                let cleaned = if sups.is_empty() {
+                    cleaned_base
+                } else {
+                    format!("{}{}", cleaned_base, sups)
+                };
                 for w in word_wrap(&cleaned, text_w_mm() - BLOCKQUOTE_INDENT_MM) {
                     lines.push(DocLine::blockquote(w));
                 }

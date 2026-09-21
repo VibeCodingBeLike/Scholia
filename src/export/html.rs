@@ -40,13 +40,20 @@ pub fn generate_mla_html(doc: &MlaDocument) -> String {
 
     // Blocks
     for block in &doc.blocks {
+        let block_notes = doc.notes_for_block(block.id());
+        let sups: String = block_notes
+            .iter()
+            .map(|n| format!("<sup>{}</sup>", n.index))
+            .collect();
+
         match block {
             MlaBlock::Paragraph { text, .. } => {
                 let trimmed = text.trim();
                 if !trimmed.is_empty() {
                     body_html.push_str(&format!(
-                        r#"<p class="mla-paragraph">{}</p>"#,
-                        markdown_to_html(trimmed)
+                        r#"<p class="mla-paragraph">{}{}</p>"#,
+                        markdown_to_html(trimmed),
+                        sups
                     ));
                 }
             }
@@ -59,8 +66,9 @@ pub fn generate_mla_html(doc: &MlaDocument) -> String {
                         format!(" {}", escape_html(citation.trim()))
                     };
                     body_html.push_str(&format!(
-                        r#"<blockquote class="mla-blockquote">{}<span class="citation">{}</span></blockquote>"#,
+                        r#"<blockquote class="mla-blockquote">{}{}<span class="citation">{}</span></blockquote>"#,
                         markdown_to_html(trimmed),
+                        sups,
                         cite_part
                     ));
                 }
