@@ -83,29 +83,48 @@ pub fn generate_mla_html(doc: &MlaDocument) -> String {
         }
     }
 
-    // Works Cited
-    if !sorted_wc.is_empty() {
-        let title_label = if sorted_wc.len() == 1 {
-            "Work Cited"
-        } else {
-            "Works Cited"
-        };
-        body_html.push_str(&format!(
-            r#"<div class="mla-works-cited-section">
-    <h2 class="mla-works-cited-title">{}</h2>"#,
-            title_label
-        ));
-
-        for entry in &sorted_wc {
-            let md = entry.format_markdown();
+    // Footnotes / Notes Section (Rendered in footer at bottom of body text per MLA standards)
+    if !doc.notes.is_empty() {
+        body_html.push_str(
+            r#"<footer class="mla-footnotes">
+    <hr class="mla-footnotes-divider">"#,
+        );
+        for note in &doc.notes {
+            let note_str = format!("{}. {}", note.index, crate::model::typographical_clean(&note.text));
             body_html.push_str(&format!(
-                r#"    <p class="mla-works-cited-entry">{}</p>"#,
-                markdown_to_html(&md)
+                r#"    <p class="mla-footnote-entry">{}</p>"#,
+                escape_html(&note_str)
             ));
         }
-
-        body_html.push_str("</div>");
+        body_html.push_str("</footer>");
     }
+
+    // Works Cited
+    let title_label = if sorted_wc.len() == 1 {
+        "Work Cited"
+    } else {
+        "Works Cited"
+    };
+    body_html.push_str(&format!(
+        r#"<div class="mla-works-cited-section">
+    <h2 class="mla-works-cited-title">{}</h2>"#,
+        title_label
+    ));
+
+    if sorted_wc.is_empty() {
+        body_html.push_str(r#"    <p class="mla-works-cited-entry" style="text-align: center; text-indent: 0;">No entries yet.</p>"#);
+    } else {
+        for entry in &sorted_wc {
+            let md = entry.format_markdown();
+            let cleaned = crate::model::typographical_clean(&md);
+            body_html.push_str(&format!(
+                r#"    <p class="mla-works-cited-entry">{}</p>"#,
+                markdown_to_html(&cleaned)
+            ));
+        }
+    }
+
+    body_html.push_str("</div>");
 
     format!(
         r#"<!DOCTYPE html>
@@ -235,6 +254,28 @@ pub fn generate_mla_html(doc: &MlaDocument) -> String {
             text-align: center;
             margin: 0;
             padding: 0;
+        }}
+
+        .mla-footnotes {{
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+        }}
+
+        .mla-footnotes-divider {{
+            width: 1.5in;
+            border: none;
+            border-top: 1px solid #000;
+            margin: 0 0 0.5rem 0;
+            text-align: left;
+        }}
+
+        .mla-footnote-entry {{
+            font-size: 10pt;
+            line-height: 1.4;
+            text-indent: 0.5in;
+            margin: 0 0 0.25rem 0;
+            padding: 0;
+            text-align: left;
         }}
 
         .mla-works-cited-section {{

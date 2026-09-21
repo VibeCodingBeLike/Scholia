@@ -14,6 +14,7 @@ pub enum ToolbarEvent {
     AddBlockquote,
     AddHeading(u8),
     OpenWorksCited,
+    AddFootnote,
 }
 
 pub fn render_toolbar(
@@ -171,6 +172,17 @@ pub fn render_toolbar(
             .clicked()
         {
             event = Some(ToolbarEvent::OpenWorksCited);
+        }
+
+        // Add Footnote / Definition button
+        let fn_sc = keybinds.get_shortcut(Action::AddFootnote).display_string();
+        let fn_label = format!("{} Note / Def ({})", icons::INFO, doc.notes.len());
+        if ui
+            .button(RichText::new(fn_label).color(text_col))
+            .on_hover_text(format!("Insert Explanatory Note / Definition ({})", fn_sc))
+            .clicked()
+        {
+            event = Some(ToolbarEvent::AddFootnote);
         }
 
         // Draggable empty space between tools and window controls

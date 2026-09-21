@@ -18,6 +18,7 @@ pub enum Action {
     MoveBlockUp,
     MoveBlockDown,
     ManageWorksCited,
+    AddFootnote,
     ConvertToMlaTitleCase,
     OpenPreferences,
     ToggleComplianceCheck,
@@ -42,6 +43,7 @@ impl Action {
             Action::MoveBlockUp => "Move Active Block Up",
             Action::MoveBlockDown => "Move Active Block Down",
             Action::ManageWorksCited => "Open Works Cited Manager",
+            Action::AddFootnote => "Add Definition / Note",
             Action::ConvertToMlaTitleCase => "Format Title to MLA Title Case",
             Action::OpenPreferences => "Theme & Transparency Settings",
             Action::ToggleComplianceCheck => "Run MLA Compliance Inspector",
@@ -65,6 +67,7 @@ impl Action {
             | Action::DeleteBlock
             | Action::MoveBlockUp
             | Action::MoveBlockDown
+            | Action::AddFootnote
             | Action::ConvertToMlaTitleCase => "Editing & MLA Blocks",
             Action::ManageWorksCited => "Works Cited",
             Action::OpenPreferences | Action::ToggleComplianceCheck | Action::ToggleFocusMode => {
@@ -90,6 +93,7 @@ impl Action {
             Action::MoveBlockUp,
             Action::MoveBlockDown,
             Action::ManageWorksCited,
+            Action::AddFootnote,
             Action::ConvertToMlaTitleCase,
             Action::OpenPreferences,
             Action::ToggleComplianceCheck,
@@ -114,6 +118,7 @@ pub enum KeyName {
     E,
     B,
     C,
+    F,
     L,
     W,
     T,
@@ -140,6 +145,7 @@ impl KeyName {
             KeyName::E => Key::E,
             KeyName::B => Key::B,
             KeyName::C => Key::C,
+            KeyName::F => Key::F,
             KeyName::L => Key::L,
             KeyName::W => Key::W,
             KeyName::T => Key::T,
@@ -166,6 +172,7 @@ impl KeyName {
             KeyName::E => "E",
             KeyName::B => "B",
             KeyName::C => "C",
+            KeyName::F => "F",
             KeyName::L => "L",
             KeyName::W => "W",
             KeyName::T => "T",
@@ -260,6 +267,7 @@ pub struct KeybindConfig {
     pub move_block_up: Shortcut,
     pub move_block_down: Shortcut,
     pub manage_works_cited: Shortcut,
+    pub add_footnote: Shortcut,
     pub convert_title_case: Shortcut,
     pub open_preferences: Shortcut,
     pub toggle_compliance: Shortcut,
@@ -284,6 +292,7 @@ impl Default for KeybindConfig {
             move_block_up: Shortcut::new(false, false, true, KeyName::Up),
             move_block_down: Shortcut::new(false, false, true, KeyName::Down),
             manage_works_cited: Shortcut::new(true, false, false, KeyName::W),
+            add_footnote: Shortcut::new(true, true, false, KeyName::F), // Cmd/Ctrl + Shift + F
             convert_title_case: Shortcut::new(true, true, false, KeyName::T),
             open_preferences: Shortcut::new(true, false, false, KeyName::Comma),
             toggle_compliance: Shortcut::new(true, false, false, KeyName::L),
@@ -310,6 +319,7 @@ impl KeybindConfig {
             Action::MoveBlockUp => self.move_block_up,
             Action::MoveBlockDown => self.move_block_down,
             Action::ManageWorksCited => self.manage_works_cited,
+            Action::AddFootnote => self.add_footnote,
             Action::ConvertToMlaTitleCase => self.convert_title_case,
             Action::OpenPreferences => self.open_preferences,
             Action::ToggleComplianceCheck => self.toggle_compliance,
@@ -334,6 +344,7 @@ impl KeybindConfig {
             Action::MoveBlockUp => self.move_block_up = sc,
             Action::MoveBlockDown => self.move_block_down = sc,
             Action::ManageWorksCited => self.manage_works_cited = sc,
+            Action::AddFootnote => self.add_footnote = sc,
             Action::ConvertToMlaTitleCase => self.convert_title_case = sc,
             Action::OpenPreferences => self.open_preferences = sc,
             Action::ToggleComplianceCheck => self.toggle_compliance = sc,

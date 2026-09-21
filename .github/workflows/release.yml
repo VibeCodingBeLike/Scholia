@@ -1,13 +1,22 @@
-name: Release & Package Installers
+name: Release & Publish to GitHub Releases
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Semantic Version tag (e.g. v0.1.0)'
+        required: false
+        default: 'v0.1.0'
+
+permissions:
+  contents: write
 
 jobs:
-  build-release:
-    name: Build Release Asset (${{ matrix.target }})
+  build-binaries:
+    name: Build (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -16,19 +25,33 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact_name: Scholia-windows-x64.zip
-            use_inno: true
           - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: Scholia-macos-arm64.zip
+          - os: macos-13
             target: x86_64-apple-darwin
-            artifact_name: Scholia-macOS-x64.zip
-            use_inno: false
+            artifact_name: Scholia-macos-x64.zip
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact_name: Scholia-linux-x64.tar.gz
-            use_inno: false
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Determine Semantic Version
+        id: semver
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
+            TAG="${{ github.event.inputs.version }}"
+          elif [ -n "${{ github.ref_name }}" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v0.1.0"
+          fi
+          echo "VERSION=${TAG}" >> $GITHUB_OUTPUT
+          echo "Building Scholia for tag: ${TAG}"
 
       - name: Install Linux Dependencies
         if: runner.os == 'Linux'
@@ -44,40 +67,109 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
+      - name: Run Test Suite
+        run: cargo test --release --target ${{ matrix.target }}
+
       - name: Build Optimized Release Binary
         run: cargo build --release --target ${{ matrix.target }}
 
       # Packaging on Windows
-      - name: Package Windows Artifacts
+      - name: Package Windows Artifact
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path "dist\bundle" -Force
-          Copy-Item "target\${{ matrix.target }}\release\scholia.exe" -Destination "dist\bundle\"
-          Copy-Item "README.md", "LICENSE", "sample_mla_paper.mladoc" -Destination "dist\bundle\"
-          Compress-Archive -Path "dist\bundle\*" -DestinationPath "dist\${{ matrix.artifact_name }}" -Force
+          $ver = "${{ steps.semver.outputs.VERSION }}"
+          $pkgDir = "dist\Scholia-$ver-windows-x64"
+          New-Item -ItemType Directory -Path $pkgDir -Force
+          Copy-Item "target\${{ matrix.target }}\release\scholia.exe" -Destination "$pkgDir\"
+          Copy-Item "README.md", "LICENSE", "sample_mla_paper.mladoc" -Destination "$pkgDir\"
+          $zipName = "Scholia-$ver-windows-x64.zip"
+          Compress-Archive -Path "$pkgDir\*" -DestinationPath "dist\$zipName" -Force
+          Write-Host "Created dist\$zipName"
 
       # Packaging on macOS
-      - name: Package macOS Artifacts
+      - name: Package macOS Artifact
         if: runner.os == 'macOS'
         run: |
-          mkdir -p dist/bundle
-          cp target/${{ matrix.target }}/release/scholia dist/bundle/
-          cp README.md LICENSE sample_mla_paper.mladoc dist/bundle/
-          cd dist && zip -r "${{ matrix.artifact_name }}" bundle/
+          TAG="${{ steps.semver.outputs.VERSION }}"
+          ARCH="${{ matrix.target == 'aarch64-apple-darwin' && 'arm64' || 'x64' }}"
+          PKG_DIR="dist/Scholia-${TAG}-macos-${ARCH}"
+          mkdir -p "$PKG_DIR"
+          cp "target/${{ matrix.target }}/release/scholia" "$PKG_DIR/"
+          cp README.md LICENSE sample_mla_paper.mladoc "$PKG_DIR/"
+          cd dist && zip -r "Scholia-${TAG}-macos-${ARCH}.zip" "Scholia-${TAG}-macos-${ARCH}"
+          echo "Created dist/Scholia-${TAG}-macos-${ARCH}.zip"
 
       # Packaging on Linux
-      - name: Package Linux Artifacts
+      - name: Package Linux Artifact
         if: runner.os == 'Linux'
         run: |
-          mkdir -p dist/bundle
-          cp target/${{ matrix.target }}/release/scholia dist/bundle/
-          cp README.md LICENSE sample_mla_paper.mladoc dist/bundle/
-          cd dist && tar -czvf "${{ matrix.artifact_name }}" bundle/
+          TAG="${{ steps.semver.outputs.VERSION }}"
+          PKG_DIR="dist/Scholia-${TAG}-linux-x64"
+          mkdir -p "$PKG_DIR"
+          cp "target/${{ matrix.target }}/release/scholia" "$PKG_DIR/"
+          cp README.md LICENSE sample_mla_paper.mladoc "$PKG_DIR/"
+          cd dist && tar -czvf "Scholia-${TAG}-linux-x64.tar.gz" "Scholia-${TAG}-linux-x64"
+          echo "Created dist/Scholia-${TAG}-linux-x64.tar.gz"
 
-      - name: Upload Release Asset
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-${{ matrix.target }}
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+          retention-days: 1
+
+  publish-release:
+    name: Publish to GitHub Releases
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Determine Semantic Version
+        id: semver
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
+            TAG="${{ github.event.inputs.version }}"
+          elif [ -n "${{ github.ref_name }}" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v0.1.0"
+          fi
+          echo "VERSION=${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Download All Release Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-downloads
+          merge-multiple: true
+
+      - name: Generate SHA256 Checksums
+        id: checksums
+        shell: bash
+        run: |
+          mkdir -p final-assets
+          cp release-downloads/*.zip release-downloads/*.tar.gz final-assets/ 2>/dev/null || true
+          cd final-assets
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/${{ matrix.artifact_name }}
+          tag_name: ${{ steps.semver.outputs.VERSION }}
+          name: "Scholia ${{ steps.semver.outputs.VERSION }}"
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: |
+            final-assets/*.zip
+            final-assets/*.tar.gz
+            final-assets/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

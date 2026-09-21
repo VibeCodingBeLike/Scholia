@@ -88,6 +88,13 @@ impl MlaHeader {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ExplanatoryNote {
+    pub id: String,
+    pub index: usize,
+    pub text: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MlaDocument {
     pub header: MlaHeader,
@@ -97,6 +104,8 @@ pub struct MlaDocument {
     #[serde(default)]
     pub blocks: Vec<MlaBlock>,
     pub works_cited: Vec<WorksCitedEntry>,
+    #[serde(default)]
+    pub notes: Vec<ExplanatoryNote>,
     #[serde(default)]
     pub file_path: Option<String>,
     #[serde(default)]
@@ -124,6 +133,7 @@ impl MlaDocument {
                 text: String::new(),
             }],
             works_cited: Vec::new(),
+            notes: Vec::new(),
             file_path: None,
             is_dirty: false,
             active_block_idx: 0,
@@ -146,6 +156,7 @@ impl MlaDocument {
             body: starter_text.to_string(),
             blocks: Vec::new(),
             works_cited: Vec::new(),
+            notes: Vec::new(),
             file_path: None,
             is_dirty: false,
             active_block_idx: 0,
@@ -372,6 +383,139 @@ impl MlaDocument {
         self.works_cited.sort_by_key(|a| a.sort_key());
         self.is_dirty = true;
     }
+
+    pub fn add_explanatory_note(&mut self, text: String) -> usize {
+        let next_idx = self.notes.len() + 1;
+        self.notes.push(ExplanatoryNote {
+            id: generate_block_id(next_idx),
+            index: next_idx,
+            text,
+        });
+        self.is_dirty = true;
+        next_idx
+    }
+
+    pub fn delete_explanatory_note(&mut self, index: usize) {
+        if let Some(pos) = self.notes.iter().position(|n| n.index == index) {
+            self.notes.remove(pos);
+            self.sync_notes_with_body();
+            self.is_dirty = true;
+        }
+    }
+
+    pub fn toggle_block_type(&mut self, idx: usize) {
+        if idx < self.blocks.len() {
+            match &self.blocks[idx] {
+                MlaBlock::Paragraph { id, text } => {
+                    self.blocks[idx] = MlaBlock::BlockQuote {
+                        id: id.clone(),
+                        text: text.clone(),
+                        citation: String::new(),
+                    };
+                }
+                MlaBlock::BlockQuote { id, text, citation } => {
+                    let mut combined = text.clone();
+                    if !citation.trim().is_empty() {
+                        combined.push(' ');
+                        combined.push_str(citation.trim());
+                    }
+                    self.blocks[idx] = MlaBlock::Paragraph {
+                        id: id.clone(),
+                        text: combined,
+                    };
+                }
+                MlaBlock::SectionHeading { id, text, .. } => {
+                    self.blocks[idx] = MlaBlock::Paragraph {
+                        id: id.clone(),
+                        text: text.clone(),
+                    };
+                }
+            }
+            self.sync_body_from_blocks();
+            self.is_dirty = true;
+        }
+    }
+
+    /// Scans the body blocks for superscript note references (¹, ², etc.).
+    /// Re-indexes notes that exist in the body sequentially, deletes orphaned notes,
+    /// and updates the superscripts in the body text so they match the re-indexed notes.
+    pub fn sync_notes_with_body(&mut self) {
+        let mut found_indices = Vec::new();
+        for block in &self.blocks {
+            let mut current_super = String::new();
+            for c in block.text().chars() {
+                if is_superscript_digit(c) {
+                    current_super.push(c);
+                } else {
+                    if !current_super.is_empty() {
+                        if let Some(num) = superscript_to_num(&current_super) {
+                            if !found_indices.contains(&num) {
+                                found_indices.push(num);
+                            }
+                        }
+                        current_super.clear();
+                    }
+                }
+            }
+            if !current_super.is_empty() {
+                if let Some(num) = superscript_to_num(&current_super) {
+                    if !found_indices.contains(&num) {
+                        found_indices.push(num);
+                    }
+                }
+            }
+        }
+
+        let mut new_notes = Vec::new();
+        let mut index_mapping = std::collections::HashMap::new();
+
+        for old_idx in &found_indices {
+            if let Some(mut note) = self.notes.iter().find(|n| n.index == *old_idx).cloned() {
+                let new_idx = new_notes.len() + 1;
+                index_mapping.insert(*old_idx, new_idx);
+                note.index = new_idx;
+                new_notes.push(note);
+            }
+        }
+
+        self.notes = new_notes;
+
+        // If index mapping changed any numbers, rewrite the superscripts in body blocks
+        for block in &mut self.blocks {
+            let original = block.text().to_string();
+            let mut rewritten = String::new();
+            let mut current_super = String::new();
+
+            for c in original.chars() {
+                if is_superscript_digit(c) {
+                    current_super.push(c);
+                } else {
+                    if !current_super.is_empty() {
+                        if let Some(old_num) = superscript_to_num(&current_super) {
+                            let mapped_num = index_mapping.get(&old_num).copied().unwrap_or(old_num);
+                            rewritten.push_str(&num_to_superscript(mapped_num));
+                        } else {
+                            rewritten.push_str(&current_super);
+                        }
+                        current_super.clear();
+                    }
+                    rewritten.push(c);
+                }
+            }
+            if !current_super.is_empty() {
+                if let Some(old_num) = superscript_to_num(&current_super) {
+                    let mapped_num = index_mapping.get(&old_num).copied().unwrap_or(old_num);
+                    rewritten.push_str(&num_to_superscript(mapped_num));
+                } else {
+                    rewritten.push_str(&current_super);
+                }
+            }
+
+            if rewritten != original {
+                *block.text_mut() = rewritten;
+            }
+        }
+    }
 }
 
 pub fn count_words(s: &str) -> usize {
@@ -467,4 +611,122 @@ pub fn generate_block_id(seed: usize) -> String {
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     format!("blk_{}_{:x}", seed, nanos)
+}
+
+pub fn num_to_superscript(n: usize) -> String {
+    n.to_string()
+        .chars()
+        .map(|c| match c {
+            '0' => '⁰',
+            '1' => '¹',
+            '2' => '²',
+            '3' => '³',
+            '4' => '⁴',
+            '5' => '⁵',
+            '6' => '⁶',
+            '7' => '⁷',
+            '8' => '⁸',
+            '9' => '⁹',
+            other => other,
+        })
+        .collect()
+}
+
+pub fn is_superscript_digit(c: char) -> bool {
+    matches!(c, '⁰' | '¹' | '²' | '³' | '⁴' | '⁵' | '⁶' | '⁷' | '⁸' | '⁹')
+}
+
+pub fn superscript_to_num(s: &str) -> Option<usize> {
+    let mut num_str = String::new();
+    for c in s.chars() {
+        match c {
+            '⁰' => num_str.push('0'),
+            '¹' => num_str.push('1'),
+            '²' => num_str.push('2'),
+            '³' => num_str.push('3'),
+            '⁴' => num_str.push('4'),
+            '⁵' => num_str.push('5'),
+            '⁶' => num_str.push('6'),
+            '⁷' => num_str.push('7'),
+            '⁸' => num_str.push('8'),
+            '⁹' => num_str.push('9'),
+            _ => return None,
+        }
+    }
+    num_str.parse().ok()
+}
+
+/// Smart Typographical Cleaning on Export:
+/// - Straight quotes (", ') converted to curly smart quotes (“ ”, ‘ ’)
+/// - Double hyphens (--) converted to em dashes (—) without surrounding spaces
+pub fn typographical_clean(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let chars: Vec<char> = s.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
+
+    while i < len {
+        // Double hyphens: "--" or " -- " -> "—"
+        if chars[i] == '-' && i + 1 < len && chars[i + 1] == '-' {
+            if result.ends_with(' ') {
+                result.pop();
+            }
+            result.push('—');
+            i += 2;
+            if i < len && chars[i] == ' ' {
+                i += 1;
+            }
+            continue;
+        }
+
+        // Double quotes: " -> “ or ”
+        if chars[i] == '"' {
+            let prev = if i > 0 { Some(chars[i - 1]) } else { None };
+            let is_open = match prev {
+                None => true,
+                Some(c) if c.is_whitespace() || c == '(' || c == '[' || c == '{' || c == '—' => true,
+                _ => false,
+            };
+            if is_open {
+                result.push('“');
+            } else {
+                result.push('”');
+            }
+            i += 1;
+            continue;
+        }
+
+        // Single quotes: ' -> ‘ or ’
+        if chars[i] == '\'' {
+            let prev = if i > 0 { Some(chars[i - 1]) } else { None };
+            let next = if i + 1 < len { Some(chars[i + 1]) } else { None };
+
+            // Apostrophe inside word: don't, Smith's
+            if let (Some(p), Some(n)) = (prev, next) {
+                if p.is_alphabetic() && n.is_alphabetic() {
+                    result.push('’');
+                    i += 1;
+                    continue;
+                }
+            }
+
+            let is_open = match prev {
+                None => true,
+                Some(c) if c.is_whitespace() || c == '(' || c == '[' || c == '{' || c == '—' => true,
+                _ => false,
+            };
+            if is_open {
+                result.push('‘');
+            } else {
+                result.push('’');
+            }
+            i += 1;
+            continue;
+        }
+
+        result.push(chars[i]);
+        i += 1;
+    }
+
+    result
 }

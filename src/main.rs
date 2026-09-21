@@ -257,6 +257,17 @@ impl MlaApp {
             Action::ManageWorksCited => {
                 self.works_cited_state.open_new();
             }
+            Action::AddFootnote => {
+                let note_idx = self.doc.add_explanatory_note(String::new());
+                let sup = model::num_to_superscript(note_idx);
+                self.doc.ensure_blocks_initialized();
+                if !self.doc.blocks.is_empty() {
+                    let b_idx = self.doc.active_block_idx.min(self.doc.blocks.len() - 1);
+                    self.doc.blocks[b_idx].text_mut().push_str(&sup);
+                    self.doc.sync_body_from_blocks();
+                }
+                self.set_notification(format!("Inserted Note / Definition marker {}.", sup));
+            }
             Action::ConvertToMlaTitleCase => {
                 self.doc.title = to_mla_title_case(&self.doc.title);
                 self.doc.is_dirty = true;
@@ -361,6 +372,9 @@ impl eframe::App for MlaApp {
                             }
                             ToolbarEvent::OpenWorksCited => {
                                 self.handle_action(Action::ManageWorksCited)
+                            }
+                            ToolbarEvent::AddFootnote => {
+                                self.handle_action(Action::AddFootnote)
                             }
                         }
                     }

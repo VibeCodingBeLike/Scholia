@@ -97,19 +97,30 @@ pub fn render_editor_page(
                         ui.set_max_width(printable_width);
                         ui.spacing_mut().item_spacing.y = 8.0;
 
-                        // --- RUNNING HEAD (Top-Right: LastName 1) ---
+                        // --- RUNNING HEAD (Top-Right: [LastName] 1) ---
                         let derived_last = doc.header.derived_last_name();
-                        let head_str = if derived_last.is_empty() {
-                            "1".to_string()
-                        } else {
-                            format!("{} 1", derived_last)
-                        };
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                             ui.label(
-                                RichText::new(head_str)
+                                RichText::new("1")
                                     .font(doc_font(15.0))
                                     .color(muted_col),
                             );
+                            ui.add_space(4.0);
+                            let rh_edit = ui.add(
+                                egui::TextEdit::singleline(&mut doc.header.running_header_last_name)
+                                    .font(doc_font(15.0))
+                                    .text_color(text_col)
+                                    .frame(egui::Frame::NONE)
+                                    .hint_text(
+                                        RichText::new(if derived_last.is_empty() { "LastName" } else { &derived_last })
+                                            .italics()
+                                            .color(muted_col),
+                                    )
+                                    .desired_width(120.0),
+                            ).on_hover_text("Running Head: Student's Last Name (automatically derived, or type here to override)");
+                            if rh_edit.changed() {
+                                doc.is_dirty = true;
+                            }
                         });
 
                         ui.add_space(10.0);
@@ -219,6 +230,7 @@ pub fn render_editor_page(
 
                         // --- STRUCTURED MLA BODY BLOCKS EDITOR ---
                         let mut block_to_delete = None;
+                        let mut block_to_toggle = None;
                         let mut block_splits: Vec<(usize, String, Vec<String>)> = Vec::new();
                         let mut focus_target_id = None;
                         let mut focus_navigate: Option<(usize, bool)> = None;
@@ -245,7 +257,7 @@ pub fn render_editor_page(
                                             .desired_width(printable_width)
                                             .desired_rows(2)
                                             .hint_text(
-                                                RichText::new("Begin typing your paragraph here...")
+                                                RichText::new("Begin typing your paragraph here... (type /cite for citation)")
                                                     .italics()
                                                     .color(muted_col),
                                             ),
@@ -253,6 +265,12 @@ pub fn render_editor_page(
 
                                     if resp.changed() {
                                         blocks_changed = true;
+                                        // Slash command: /cite
+                                        if text.contains("/cite") {
+                                            *text = text.replace("/cite", "").trim_end().to_string();
+                                            action = Some(EditorAction::OpenCitationModal(Some(b_idx)));
+                                        }
+
                                         if text.contains('\n') {
                                             let lines: Vec<&str> = text.split('\n').collect();
                                             if lines.len() > 1 {
@@ -264,6 +282,22 @@ pub fn render_editor_page(
                                                 block_splits.push((b_idx, first_part, rest_parts));
                                             }
                                         }
+                                    }
+
+                                    // Automatic Block Quote Detection (>4 lines of prose or >250 chars)
+                                    let line_count = text.lines().count();
+                                    let char_count = text.len();
+                                    if line_count >= 4 || char_count >= 250 {
+                                        ui.horizontal(|ui| {
+                                            ui.label(
+                                                RichText::new("💡 MLA Rule: Quotation exceeds 4 lines of prose.")
+                                                    .size(11.0)
+                                                    .color(egui::Color32::from_rgb(220, 150, 30)),
+                                            );
+                                            if ui.small_button("Convert to Block Quote").clicked() {
+                                                block_to_toggle = Some(b_idx);
+                                            }
+                                        });
                                     }
 
                                     if resp.has_focus() {
@@ -311,13 +345,20 @@ pub fn render_editor_page(
                                         .show(ui, |ui| {
                                             ui.spacing_mut().item_spacing.y = 6.0;
 
-                                            // Header label (clean, no inline buttons)
-                                            ui.label(
-                                                RichText::new("❝ MLA Block Quote (0.5\" Indent)")
-                                                    .size(11.5)
-                                                    .strong()
-                                                    .color(accent_col),
-                                            );
+                                            // Header label with toggle back to Paragraph
+                                            ui.horizontal(|ui| {
+                                                ui.label(
+                                                    RichText::new("❝ MLA Block Quote (0.5\" Indent)")
+                                                        .size(11.5)
+                                                        .strong()
+                                                        .color(accent_col),
+                                                );
+                                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                    if ui.small_button("Convert to Paragraph").clicked() {
+                                                        block_to_toggle = Some(b_idx);
+                                                    }
+                                                });
+                                            });
 
                                             // Quotation content (without markdown > prefix)
                                             let q_resp = ui.add(
@@ -329,7 +370,7 @@ pub fn render_editor_page(
                                                     .desired_rows(3)
                                                     .hint_text(
                                                         RichText::new(
-                                                            "Enter quoted passage (required for prose >4 lines)...",
+                                                            "Enter quoted passage (required for prose >4 lines)... (type /cite for citation)",
                                                         )
                                                         .italics()
                                                         .color(muted_col),
@@ -337,6 +378,10 @@ pub fn render_editor_page(
                                             );
                                             if q_resp.changed() {
                                                 blocks_changed = true;
+                                                if text.contains("/cite") {
+                                                    *text = text.replace("/cite", "").trim_end().to_string();
+                                                    action = Some(EditorAction::OpenCitationModal(Some(b_idx)));
+                                                }
                                             }
                                             if q_resp.has_focus() {
                                                 doc.active_block_idx = b_idx;
@@ -517,6 +562,12 @@ pub fn render_editor_page(
                             ui.ctx().memory_mut(|m| m.request_focus(target_id));
                         }
 
+                        // Apply block toggle actions
+                        if let Some(idx) = block_to_toggle {
+                            doc.toggle_block_type(idx);
+                            blocks_changed = true;
+                        }
+
                         // Apply delete actions
                         if let Some(idx) = block_to_delete {
                             let prev_idx = if idx > 0 { idx - 1 } else { 0 };
@@ -529,6 +580,7 @@ pub fn render_editor_page(
                         if blocks_changed {
                             doc.is_dirty = true;
                             doc.sync_body_from_blocks();
+                            doc.sync_notes_with_body();
                         }
 
                         // Focus requested block (e.g. after deletion or insertion)
@@ -542,7 +594,104 @@ pub fn render_editor_page(
                                 ui.ctx().memory_mut(|m| m.request_focus(target_id));
                             }
                         }
+
                     });
+
+                    // ==========================================
+                    // 📝 SEPARATE PAGE: NOTES (Only present when notes exist)
+                    // ==========================================
+                    if !doc.notes.is_empty() {
+                        ui.add_space(32.0);
+                        ui.horizontal(|ui| {
+                            ui.add_space((page_width - 240.0) / 2.0);
+                            ui.label(
+                                RichText::new("────── Page Break: Notes ──────")
+                                    .size(11.5)
+                                    .italics()
+                                    .color(muted_col),
+                            );
+                        });
+                        ui.add_space(12.0);
+
+                        let notes_frame = egui::Frame::new()
+                            .fill(theme.page_fill_color())
+                            .stroke(theme.page_stroke())
+                            .corner_radius(6.0)
+                            .inner_margin(egui::Margin::symmetric(page_margin, page_margin));
+
+                        notes_frame.show(ui, |ui| {
+                            ui.set_width(printable_width);
+                            ui.set_min_width(printable_width);
+                            ui.set_max_width(printable_width);
+                            ui.spacing_mut().item_spacing.y = 8.0;
+
+                            // Running head for Notes
+                            let derived_last = doc.header.derived_last_name();
+                            let head_str = if derived_last.is_empty() {
+                                "2".to_string()
+                            } else {
+                                format!("{} 2", derived_last)
+                            };
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                                ui.label(
+                                    RichText::new(head_str)
+                                        .font(doc_font(15.0))
+                                        .color(muted_col),
+                                );
+                            });
+
+                            ui.add_space(6.0);
+                            ui.vertical_centered(|ui| {
+                                ui.label(
+                                    RichText::new("Notes")
+                                        .font(doc_font(16.0))
+                                        .color(text_col),
+                                );
+                            });
+                            ui.add_space(14.0);
+
+                            let mut note_to_delete = None;
+                            for note in &mut doc.notes {
+                                ui.horizontal_top(|ui| {
+                                    ui.label(
+                                        RichText::new(format!("{}.", note.index))
+                                            .strong()
+                                            .font(doc_font(15.0))
+                                            .color(accent_col),
+                                    );
+                                    let n_edit = ui.add(
+                                        egui::TextEdit::multiline(&mut note.text)
+                                            .font(doc_font(15.0))
+                                            .text_color(text_col)
+                                            .frame(egui::Frame::NONE)
+                                            .desired_width(printable_width - 80.0)
+                                            .desired_rows(1)
+                                            .hint_text(RichText::new("Enter explanatory note, definition, or translation...").italics().color(muted_col)),
+                                    );
+                                    if n_edit.changed() {
+                                        doc.is_dirty = true;
+                                    }
+
+                                    if ui.small_button(RichText::new(icons::TRASH).color(muted_col))
+                                        .on_hover_text(format!("Delete Note {}", note.index))
+                                        .clicked()
+                                    {
+                                        note_to_delete = Some(note.index);
+                                    }
+                                });
+                                ui.add_space(6.0);
+                            }
+
+                            if let Some(idx) = note_to_delete {
+                                doc.delete_explanatory_note(idx);
+                            }
+
+                            ui.add_space(8.0);
+                            if ui.small_button("+ Add Note / Definition [Ctrl+Shift+F]").clicked() {
+                                action = Some(EditorAction::TriggerAction(Action::AddFootnote));
+                            }
+                        });
+                    }
 
                     // ==========================================
                     // 📚 PAGE 2: WORKS CITED PAGE

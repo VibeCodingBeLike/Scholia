@@ -95,12 +95,17 @@ fn build_pdf(mla: &MlaDocument) -> Result<Vec<u8>, String> {
     let mut page_ops: Vec<Op> = Vec::new();
     let mut y_mm = top_y_mm();
     let mut page_num: u32 = 1;
+    let mut added_notes_footer = false;
 
     // Draw running head (right-aligned "LastName N") at top of each page
     add_running_head(&mut page_ops, &font, &last_name, page_num);
 
     for line in &doc_lines {
         if matches!(line.kind, LineKind::PageBreak) {
+            if !added_notes_footer && !mla.notes.is_empty() {
+                add_footnotes_footer(&mut page_ops, &font, &mla.notes);
+                added_notes_footer = true;
+            }
             pages.push(PdfPage::new(Mm(PAGE_W_MM), Mm(PAGE_H_MM), page_ops));
             page_ops = Vec::new();
             y_mm = top_y_mm();
@@ -157,6 +162,10 @@ fn build_pdf(mla: &MlaDocument) -> Result<Vec<u8>, String> {
         y_mm -= line_h_mm();
     }
 
+    if !added_notes_footer && !mla.notes.is_empty() {
+        add_footnotes_footer(&mut page_ops, &font, &mla.notes);
+    }
+
     if !page_ops.is_empty() {
         pages.push(PdfPage::new(Mm(PAGE_W_MM), Mm(PAGE_H_MM), page_ops));
     }
@@ -170,6 +179,8 @@ fn build_pdf(mla: &MlaDocument) -> Result<Vec<u8>, String> {
 // ── Proper line builder ──────────────────────────────────────────────────────
 
 fn rebuild_lines(mla: &MlaDocument, sorted_wc: &[crate::model::WorksCitedEntry]) -> Vec<DocLine> {
+    use crate::model::typographical_clean;
+
     let mut lines: Vec<DocLine> = Vec::new();
 
     // Header
@@ -179,11 +190,11 @@ fn rebuild_lines(mla: &MlaDocument, sorted_wc: &[crate::model::WorksCitedEntry])
         &mla.header.course,
         &mla.header.date,
     ] {
-        lines.push(DocLine::normal(s));
+        lines.push(DocLine::normal(typographical_clean(s)));
     }
 
     // Title (centered)
-    lines.push(DocLine::centered(&mla.title));
+    lines.push(DocLine::centered(typographical_clean(&mla.title)));
 
     // Body
     for block in &mla.blocks {
@@ -191,7 +202,8 @@ fn rebuild_lines(mla: &MlaDocument, sorted_wc: &[crate::model::WorksCitedEntry])
             MlaBlock::Paragraph { text, .. } => {
                 let t = text.trim();
                 if t.is_empty() { continue; }
-                let wrapped = word_wrap(t, text_w_mm() - INDENT_MM);
+                let cleaned = typographical_clean(t);
+                let wrapped = word_wrap(&cleaned, text_w_mm() - INDENT_MM);
                 for (i, w) in wrapped.into_iter().enumerate() {
                     if i == 0 {
                         lines.push(DocLine::paragraph(w));
@@ -208,16 +220,18 @@ fn rebuild_lines(mla: &MlaDocument, sorted_wc: &[crate::model::WorksCitedEntry])
                 } else {
                     format!("{} {}", t, citation.trim())
                 };
-                for w in word_wrap(&full, text_w_mm() - BLOCKQUOTE_INDENT_MM) {
+                let cleaned = typographical_clean(&full);
+                for w in word_wrap(&cleaned, text_w_mm() - BLOCKQUOTE_INDENT_MM) {
                     lines.push(DocLine::blockquote(w));
                 }
             }
             MlaBlock::SectionHeading { level, text, .. } => {
                 let t = text.trim();
                 if t.is_empty() { continue; }
+                let cleaned = typographical_clean(t);
                 match level {
-                    1 => lines.push(DocLine::bold(t)),
-                    _ => lines.push(DocLine::centered(t)),
+                    1 => lines.push(DocLine::bold(cleaned)),
+                    _ => lines.push(DocLine::centered(cleaned)),
                 }
             }
         }
@@ -232,7 +246,8 @@ fn rebuild_lines(mla: &MlaDocument, sorted_wc: &[crate::model::WorksCitedEntry])
     } else {
         for entry in sorted_wc {
             let plain = strip_markdown(&entry.format_markdown());
-            let wrapped = word_wrap(&plain, text_w_mm());
+            let cleaned = typographical_clean(&plain);
+            let wrapped = word_wrap(&cleaned, text_w_mm());
             for (i, w) in wrapped.into_iter().enumerate() {
                 if i == 0 {
                     lines.push(DocLine::normal(w));
@@ -259,6 +274,39 @@ fn add_running_head(ops: &mut Vec<Op>, font: &FontId, last_name: &str, page_num:
     ops.push(Op::SetLineHeight { lh: Pt(FONT_PT) });
     ops.push(Op::ShowText { items: vec![PdfTextItem::Text(text)] });
     ops.push(Op::EndTextSection);
+}
+
+// ── Footnotes footer (at bottom of body page, above bottom margin) ───────────
+
+fn add_footnotes_footer(ops: &mut Vec<Op>, font: &FontId, notes: &[crate::model::ExplanatoryNote]) {
+    use crate::model::typographical_clean;
+
+    if notes.is_empty() {
+        return;
+    }
+
+    let foot_line_h_mm = 4.2;
+    let total_foot_h = notes.len() as f32 * foot_line_h_mm + 5.0;
+    let divider_y = MARGIN_MM + total_foot_h;
+
+    // Standard MLA 1.5-inch rule divider (38.1 mm) rendered with standard underscore characters
+    ops.push(Op::StartTextSection);
+    ops.push(Op::SetTextCursor { pos: Point::new(Mm(MARGIN_MM), Mm(divider_y)) });
+    ops.push(Op::SetFont { font: PdfFontHandle::External(font.clone()), size: Pt(10.0) });
+    ops.push(Op::ShowText { items: vec![PdfTextItem::Text("______________________".to_string())] });
+    ops.push(Op::EndTextSection);
+
+    let mut cur_y = divider_y - 4.0;
+    for note in notes {
+        let text = format!("{}. {}", note.index, typographical_clean(&note.text));
+        ops.push(Op::StartTextSection);
+        ops.push(Op::SetTextCursor { pos: Point::new(Mm(MARGIN_MM + INDENT_MM), Mm(cur_y)) });
+        ops.push(Op::SetFont { font: PdfFontHandle::External(font.clone()), size: Pt(10.0) });
+        ops.push(Op::SetLineHeight { lh: Pt(12.0) });
+        ops.push(Op::ShowText { items: vec![PdfTextItem::Text(text)] });
+        ops.push(Op::EndTextSection);
+        cur_y -= foot_line_h_mm;
+    }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

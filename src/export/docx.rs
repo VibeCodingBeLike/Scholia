@@ -1,6 +1,6 @@
 use crate::model::{MlaBlock, MlaDocument};
 use docx_rs::{
-    AlignmentType, Docx, Header, LineSpacing, LineSpacingType, PageMargin, PageNum, Paragraph, Run,
+    AlignmentType, Docx, Footer, Header, LineSpacing, LineSpacingType, PageMargin, PageNum, Paragraph, Run,
     RunFonts, SpecialIndentType,
 };
 use std::fs::File;
@@ -180,26 +180,71 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
         }
     }
 
+    // Explanatory Notes / Footnotes (Rendered in page footer per MLA standards)
+    if !doc.notes.is_empty() {
+        let mut footer = Footer::new();
+        // 1.5-inch rule divider
+        footer = footer.add_paragraph(
+            Paragraph::new()
+                .align(AlignmentType::Left)
+                .add_run(
+                    Run::new()
+                        .fonts(RunFonts::new().ascii(font_name))
+                        .size(20) // 10pt
+                        .add_text("______________________"),
+                ),
+        );
+
+        for note in &doc.notes {
+            let note_text = format!("{}. {}", note.index, crate::model::typographical_clean(&note.text));
+            footer = footer.add_paragraph(
+                Paragraph::new()
+                    .align(AlignmentType::Left)
+                    .indent(None, Some(SpecialIndentType::FirstLine(720)), None, None)
+                    .add_run(
+                        Run::new()
+                            .fonts(RunFonts::new().ascii(font_name))
+                            .size(20) // 10pt
+                            .add_text(note_text),
+                    ),
+            );
+        }
+        docx = docx.footer(footer);
+    }
+
     // --- Works Cited (Starts on a New Page) ---
-    if !doc.works_cited.is_empty() {
-        // Page break before Works Cited
+    let wc_title = if doc.works_cited.len() == 1 {
+        "Work Cited"
+    } else {
+        "Works Cited"
+    };
+
+    docx = docx.add_paragraph(
+        Paragraph::new()
+            .page_break_before(true)
+            .align(AlignmentType::Center)
+            .line_spacing(double_spacing())
+            .add_run(
+                Run::new()
+                    .fonts(RunFonts::new().ascii(font_name))
+                    .size(font_size)
+                    .add_text(wc_title),
+            ),
+    );
+
+    if doc.works_cited.is_empty() {
         docx = docx.add_paragraph(
             Paragraph::new()
-                .page_break_before(true)
                 .align(AlignmentType::Center)
                 .line_spacing(double_spacing())
                 .add_run(
                     Run::new()
                         .fonts(RunFonts::new().ascii(font_name))
                         .size(font_size)
-                        .add_text(if doc.works_cited.len() == 1 {
-                            "Work Cited"
-                        } else {
-                            "Works Cited"
-                        }),
+                        .add_text("No entries yet."),
                 ),
         );
-
+    } else {
         // Sorted works cited entries with hanging indent (left 720, hanging 720)
         let mut sorted = doc.works_cited.clone();
         sorted.sort_by_key(|a| a.sort_key());
@@ -224,7 +269,7 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Parses inline markdown asterisks for italics: *title* into Runs
+/// Parses inline markdown asterisks for italics: *title* into Runs, with typographical cleaning
 fn append_formatted_runs(
     mut paragraph: Paragraph,
     text: &str,
@@ -237,10 +282,11 @@ fn append_formatted_runs(
             continue;
         }
         let is_italic = i % 2 == 1; // Odd indices are inside *...*
+        let cleaned = crate::model::typographical_clean(part);
         let mut run = Run::new()
             .fonts(RunFonts::new().ascii(font_name))
             .size(font_size)
-            .add_text(*part);
+            .add_text(cleaned);
         if is_italic {
             run = run.italic();
         }

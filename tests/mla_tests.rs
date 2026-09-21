@@ -84,7 +84,7 @@ fn test_works_cited_alphabetization() {
 
 #[test]
 fn test_document_exporters() {
-    let doc = MlaDocument::sample_template();
+    let mut doc = MlaDocument::sample_template();
     let temp_dir = std::env::temp_dir();
 
     // DOCX export
@@ -127,6 +127,21 @@ fn test_document_exporters() {
     let pdf_bytes = std::fs::read(&pdf_path).unwrap();
     assert!(pdf_bytes.starts_with(b"%PDF"));
     let _ = std::fs::remove_file(&pdf_path);
+
+    // Export with Explanatory Notes
+    doc.add_explanatory_note("Explanatory content note for test".to_string());
+    let pdf_notes_path = temp_dir.join("test_mla_notes.pdf");
+    assert!(export_to_pdf(&doc, &pdf_notes_path).is_ok());
+    let docx_notes_path = temp_dir.join("test_mla_notes.docx");
+    assert!(export_to_docx(&doc, &docx_notes_path).is_ok());
+    let html_notes_path = temp_dir.join("test_mla_notes.html");
+    assert!(export_to_html(&doc, &html_notes_path).is_ok());
+    let html_str = std::fs::read_to_string(&html_notes_path).unwrap();
+    assert!(html_str.contains("mla-footnotes"));
+    assert!(html_str.contains("Explanatory content note for test"));
+    let _ = std::fs::remove_file(&pdf_notes_path);
+    let _ = std::fs::remove_file(&docx_notes_path);
+    let _ = std::fs::remove_file(&html_notes_path);
 }
 
 #[test]
@@ -293,5 +308,124 @@ fn test_interface_options_and_removed_shortcuts() {
     assert!(!cfg.check_action(Action::AddParagraph, &input));
     assert!(!cfg.check_action(Action::ExportDocx, &input));
     assert!(!cfg.check_action(Action::ExportHtmlPdf, &input));
+
+    // Verify AddFootnote shortcut is Ctrl+Shift+F
+    assert_eq!(cfg.get_shortcut(Action::AddFootnote).display_string(), "Ctrl+Shift+F");
+}
+
+#[test]
+fn test_typographical_cleaning() {
+    use scholia::model::typographical_clean;
+
+    // Test em dash conversion
+    assert_eq!(typographical_clean("prose--text"), "prose—text");
+    assert_eq!(typographical_clean("prose -- text"), "prose—text");
+
+    // Test double curly quotes
+    assert_eq!(typographical_clean("\"Hello World\""), "“Hello World”");
+    assert_eq!(typographical_clean("He said, \"yes\"."), "He said, “yes”.");
+
+    // Test single curly quotes & apostrophes
+    assert_eq!(typographical_clean("'hello'"), "‘hello’");
+    assert_eq!(typographical_clean("don't Smith's"), "don’t Smith’s");
+}
+
+#[test]
+fn test_explanatory_notes_and_superscript_engine() {
+    use scholia::model::{num_to_superscript, MlaBlock, MlaDocument};
+
+    let mut doc = MlaDocument::new_blank();
+    assert_eq!(num_to_superscript(1), "¹");
+    assert_eq!(num_to_superscript(2), "²");
+    assert_eq!(num_to_superscript(12), "¹²");
+
+    // Add note 1 and 2
+    let n1 = doc.add_explanatory_note("First definition".to_string());
+    let n2 = doc.add_explanatory_note("Second definition".to_string());
+    assert_eq!(n1, 1);
+    assert_eq!(n2, 2);
+    assert_eq!(doc.notes.len(), 2);
+
+    // Insert note marker into paragraph
+    if let MlaBlock::Paragraph { text, .. } = &mut doc.blocks[0] {
+        text.push_str("Here is a term¹ and another².");
+    }
+
+    // Deleting note 1 marker should re-index note 2 to note 1
+    if let MlaBlock::Paragraph { text, .. } = &mut doc.blocks[0] {
+        *text = "Here is a term and another².".to_string();
+    }
+    doc.sync_notes_with_body();
+
+    assert_eq!(doc.notes.len(), 1);
+    assert_eq!(doc.notes[0].index, 1);
+    assert_eq!(doc.notes[0].text, "Second definition");
+    assert_eq!(doc.blocks[0].text(), "Here is a term and another¹.");
+}
+
+#[test]
+fn test_block_toggle_conversion() {
+    use scholia::model::{MlaBlock, MlaDocument};
+
+    let mut doc = MlaDocument::new_blank();
+    if let MlaBlock::Paragraph { text, .. } = &mut doc.blocks[0] {
+        *text = "This is a long prose passage intended for block quotation.".to_string();
+    }
+
+    // Toggle paragraph to blockquote
+    doc.toggle_block_type(0);
+    assert!(matches!(doc.blocks[0], MlaBlock::BlockQuote { .. }));
+
+    // Toggle blockquote back to paragraph
+    doc.toggle_block_type(0);
+    assert!(matches!(doc.blocks[0], MlaBlock::Paragraph { .. }));
+}
+
+#[test]
+fn test_semantic_versioning() {
+    let version = env!("CARGO_PKG_VERSION");
+    assert_eq!(version, "0.1.0");
+
+    // Verify version components follow semver: major.minor.patch
+    let parts: Vec<&str> = version.split('.').collect();
+    assert_eq!(parts.len(), 3);
+    assert_eq!(parts[0], "0");
+    assert_eq!(parts[1], "1");
+    assert_eq!(parts[2], "0");
+}
+
+#[test]
+fn test_notes_exported_in_footer_not_separate_page() {
+    use scholia::export::{export_to_docx, export_to_pdf, generate_mla_html};
+    use scholia::model::MlaDocument;
+
+    let mut doc = MlaDocument::new_blank();
+    doc.header.student_name = "Jane Doe".to_string();
+    doc.header.instructor_name = "Dr. Smith".to_string();
+    doc.header.course = "ENG 101".to_string();
+    doc.header.date = "21 September 2026".to_string();
+    doc.title = "A Study of Footnotes".to_string();
+    doc.add_explanatory_note("Explanatory footnote content.".to_string());
+
+    // HTML Verification
+    let html = generate_mla_html(&doc);
+    assert!(html.contains(r#"<footer class="mla-footnotes">"#), "Notes must be inside footer element in HTML");
+    assert!(html.contains(r#"<hr class="mla-footnotes-divider">"#), "Footer must contain standard 1.5-inch divider");
+    assert!(html.contains("1. Explanatory footnote content."), "Footnote text must be present");
+    assert!(!html.contains("mla-notes-section"), "Must not have separate notes page section");
+    assert!(!html.contains(r#"<h2 class="mla-notes-title""#), "Must not have separate Notes h2 page header");
+
+    // DOCX Export Verification
+    let temp_dir = std::env::temp_dir();
+    let docx_path = temp_dir.join("test_export_notes.docx");
+    let docx_res = export_to_docx(&doc, &docx_path);
+    assert!(docx_res.is_ok(), "DOCX export with notes in footer should succeed: {:?}", docx_res.err());
+    let _ = std::fs::remove_file(&docx_path);
+
+    // PDF Export Verification
+    let pdf_path = temp_dir.join("test_export_notes.pdf");
+    let pdf_res = export_to_pdf(&doc, &pdf_path);
+    assert!(pdf_res.is_ok(), "PDF export with notes in footer should succeed: {:?}", pdf_res.err());
+    let _ = std::fs::remove_file(&pdf_path);
 }
 

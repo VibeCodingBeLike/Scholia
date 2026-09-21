@@ -45,7 +45,7 @@ pub fn render_settings_modal(
         .default_height(500.0)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .show(ctx, |ui| {
-            // Tab bar
+            // Tab bar with version display
             ui.horizontal(|ui| {
                 ui.selectable_value(
                     &mut state.selected_tab,
@@ -57,6 +57,15 @@ pub fn render_settings_modal(
                     SettingsTab::Keybindings,
                     "⌨️ Custom Keybinds",
                 );
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(
+                        RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
+                            .size(12.5)
+                            .strong()
+                            .color(theme.accent_color()),
+                    );
+                });
             });
 
             ui.separator();
@@ -76,6 +85,15 @@ pub fn render_settings_modal(
                 if ui.button("Close").clicked() {
                     close_modal = true;
                 }
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(
+                        RichText::new(format!("Scholia v{}", env!("CARGO_PKG_VERSION")))
+                            .size(11.5)
+                            .italics()
+                            .color(theme.muted_text_color()),
+                    );
+                });
             });
         });
 
