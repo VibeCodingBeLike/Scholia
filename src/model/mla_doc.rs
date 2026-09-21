@@ -115,7 +115,10 @@ impl MlaDocument {
             header: MlaHeader::default(),
             title: String::new(),
             body: String::new(),
-            blocks: Vec::new(),
+            blocks: vec![MlaBlock::Paragraph {
+                id: generate_block_id(1),
+                text: String::new(),
+            }],
             works_cited: Vec::new(),
             file_path: None,
             is_dirty: false,
@@ -156,26 +159,43 @@ impl MlaDocument {
         doc
     }
 
+    pub fn sync_body_from_blocks(&mut self) {
+        let parts: Vec<String> = self
+            .blocks
+            .iter()
+            .map(|b| match b {
+                MlaBlock::Paragraph { text, .. } => text.clone(),
+                MlaBlock::BlockQuote { text, citation, .. } => {
+                    if citation.trim().is_empty() {
+                        format!("> {}", text.trim())
+                    } else {
+                        format!("> {} {}", text.trim(), citation.trim())
+                    }
+                }
+                MlaBlock::SectionHeading { level, text, .. } => {
+                    format!("{} {}", "#".repeat(*level as usize), text.trim())
+                }
+            })
+            .collect();
+        self.body = parts.join("\n\n");
+    }
+
+    pub fn ensure_blocks_initialized(&mut self) {
+        if self.blocks.is_empty() {
+            if !self.body.trim().is_empty() {
+                self.sync_blocks_from_body();
+            } else {
+                self.blocks.push(MlaBlock::Paragraph {
+                    id: generate_block_id(1),
+                    text: String::new(),
+                });
+            }
+        }
+    }
+
     pub fn ensure_body_synced(&mut self) {
         if self.body.trim().is_empty() && !self.blocks.is_empty() {
-            let parts: Vec<String> = self
-                .blocks
-                .iter()
-                .map(|b| match b {
-                    MlaBlock::Paragraph { text, .. } => text.clone(),
-                    MlaBlock::BlockQuote { text, citation, .. } => {
-                        if citation.trim().is_empty() {
-                            format!("> {}", text)
-                        } else {
-                            format!("> {} {}", text, citation.trim())
-                        }
-                    }
-                    MlaBlock::SectionHeading { level, text, .. } => {
-                        format!("{} {}", "#".repeat(*level as usize), text)
-                    }
-                })
-                .collect();
-            self.body = parts.join("\n\n");
+            self.sync_body_from_blocks();
         }
     }
 
@@ -263,7 +283,7 @@ impl MlaDocument {
             text: String::new(),
         };
         self.is_dirty = true;
-        match after_index {
+        let idx = match after_index {
             Some(idx) if idx < self.blocks.len() => {
                 self.blocks.insert(idx + 1, new_block);
                 idx + 1
@@ -272,7 +292,9 @@ impl MlaDocument {
                 self.blocks.push(new_block);
                 self.blocks.len() - 1
             }
-        }
+        };
+        self.sync_body_from_blocks();
+        idx
     }
 
     pub fn add_blockquote(&mut self, after_index: Option<usize>) -> usize {
@@ -282,7 +304,7 @@ impl MlaDocument {
             citation: String::new(),
         };
         self.is_dirty = true;
-        match after_index {
+        let idx = match after_index {
             Some(idx) if idx < self.blocks.len() => {
                 self.blocks.insert(idx + 1, new_block);
                 idx + 1
@@ -291,7 +313,9 @@ impl MlaDocument {
                 self.blocks.push(new_block);
                 self.blocks.len() - 1
             }
-        }
+        };
+        self.sync_body_from_blocks();
+        idx
     }
 
     pub fn add_heading(&mut self, level: u8, after_index: Option<usize>) -> usize {
@@ -301,7 +325,7 @@ impl MlaDocument {
             text: String::new(),
         };
         self.is_dirty = true;
-        match after_index {
+        let idx = match after_index {
             Some(idx) if idx < self.blocks.len() => {
                 self.blocks.insert(idx + 1, new_block);
                 idx + 1
@@ -310,13 +334,16 @@ impl MlaDocument {
                 self.blocks.push(new_block);
                 self.blocks.len() - 1
             }
-        }
+        };
+        self.sync_body_from_blocks();
+        idx
     }
 
     pub fn remove_block(&mut self, index: usize) {
         if self.blocks.len() > 1 && index < self.blocks.len() {
             self.blocks.remove(index);
             self.is_dirty = true;
+            self.sync_body_from_blocks();
         }
     }
 
@@ -324,6 +351,7 @@ impl MlaDocument {
         if index > 0 && index < self.blocks.len() {
             self.blocks.swap(index, index - 1);
             self.is_dirty = true;
+            self.sync_body_from_blocks();
         }
     }
 
@@ -331,6 +359,7 @@ impl MlaDocument {
         if index + 1 < self.blocks.len() {
             self.blocks.swap(index, index + 1);
             self.is_dirty = true;
+            self.sync_body_from_blocks();
         }
     }
 
@@ -405,7 +434,7 @@ fn capitalize_first(s: &str) -> String {
     }
 }
 
-fn generate_block_id(seed: usize) -> String {
+pub fn generate_block_id(seed: usize) -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)

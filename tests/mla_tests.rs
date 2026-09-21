@@ -184,3 +184,53 @@ fn test_editor_page_centering() {
     );
     out.textures_delta.clear();
 }
+
+#[test]
+fn test_document_block_operations_and_sync() {
+    let mut doc = scholia::model::MlaDocument::new_blank();
+    assert_eq!(doc.blocks.len(), 1);
+
+    // Add paragraph
+    let p2 = doc.add_paragraph(None);
+    assert_eq!(doc.blocks.len(), 2);
+    assert_eq!(p2, 1);
+
+    // Add blockquote
+    let bq = doc.add_blockquote(Some(0));
+    assert_eq!(doc.blocks.len(), 3);
+    assert_eq!(bq, 1);
+
+    // Add heading
+    let h1 = doc.add_heading(1, None);
+    assert_eq!(doc.blocks.len(), 4);
+    assert_eq!(h1, 3);
+
+    // Verify sync_body_from_blocks
+    doc.blocks[0].text_mut().push_str("Paragraph one.");
+    doc.blocks[1].text_mut().push_str("A quoted passage from literature.");
+    doc.sync_body_from_blocks();
+    assert!(doc.body.contains("Paragraph one."));
+    assert!(doc.body.contains("> A quoted passage from literature."));
+}
+
+#[test]
+fn test_word_count_and_pdf_page_count() {
+    let mut doc = scholia::model::MlaDocument::new_blank();
+    doc.title = "A Scholarly Analysis".to_string();
+    assert_eq!(doc.total_word_count(), 3);
+    assert_eq!(doc.estimated_page_count(), 1);
+
+    // Add 300 words into a paragraph
+    let words = vec!["word"; 300].join(" ");
+    doc.blocks[0].text_mut().push_str(&words);
+    assert_eq!(doc.total_word_count(), 303);
+    // 300 words body => ceil(300 / 250) = 2 pages
+    assert_eq!(doc.estimated_page_count(), 2);
+
+    // Adding Works Cited entry adds 1 page for the separate Works Cited page
+    let mut entry = scholia::model::WorksCitedEntry::new_empty();
+    entry.author = "Smith, John".to_string();
+    entry.title_of_source = "A Book".to_string();
+    doc.works_cited.push(entry);
+    assert_eq!(doc.estimated_page_count(), 3);
+}

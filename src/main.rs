@@ -164,35 +164,24 @@ impl MlaApp {
                 }
             }
             Action::AddParagraph => {
-                if !self.doc.body.ends_with('\n') && !self.doc.body.is_empty() {
-                    self.doc.body.push('\n');
-                }
-                self.doc.sync_blocks_from_body();
-                self.doc.is_dirty = true;
+                self.doc.ensure_blocks_initialized();
+                self.doc.add_paragraph(None);
+                self.set_notification("Added new body paragraph.");
             }
             Action::InsertBlockQuote => {
-                if !self.doc.body.ends_with('\n') && !self.doc.body.is_empty() {
-                    self.doc.body.push('\n');
-                }
-                self.doc.body.push_str("> Blockquote quotation here...\n");
-                self.doc.sync_blocks_from_body();
-                self.doc.is_dirty = true;
+                self.doc.ensure_blocks_initialized();
+                self.doc.add_blockquote(None);
+                self.set_notification("Inserted MLA block quotation.");
             }
             Action::InsertHeading1 => {
-                if !self.doc.body.ends_with('\n') && !self.doc.body.is_empty() {
-                    self.doc.body.push('\n');
-                }
-                self.doc.body.push_str("# Section Heading\n");
-                self.doc.sync_blocks_from_body();
-                self.doc.is_dirty = true;
+                self.doc.ensure_blocks_initialized();
+                self.doc.add_heading(1, None);
+                self.set_notification("Inserted Level 1 Heading (Bold).");
             }
             Action::InsertHeading2 => {
-                if !self.doc.body.ends_with('\n') && !self.doc.body.is_empty() {
-                    self.doc.body.push('\n');
-                }
-                self.doc.body.push_str("## Subheading\n");
-                self.doc.sync_blocks_from_body();
-                self.doc.is_dirty = true;
+                self.doc.ensure_blocks_initialized();
+                self.doc.add_heading(2, None);
+                self.set_notification("Inserted Level 2 Heading (Italic).");
             }
             Action::InsertCitation => {
                 self.citation_state.open(None);
@@ -406,14 +395,47 @@ impl eframe::App for MlaApp {
         );
 
         if let Some(cite_str) = citation_insert {
-            if !self.doc.body.is_empty()
-                && !self.doc.body.ends_with(' ')
-                && !self.doc.body.ends_with('\n')
-            {
-                self.doc.body.push(' ');
+            self.doc.ensure_blocks_initialized();
+            if let Some(target_idx) = self.citation_state.target_block_index {
+                if target_idx < self.doc.blocks.len() {
+                    match &mut self.doc.blocks[target_idx] {
+                        model::MlaBlock::BlockQuote { citation, .. } => {
+                            *citation = cite_str.clone();
+                        }
+                        model::MlaBlock::Paragraph { text, .. } => {
+                            if !text.is_empty() && !text.ends_with(' ') {
+                                text.push(' ');
+                            }
+                            text.push_str(&cite_str);
+                        }
+                        model::MlaBlock::SectionHeading { text, .. } => {
+                            if !text.is_empty() && !text.ends_with(' ') {
+                                text.push(' ');
+                            }
+                            text.push_str(&cite_str);
+                        }
+                    }
+                }
+            } else if let Some(last_block) = self.doc.blocks.last_mut() {
+                match last_block {
+                    model::MlaBlock::BlockQuote { citation, .. } => {
+                        *citation = cite_str.clone();
+                    }
+                    model::MlaBlock::Paragraph { text, .. } => {
+                        if !text.is_empty() && !text.ends_with(' ') {
+                            text.push(' ');
+                        }
+                        text.push_str(&cite_str);
+                    }
+                    model::MlaBlock::SectionHeading { text, .. } => {
+                        if !text.is_empty() && !text.ends_with(' ') {
+                            text.push(' ');
+                        }
+                        text.push_str(&cite_str);
+                    }
+                }
             }
-            self.doc.body.push_str(&cite_str);
-            self.doc.sync_blocks_from_body();
+            self.doc.sync_body_from_blocks();
             self.doc.is_dirty = true;
             self.set_notification("Citation inserted.");
         }

@@ -243,6 +243,25 @@ pub fn render_toolbar(
         {
             event = Some(ToolbarEvent::OpenCompliance);
         }
+
+        ui.separator();
+
+        // Live Document Stats (Words & PDF Pages)
+        let word_count = doc.total_word_count();
+        let est_pages = doc.estimated_page_count();
+        ui.label(
+            RichText::new(format!(
+                "{} ~{} Page{} (PDF)   {} {} Words",
+                icons::FILE_NEW,
+                est_pages,
+                if est_pages == 1 { "" } else { "s" },
+                icons::EDIT,
+                word_count
+            ))
+            .size(11.5)
+            .strong()
+            .color(accent_col),
+        );
     });
 
     event
