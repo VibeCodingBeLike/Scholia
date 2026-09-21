@@ -30,11 +30,11 @@ fn test_mla_current_date_format() {
 
 #[test]
 fn test_mla_compliance_linter() {
-    let mut doc = MlaDocument::default();
+    let mut doc = MlaDocument::sample_template();
     let report = MlaLinter::inspect(&doc);
     assert!(
         report.score_percentage >= 90,
-        "Default document should be compliant"
+        "Sample template document should be compliant"
     );
 
     // Introduce an error: empty student name
@@ -79,7 +79,7 @@ fn test_works_cited_alphabetization() {
 
 #[test]
 fn test_document_exporters() {
-    let doc = MlaDocument::default();
+    let doc = MlaDocument::sample_template();
     let temp_dir = std::env::temp_dir();
 
     // DOCX export
@@ -163,4 +163,24 @@ fn test_calendar_modal_state() {
     assert!(state.is_open);
     assert_eq!(state.current_month, 3);
     assert_eq!(state.current_year, 2027);
+}
+
+#[test]
+fn test_editor_page_centering() {
+    let ctx = egui::Context::default();
+    scholia::fonts::configure_fonts(&ctx);
+    let mut doc = scholia::model::MlaDocument::new_blank();
+    let theme = scholia::theme::ThemeConfig::default();
+    let keybinds = scholia::keybinds::KeybindConfig::default();
+
+    let mut out = ctx.run_ui(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(1920.0, 1080.0))),
+            ..Default::default()
+        },
+        |ui| {
+            let _action = scholia::ui::render_editor_page(ui, &mut doc, &theme, &keybinds, false);
+        },
+    );
+    out.textures_delta.clear();
 }

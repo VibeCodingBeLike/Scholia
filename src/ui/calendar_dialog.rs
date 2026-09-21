@@ -77,7 +77,7 @@ pub fn render_calendar_popup(
         .open(&mut open)
         .collapsible(false)
         .resizable(false)
-        .default_width(260.0);
+        .fixed_size(egui::vec2(256.0, 315.0));
 
     if let Some(pos) = state.popup_pos {
         window = window.current_pos(pos);
@@ -86,6 +86,8 @@ pub fn render_calendar_popup(
     }
 
     window.show(ctx, |ui| {
+        ui.set_width(236.0);
+        ui.set_max_width(236.0);
         ui.spacing_mut().item_spacing.y = 8.0;
 
         // Month / Year Navigation Header
@@ -94,18 +96,23 @@ pub fn render_calendar_popup(
                 state.prev_month();
             }
 
-            ui.vertical_centered(|ui| {
-                ui.label(
-                    RichText::new(format!(
-                        "{} {}",
-                        month_number_to_name(state.current_month),
-                        state.current_year
-                    ))
-                    .strong()
-                    .size(13.5)
-                    .color(text_col),
-                );
-            });
+            let title_width = (ui.available_width() - 32.0).max(120.0);
+            ui.allocate_ui_with_layout(
+                egui::vec2(title_width, 22.0),
+                egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
+                |ui| {
+                    ui.label(
+                        RichText::new(format!(
+                            "{} {}",
+                            month_number_to_name(state.current_month),
+                            state.current_year
+                        ))
+                        .strong()
+                        .size(13.5)
+                        .color(text_col),
+                    );
+                },
+            );
 
             if ui.button("▶").on_hover_text("Next Month").clicked() {
                 state.next_month();

@@ -38,13 +38,12 @@ pub fn render_editor_page(
             let page_margin_left = ((total_avail - page_width) / 2.0).max(0.0);
 
             let sidebar_width = 208.0f32;
-            let gap = 16.0f32;
 
             // Show keybind sidebar ONLY if the left margin is wide enough to fit it comfortably
-            let show_sidebar = !focus_mode && (page_margin_left >= sidebar_width + gap + 10.0);
+            let show_sidebar = !focus_mode && (page_margin_left >= sidebar_width + 36.0);
 
             if show_sidebar {
-                let sidebar_x = (page_margin_left - sidebar_width - gap).max(18.0);
+                let sidebar_x = 24.0f32;
                 egui::Area::new(egui::Id::new("editor_keybind_preview_sidebar"))
                     .fixed_pos(egui::pos2(sidebar_x, 70.0))
                     .show(ui.ctx(), |ui| {
@@ -88,9 +87,14 @@ pub fn render_editor_page(
 
                         // --- RUNNING HEAD (Top-Right: LastName 1) ---
                         let derived_last = doc.header.derived_last_name();
+                        let head_str = if derived_last.is_empty() {
+                            "1".to_string()
+                        } else {
+                            format!("{} 1", derived_last)
+                        };
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                             ui.label(
-                                RichText::new(format!("{} 1", derived_last))
+                                RichText::new(head_str)
                                     .font(doc_font(15.0))
                                     .color(muted_col),
                             );
@@ -178,6 +182,7 @@ pub fn render_editor_page(
                                 egui::TextEdit::singleline(&mut doc.title)
                                     .font(doc_font(16.0))
                                     .text_color(text_col)
+                                    .horizontal_align(egui::Align::Center)
                                     .frame(egui::Frame::NONE)
                                     .hint_text(RichText::new("Title of Your Paper (MLA Title Case)").italics().color(muted_col))
                                     .desired_width(printable_width),
@@ -241,9 +246,14 @@ pub fn render_editor_page(
                         // Running head for Works Cited page
                         let derived_last = doc.header.derived_last_name();
                         let est_pages = doc.estimated_page_count();
+                        let wc_head = if derived_last.is_empty() {
+                            format!("{}", est_pages.max(2))
+                        } else {
+                            format!("{} {}", derived_last, est_pages.max(2))
+                        };
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                             ui.label(
-                                RichText::new(format!("{} {}", derived_last, est_pages.max(2)))
+                                RichText::new(wc_head)
                                     .font(doc_font(15.0))
                                     .color(muted_col),
                             );

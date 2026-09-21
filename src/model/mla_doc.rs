@@ -69,11 +69,11 @@ pub struct MlaHeader {
 impl Default for MlaHeader {
     fn default() -> Self {
         Self {
-            student_name: "Jane Doe".to_string(),
-            instructor_name: "Professor Smith".to_string(),
-            course: "ENG 101: Literature & Composition".to_string(),
+            student_name: String::new(),
+            instructor_name: String::new(),
+            course: String::new(),
             date: format_current_mla_date(),
-            running_header_last_name: "Doe".to_string(),
+            running_header_last_name: String::new(),
         }
     }
 }
@@ -84,7 +84,7 @@ impl MlaHeader {
             return self.running_header_last_name.trim().to_string();
         }
         let parts: Vec<&str> = self.student_name.split_whitespace().collect();
-        parts.last().unwrap_or(&"Student").to_string()
+        parts.last().copied().unwrap_or("").to_string()
     }
 }
 
@@ -105,10 +105,34 @@ pub struct MlaDocument {
 
 impl Default for MlaDocument {
     fn default() -> Self {
+        Self::new_blank()
+    }
+}
+
+impl MlaDocument {
+    pub fn new_blank() -> Self {
+        Self {
+            header: MlaHeader::default(),
+            title: String::new(),
+            body: String::new(),
+            blocks: Vec::new(),
+            works_cited: Vec::new(),
+            file_path: None,
+            is_dirty: false,
+        }
+    }
+
+    pub fn sample_template() -> Self {
         let starter_text = "Writing an academic paper in accordance with Modern Language Association (MLA) 9th edition standards requires meticulous adherence to structural formatting. Every element of the document—from the one-inch margins to the standardized double spacing—serves to establish academic rigor and uniformity across scholarly discourse. This text editor is engineered specifically to eliminate formatting errors at the source, constraining input so that margin variations, irregular paragraph spacing, and inconsistent typefaces are impossible to introduce.\n\nIn MLA format, all body paragraphs must be indented exactly one-half inch (0.5 in.) from the left margin, without any extra vertical blank space between paragraphs. The running head in the upper right-hand corner displays the author's last name followed by a single space and the current page number, positioned one-half inch from the top edge and flush with the right margin (Smith 42).\n\nWhen quoting prose that extends beyond four lines, or verse that extends beyond three lines, the quotation must be set off as a block quotation. It begins on a new line, is indented an additional half-inch from the left margin, maintains strict double line spacing, omits quotation marks, and places the parenthetical citation outside the concluding punctuation mark (MLA Handbook 120).\n\nThe Works Cited list begins on a separate page at the conclusion of the manuscript. Entries are formatted with a hanging indent of one-half inch, alphabetized by author or primary title, and constructed using the nine core container elements prescribed in the MLA ninth edition.";
 
         let mut doc = Self {
-            header: MlaHeader::default(),
+            header: MlaHeader {
+                student_name: "Jane Doe".to_string(),
+                instructor_name: "Professor Smith".to_string(),
+                course: "ENG 101: Literature & Composition".to_string(),
+                date: format_current_mla_date(),
+                running_header_last_name: "Doe".to_string(),
+            },
             title: "The Rhetorical Construction of Identity in Modern Literature".to_string(),
             body: starter_text.to_string(),
             blocks: Vec::new(),
@@ -130,23 +154,6 @@ impl Default for MlaDocument {
         doc.works_cited.push(entry);
 
         doc
-    }
-}
-
-impl MlaDocument {
-    pub fn new_blank() -> Self {
-        Self {
-            header: MlaHeader::default(),
-            title: "Untitled MLA Paper".to_string(),
-            body: String::new(),
-            blocks: vec![MlaBlock::Paragraph {
-                id: generate_block_id(100),
-                text: String::new(),
-            }],
-            works_cited: Vec::new(),
-            file_path: None,
-            is_dirty: false,
-        }
     }
 
     pub fn ensure_body_synced(&mut self) {
