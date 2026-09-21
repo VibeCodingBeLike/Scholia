@@ -687,7 +687,8 @@ pub fn render_editor_page(
                             }
 
                             ui.add_space(8.0);
-                            if ui.small_button("+ Add Note / Definition [Ctrl+Shift+F]").clicked() {
+                            let fn_sc = keybinds.get_shortcut(Action::AddFootnote).display_string();
+                            if ui.small_button(format!("+ Add Note / Definition [{}]", fn_sc)).clicked() {
                                 action = Some(EditorAction::TriggerAction(Action::AddFootnote));
                             }
                         });
@@ -897,6 +898,11 @@ fn render_keybind_preview_panel(
                     Action::ManageWorksCited,
                     icons::BOOK_CITATIONS,
                     "Works Cited",
+                ),
+                (
+                    Action::AddFootnote,
+                    icons::INFO,
+                    "Notes",
                 ),
                 (Action::NewDocument, icons::FILE_NEW, "New Paper"),
                 (Action::OpenDocument, icons::FOLDER_OPEN, "Open Paper"),

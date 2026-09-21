@@ -43,7 +43,7 @@ impl Action {
             Action::MoveBlockUp => "Move Active Block Up",
             Action::MoveBlockDown => "Move Active Block Down",
             Action::ManageWorksCited => "Open Works Cited Manager",
-            Action::AddFootnote => "Add Definition / Note",
+            Action::AddFootnote => "Add Note / Definition",
             Action::ConvertToMlaTitleCase => "Format Title to MLA Title Case",
             Action::OpenPreferences => "Theme & Transparency Settings",
             Action::ToggleComplianceCheck => "Run MLA Compliance Inspector",
@@ -67,9 +67,8 @@ impl Action {
             | Action::DeleteBlock
             | Action::MoveBlockUp
             | Action::MoveBlockDown
-            | Action::AddFootnote
             | Action::ConvertToMlaTitleCase => "Editing & MLA Blocks",
-            Action::ManageWorksCited => "Works Cited",
+            Action::ManageWorksCited | Action::AddFootnote => "Works Cited & Notes",
             Action::OpenPreferences | Action::ToggleComplianceCheck | Action::ToggleFocusMode => {
                 "View & Tools"
             }
@@ -292,7 +291,7 @@ impl Default for KeybindConfig {
             move_block_up: Shortcut::new(false, false, true, KeyName::Up),
             move_block_down: Shortcut::new(false, false, true, KeyName::Down),
             manage_works_cited: Shortcut::new(true, false, false, KeyName::W),
-            add_footnote: Shortcut::new(true, true, false, KeyName::F), // Cmd/Ctrl + Shift + F
+            add_footnote: Shortcut::new(true, true, false, KeyName::W), // Ctrl+Shift+W (paired with Ctrl+W for Works Cited)
             convert_title_case: Shortcut::new(true, true, false, KeyName::T),
             open_preferences: Shortcut::new(true, false, false, KeyName::Comma),
             toggle_compliance: Shortcut::new(true, false, false, KeyName::L),
@@ -355,6 +354,11 @@ impl KeybindConfig {
     pub fn check_action(&self, action: Action, input: &egui::InputState) -> bool {
         match action {
             Action::AddParagraph | Action::ExportDocx | Action::ExportHtmlPdf => false,
+            Action::AddFootnote => {
+                self.get_shortcut(action).matches(input)
+                    || Shortcut::new(true, true, false, KeyName::W).matches(input)
+                    || Shortcut::new(true, true, false, KeyName::N).matches(input)
+            }
             _ => self.get_shortcut(action).matches(input),
         }
     }

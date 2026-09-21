@@ -309,8 +309,9 @@ fn test_interface_options_and_removed_shortcuts() {
     assert!(!cfg.check_action(Action::ExportDocx, &input));
     assert!(!cfg.check_action(Action::ExportHtmlPdf, &input));
 
-    // Verify AddFootnote shortcut is Ctrl+Shift+F
-    assert_eq!(cfg.get_shortcut(Action::AddFootnote).display_string(), "Ctrl+Shift+F");
+    // Verify Works Cited shortcut is Ctrl+W and Notes is Ctrl+Shift+W (similar to Works Cited)
+    assert_eq!(cfg.get_shortcut(Action::ManageWorksCited).display_string(), "Ctrl+W");
+    assert_eq!(cfg.get_shortcut(Action::AddFootnote).display_string(), "Ctrl+Shift+W");
 }
 
 #[test]
