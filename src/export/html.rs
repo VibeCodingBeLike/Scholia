@@ -41,34 +41,40 @@ pub fn generate_mla_html(doc: &MlaDocument) -> String {
     // Blocks
     for block in &doc.blocks {
         let block_notes = doc.notes_for_block(block.id());
-        let sups: String = block_notes
-            .iter()
-            .map(|n| format!("<sup>{}</sup>", n.index))
-            .collect();
 
         match block {
             MlaBlock::Paragraph { text, .. } => {
                 let trimmed = text.trim();
                 if !trimmed.is_empty() {
+                    let text_with_notes = crate::model::render_text_with_note_tags(
+                        trimmed,
+                        block.note_tags(),
+                        &block_notes,
+                        |idx| format!("<sup>{}</sup>", idx),
+                    );
                     body_html.push_str(&format!(
-                        r#"<p class="mla-paragraph">{}{}</p>"#,
-                        markdown_to_html(trimmed),
-                        sups
+                        r#"<p class="mla-paragraph">{}</p>"#,
+                        markdown_to_html(&text_with_notes)
                     ));
                 }
             }
             MlaBlock::BlockQuote { text, citation, .. } => {
                 let trimmed = text.trim();
                 if !trimmed.is_empty() {
+                    let text_with_notes = crate::model::render_text_with_note_tags(
+                        trimmed,
+                        block.note_tags(),
+                        &block_notes,
+                        |idx| format!("<sup>{}</sup>", idx),
+                    );
                     let cite_part = if citation.trim().is_empty() {
                         String::new()
                     } else {
                         format!(" {}", escape_html(citation.trim()))
                     };
                     body_html.push_str(&format!(
-                        r#"<blockquote class="mla-blockquote">{}{}<span class="citation">{}</span></blockquote>"#,
-                        markdown_to_html(trimmed),
-                        sups,
+                        r#"<blockquote class="mla-blockquote">{}<span class="citation">{}</span></blockquote>"#,
+                        markdown_to_html(&text_with_notes),
                         cite_part
                     ));
                 }

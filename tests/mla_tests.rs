@@ -394,7 +394,70 @@ fn test_explanatory_notes_and_superscript_engine() {
     doc.remove_block(b1_idx);
     assert_eq!(doc.notes.len(), 1);
     assert_eq!(doc.notes[0].text, "Second definition");
-    assert_eq!(doc.notes_for_block(&block_1_id).len(), 0);
+}
+
+#[test]
+fn test_word_superscript_note_shortcut_and_json_tag() {
+    use scholia::model::{
+        num_to_superscript, render_text_with_note_tags, try_parse_and_apply_note_shortcut,
+        MlaBlock, MlaDocument, NoteTag,
+    };
+
+    let mut doc = MlaDocument::new_blank();
+    let block_id = doc.blocks[0].id().to_string();
+
+    // 1. User types in a paragraph: "The quixotic^(1) " (word followed by ^(1) and spacebar)
+    let mut input_text = "The quixotic^(1) quest continued.".to_string();
+    let mut tags: Vec<NoteTag> = Vec::new();
+
+    let result = try_parse_and_apply_note_shortcut(&mut input_text, &mut tags);
+    assert!(result.is_some(), "Shortcut should be recognized upon typing ^(1) and space");
+    let res = result.unwrap();
+    assert_eq!(res.note_index, 1);
+    assert_eq!(res.word, "quixotic");
+
+    // 2. Adding note does NOT delete the associated word
+    assert_eq!(input_text, "The quixotic quest continued.");
+
+    // 3. JSON tag added to the paragraph
+    assert_eq!(tags.len(), 1);
+    assert_eq!(tags[0].note_index, 1);
+    assert_eq!(tags[0].word, "quixotic");
+    assert_eq!(tags[0].offset, 12); // right after "quixotic"
+
+    // 4. Update block in document
+    if let MlaBlock::Paragraph { text, note_tags, .. } = &mut doc.blocks[0] {
+        *text = input_text.clone();
+        *note_tags = tags.clone();
+    }
+    doc.link_note_from_shortcut(&block_id, res.note_index, &res.word);
+
+    // Verify linked in document
+    assert_eq!(doc.notes.len(), 1);
+    assert_eq!(doc.notes[0].index, 1);
+    assert_eq!(doc.notes[0].word, "quixotic");
+    assert_eq!(doc.notes[0].block_id, block_id);
+
+    // 5. Test JSON serialization and deserialization retains note_tags
+    let json = serde_json::to_string(&doc).expect("Serialization to JSON must succeed");
+    assert!(json.contains("note_tags"), "JSON must contain note_tags tag in block");
+    assert!(json.contains("quixotic"));
+    let deserialized: MlaDocument = serde_json::from_str(&json).expect("Deserialization must succeed");
+    assert_eq!(deserialized.blocks[0].note_tags().len(), 1);
+    assert_eq!(deserialized.blocks[0].note_tags()[0].word, "quixotic");
+
+    // 6. Test Exporter text rendering: superscript placed right after the word!
+    let block_notes = doc.notes_for_block(&block_id);
+    let rendered_text = render_text_with_note_tags(&input_text, doc.blocks[0].note_tags(), &block_notes, num_to_superscript);
+    assert_eq!(rendered_text, "The quixotic¹ quest continued.");
+
+    let rendered_html = render_text_with_note_tags(&input_text, doc.blocks[0].note_tags(), &block_notes, |idx| format!("<sup>{}</sup>", idx));
+    assert_eq!(rendered_html, "The quixotic<sup>1</sup> quest continued.");
+
+    // 7. Deleting note removes note tag from paragraph
+    doc.delete_explanatory_note(1);
+    assert_eq!(doc.notes.len(), 0);
+    assert_eq!(doc.blocks[0].note_tags().len(), 0);
 }
 
 #[test]

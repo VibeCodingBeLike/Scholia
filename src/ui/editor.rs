@@ -237,14 +237,15 @@ pub fn render_editor_page(
                         let mut blocks_changed = false;
                         let mut note_to_delete_id: Option<String> = None;
                         let mut note_to_add_block_id: Option<String> = None;
+                        let mut note_shortcut_to_link: Option<(String, usize, String)> = None;
 
                         // Pre-group notes by block_id for visual superscript chip rendering
-                        let mut notes_by_block: std::collections::HashMap<String, Vec<(String, usize, String)>> = std::collections::HashMap::new();
+                        let mut notes_by_block: std::collections::HashMap<String, Vec<(String, usize, String, String)>> = std::collections::HashMap::new();
                         for note in &doc.notes {
                             notes_by_block
                                 .entry(note.block_id.clone())
                                 .or_default()
-                                .push((note.id.clone(), note.index, note.text.clone()));
+                                .push((note.id.clone(), note.index, note.text.clone(), note.word.clone()));
                         }
 
                         let total_blocks = doc.blocks.len();
@@ -255,7 +256,7 @@ pub fn render_editor_page(
 
                             let block = &mut doc.blocks[b_idx];
                             match block {
-                                MlaBlock::Paragraph { id, text } => {
+                                MlaBlock::Paragraph { id, text, note_tags } => {
                                     let block_id = id.clone();
                                     let text_edit_id = egui::Id::new("p_block").with(&block_id);
 
@@ -268,7 +269,7 @@ pub fn render_editor_page(
                                             .desired_width(printable_width)
                                             .desired_rows(2)
                                             .hint_text(
-                                                RichText::new("Begin typing your paragraph here... (type /cite for citation)")
+                                                RichText::new("Begin typing your paragraph here... (type word^(1) + space for note, /cite for citation)")
                                                     .italics()
                                                     .color(muted_col),
                                             ),
@@ -276,6 +277,11 @@ pub fn render_editor_page(
 
                                     if resp.changed() {
                                         blocks_changed = true;
+                                        // Note shorthand: word^(N) followed by spacebar confirmation
+                                        if let Some(res) = crate::model::try_parse_and_apply_note_shortcut(text, note_tags) {
+                                            note_shortcut_to_link = Some((block_id.clone(), res.note_index, res.word));
+                                        }
+
                                         // Slash command: /cite
                                         if text.contains("/cite") {
                                             *text = text.replace("/cite", "").trim_end().to_string();
@@ -342,14 +348,19 @@ pub fn render_editor_page(
                                             ui.add_space(2.0);
                                             ui.horizontal_wrapped(|ui| {
                                                 ui.add_space(36.0); // Indent to align with paragraph text
-                                                for (note_id, note_idx, note_text) in linked_notes {
+                                                for (note_id, note_idx, note_text, note_word) in linked_notes {
                                                     let sup = num_to_superscript(*note_idx);
+                                                    let label = if note_word.is_empty() {
+                                                        format!("Note {}", sup)
+                                                    } else {
+                                                        format!("Note {} on “{}”", sup, note_word)
+                                                    };
                                                     let preview = if note_text.trim().is_empty() {
-                                                        "empty note (click to write on Notes page)".to_string()
+                                                        "empty definition (click to write on Notes page)".to_string()
                                                     } else {
                                                         let mut s = note_text.trim().replace('\n', " ");
-                                                        if s.chars().count() > 32 {
-                                                            s = s.chars().take(30).collect::<String>() + "...";
+                                                        if s.chars().count() > 28 {
+                                                            s = s.chars().take(26).collect::<String>() + "...";
                                                         }
                                                         s
                                                     };
@@ -362,13 +373,13 @@ pub fn render_editor_page(
                                                         .show(ui, |ui| {
                                                             ui.horizontal(|ui| {
                                                                 ui.label(
-                                                                    RichText::new(format!("Note {}", sup))
+                                                                    RichText::new(label)
                                                                         .strong()
                                                                         .size(12.0)
                                                                         .color(accent_col),
                                                                 );
                                                                 ui.label(
-                                                                    RichText::new(format!("“{}”", preview))
+                                                                    RichText::new(format!(": “{}”", preview))
                                                                         .italics()
                                                                         .size(11.0)
                                                                         .color(text_col),
@@ -402,6 +413,7 @@ pub fn render_editor_page(
                                     id,
                                     text,
                                     citation,
+                                    note_tags,
                                 } => {
                                     let block_id = id.clone();
                                     let q_edit_id = egui::Id::new("bq_block").with(&block_id);
@@ -443,7 +455,7 @@ pub fn render_editor_page(
                                                     .desired_rows(3)
                                                     .hint_text(
                                                         RichText::new(
-                                                            "Enter quoted passage (required for prose >4 lines)... (type /cite for citation)",
+                                                            "Enter quoted passage (required for prose >4 lines)... (type word^(1) + space for note, /cite for citation)",
                                                         )
                                                         .italics()
                                                         .color(muted_col),
@@ -451,6 +463,9 @@ pub fn render_editor_page(
                                             );
                                             if q_resp.changed() {
                                                 blocks_changed = true;
+                                                if let Some(res) = crate::model::try_parse_and_apply_note_shortcut(text, note_tags) {
+                                                    note_shortcut_to_link = Some((block_id.clone(), res.note_index, res.word));
+                                                }
                                                 if text.contains("/cite") {
                                                     *text = text.replace("/cite", "").trim_end().to_string();
                                                     action = Some(EditorAction::OpenCitationModal(Some(b_idx)));
@@ -507,10 +522,15 @@ pub fn render_editor_page(
                                             if let Some(linked_notes) = notes_by_block.get(&block_id) {
                                                 if !linked_notes.is_empty() {
                                                     ui.horizontal_wrapped(|ui| {
-                                                        for (note_id, note_idx, note_text) in linked_notes {
+                                                        for (note_id, note_idx, note_text, note_word) in linked_notes {
                                                             let sup = num_to_superscript(*note_idx);
+                                                            let label = if note_word.is_empty() {
+                                                                format!("Note {}", sup)
+                                                            } else {
+                                                                format!("Note {} on “{}”", sup, note_word)
+                                                            };
                                                             let preview = if note_text.trim().is_empty() {
-                                                                "empty note".to_string()
+                                                                "empty definition".to_string()
                                                             } else {
                                                                 let mut s = note_text.trim().replace('\n', " ");
                                                                 if s.chars().count() > 28 {
@@ -527,20 +547,19 @@ pub fn render_editor_page(
                                                                 .show(ui, |ui| {
                                                                     ui.horizontal(|ui| {
                                                                         ui.label(
-                                                                            RichText::new(format!("Note {}", sup))
+                                                                            RichText::new(label)
                                                                                 .strong()
                                                                                 .size(11.5)
                                                                                 .color(accent_col),
                                                                         );
                                                                         ui.label(
-                                                                            RichText::new(format!("“{}”", preview))
+                                                                            RichText::new(format!(": “{}”", preview))
                                                                                 .italics()
                                                                                 .size(10.5)
                                                                                 .color(text_col),
-                                                                        ).on_hover_text(format!("Note {}: {}", note_idx, note_text));
-
+                                                                        );
                                                                         if ui.small_button(RichText::new("✕").size(9.0).color(muted_col))
-                                                                            .on_hover_text(format!("Delete Note {}", note_idx))
+                                                                            .on_hover_text(format!("Delete Note {} and definition", note_idx))
                                                                             .clicked()
                                                                         {
                                                                             note_to_delete_id = Some(note_id.clone());
@@ -649,7 +668,7 @@ pub fn render_editor_page(
                         if let Some((target_idx, to_bottom)) = focus_navigate {
                             if let Some(target_block) = doc.blocks.get(target_idx) {
                                 let (target_id, text_len) = match target_block {
-                                    MlaBlock::Paragraph { id, text } => (egui::Id::new("p_block").with(id), text.len()),
+                                    MlaBlock::Paragraph { id, text, .. } => (egui::Id::new("p_block").with(id), text.len()),
                                     MlaBlock::BlockQuote { id, text, .. } => (egui::Id::new("bq_block").with(id), text.len()),
                                     MlaBlock::SectionHeading { id, text, .. } => (egui::Id::new("h_block").with(id), text.len()),
                                 };
@@ -670,7 +689,7 @@ pub fn render_editor_page(
                             let mut ins_idx = split_idx;
                             for p_text in rest_parts {
                                 ins_idx = doc.add_paragraph(Some(ins_idx));
-                                if let MlaBlock::Paragraph { text, id } = &mut doc.blocks[ins_idx] {
+                                if let MlaBlock::Paragraph { text, id, .. } = &mut doc.blocks[ins_idx] {
                                     *text = p_text;
                                     doc.active_block_idx = ins_idx;
                                     focus_target_id =
@@ -706,6 +725,11 @@ pub fn render_editor_page(
 
                         if let Some(target_b_id) = note_to_add_block_id {
                             doc.add_note_to_block(&target_b_id, String::new());
+                            blocks_changed = true;
+                        }
+
+                        if let Some((b_id, n_idx, word)) = note_shortcut_to_link {
+                            doc.link_note_from_shortcut(&b_id, n_idx, &word);
                             blocks_changed = true;
                         }
 
@@ -791,6 +815,14 @@ pub fn render_editor_page(
                                             .font(doc_font(15.0))
                                             .color(accent_col),
                                     );
+                                    if !note.word.is_empty() {
+                                        ui.label(
+                                            RichText::new(format!("“{}”:", note.word))
+                                                .italics()
+                                                .font(doc_font(14.5))
+                                                .color(accent_col.gamma_multiply(0.85)),
+                                        );
+                                    }
                                     let n_edit = ui.add(
                                         egui::TextEdit::multiline(&mut note.text)
                                             .font(doc_font(15.0))

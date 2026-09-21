@@ -49,26 +49,28 @@ struct DocLine {
     left_extra_mm: f32,
     /// first-line additional indent in mm
     first_indent_mm: f32,
+    /// Note indexes that were referenced on this line
+    referenced_notes: Vec<usize>,
 }
 
 impl DocLine {
     fn normal(text: impl Into<String>) -> Self {
-        Self { kind: LineKind::Normal, text: text.into(), left_extra_mm: 0.0, first_indent_mm: 0.0 }
+        Self { kind: LineKind::Normal, text: text.into(), left_extra_mm: 0.0, first_indent_mm: 0.0, referenced_notes: Vec::new() }
     }
     fn bold(text: impl Into<String>) -> Self {
-        Self { kind: LineKind::Bold, text: text.into(), left_extra_mm: 0.0, first_indent_mm: 0.0 }
+        Self { kind: LineKind::Bold, text: text.into(), left_extra_mm: 0.0, first_indent_mm: 0.0, referenced_notes: Vec::new() }
     }
     fn centered(text: impl Into<String>) -> Self {
-        Self { kind: LineKind::Centered, text: text.into(), left_extra_mm: 0.0, first_indent_mm: 0.0 }
+        Self { kind: LineKind::Centered, text: text.into(), left_extra_mm: 0.0, first_indent_mm: 0.0, referenced_notes: Vec::new() }
     }
     fn paragraph(text: impl Into<String>) -> Self {
-        Self { kind: LineKind::Normal, text: text.into(), left_extra_mm: 0.0, first_indent_mm: INDENT_MM }
+        Self { kind: LineKind::Normal, text: text.into(), left_extra_mm: 0.0, first_indent_mm: INDENT_MM, referenced_notes: Vec::new() }
     }
     fn blockquote(text: impl Into<String>) -> Self {
-        Self { kind: LineKind::Normal, text: text.into(), left_extra_mm: BLOCKQUOTE_INDENT_MM, first_indent_mm: 0.0 }
+        Self { kind: LineKind::Normal, text: text.into(), left_extra_mm: BLOCKQUOTE_INDENT_MM, first_indent_mm: 0.0, referenced_notes: Vec::new() }
     }
     fn page_break() -> Self {
-        Self { kind: LineKind::PageBreak, text: String::new(), left_extra_mm: 0.0, first_indent_mm: 0.0 }
+        Self { kind: LineKind::PageBreak, text: String::new(), left_extra_mm: 0.0, first_indent_mm: 0.0, referenced_notes: Vec::new() }
     }
 }
 
@@ -95,29 +97,62 @@ fn build_pdf(mla: &MlaDocument) -> Result<Vec<u8>, String> {
     let mut page_ops: Vec<Op> = Vec::new();
     let mut y_mm = top_y_mm();
     let mut page_num: u32 = 1;
-    let mut added_notes_footer = false;
+    let mut current_page_notes: Vec<usize> = Vec::new();
+    let mut rendered_note_indices: std::collections::HashSet<usize> = std::collections::HashSet::new();
 
     // Draw running head (right-aligned "LastName N") at top of each page
     add_running_head(&mut page_ops, &font, &last_name, page_num);
 
     for line in &doc_lines {
         if matches!(line.kind, LineKind::PageBreak) {
-            if !added_notes_footer && !mla.notes.is_empty() {
-                add_footnotes_footer(&mut page_ops, &font, &mla.notes);
-                added_notes_footer = true;
+            let notes_for_this_page: Vec<crate::model::ExplanatoryNote> = current_page_notes
+                .iter()
+                .filter(|idx| !rendered_note_indices.contains(idx))
+                .filter_map(|idx| mla.notes.iter().find(|n| n.index == *idx).cloned())
+                .collect();
+            if !notes_for_this_page.is_empty() {
+                add_footnotes_footer(&mut page_ops, &font, &notes_for_this_page);
+                for n in &notes_for_this_page {
+                    rendered_note_indices.insert(n.index);
+                }
             }
             pages.push(PdfPage::new(Mm(PAGE_W_MM), Mm(PAGE_H_MM), page_ops));
             page_ops = Vec::new();
+            current_page_notes.clear();
             y_mm = top_y_mm();
             page_num += 1;
             add_running_head(&mut page_ops, &font, &last_name, page_num);
             continue;
         }
 
+        for n_idx in &line.referenced_notes {
+            if !current_page_notes.contains(n_idx) {
+                current_page_notes.push(*n_idx);
+            }
+        }
+
+        let needed_foot_notes: Vec<crate::model::ExplanatoryNote> = current_page_notes
+            .iter()
+            .filter(|idx| !rendered_note_indices.contains(idx))
+            .filter_map(|idx| mla.notes.iter().find(|n| n.index == *idx).cloned())
+            .collect();
+        let foot_reserve_mm = if needed_foot_notes.is_empty() {
+            0.0
+        } else {
+            needed_foot_notes.len() as f32 * 4.2 + 5.0
+        };
+
         // Page overflow check
-        if y_mm - line_h_mm() < MARGIN_MM {
+        if y_mm - line_h_mm() < MARGIN_MM + foot_reserve_mm {
+            if !needed_foot_notes.is_empty() {
+                add_footnotes_footer(&mut page_ops, &font, &needed_foot_notes);
+                for n in &needed_foot_notes {
+                    rendered_note_indices.insert(n.index);
+                }
+            }
             pages.push(PdfPage::new(Mm(PAGE_W_MM), Mm(PAGE_H_MM), page_ops));
             page_ops = Vec::new();
+            current_page_notes.clear();
             y_mm = top_y_mm();
             page_num += 1;
             add_running_head(&mut page_ops, &font, &last_name, page_num);
@@ -162,8 +197,15 @@ fn build_pdf(mla: &MlaDocument) -> Result<Vec<u8>, String> {
         y_mm -= line_h_mm();
     }
 
-    if !added_notes_footer && !mla.notes.is_empty() {
-        add_footnotes_footer(&mut page_ops, &font, &mla.notes);
+    // Render any remaining notes before closing document
+    let remaining_notes: Vec<crate::model::ExplanatoryNote> = mla
+        .notes
+        .iter()
+        .filter(|n| !rendered_note_indices.contains(&n.index))
+        .cloned()
+        .collect();
+    if !remaining_notes.is_empty() {
+        add_footnotes_footer(&mut page_ops, &font, &remaining_notes);
     }
 
     if !page_ops.is_empty() {
@@ -199,28 +241,32 @@ fn rebuild_lines(mla: &MlaDocument, sorted_wc: &[crate::model::WorksCitedEntry])
     // Body
     for block in &mla.blocks {
         let block_notes = mla.notes_for_block(block.id());
-        let sups: String = block_notes
-            .iter()
-            .map(|n| crate::model::num_to_superscript(n.index))
-            .collect();
 
         match block {
             MlaBlock::Paragraph { text, .. } => {
                 let t = text.trim();
                 if t.is_empty() { continue; }
                 let base = typographical_clean(t);
-                let cleaned = if sups.is_empty() {
-                    base
-                } else {
-                    format!("{}{}", base, sups)
-                };
+                let cleaned = crate::model::render_text_with_note_tags(
+                    &base,
+                    block.note_tags(),
+                    &block_notes,
+                    crate::model::num_to_superscript,
+                );
                 let wrapped = word_wrap(&cleaned, text_w_mm() - INDENT_MM);
                 for (i, w) in wrapped.into_iter().enumerate() {
-                    if i == 0 {
-                        lines.push(DocLine::paragraph(w));
+                    let mut dl = if i == 0 {
+                        DocLine::paragraph(&w)
                     } else {
-                        lines.push(DocLine::normal(w));
+                        DocLine::normal(&w)
+                    };
+                    for note in &mla.notes {
+                        let sup = crate::model::num_to_superscript(note.index);
+                        if w.contains(&sup) {
+                            dl.referenced_notes.push(note.index);
+                        }
                     }
+                    lines.push(dl);
                 }
             }
             MlaBlock::BlockQuote { text, citation, .. } => {
@@ -232,13 +278,21 @@ fn rebuild_lines(mla: &MlaDocument, sorted_wc: &[crate::model::WorksCitedEntry])
                     format!("{} {}", t, citation.trim())
                 };
                 let cleaned_base = typographical_clean(&base);
-                let cleaned = if sups.is_empty() {
-                    cleaned_base
-                } else {
-                    format!("{}{}", cleaned_base, sups)
-                };
+                let cleaned = crate::model::render_text_with_note_tags(
+                    &cleaned_base,
+                    block.note_tags(),
+                    &block_notes,
+                    crate::model::num_to_superscript,
+                );
                 for w in word_wrap(&cleaned, text_w_mm() - BLOCKQUOTE_INDENT_MM) {
-                    lines.push(DocLine::blockquote(w));
+                    let mut dl = DocLine::blockquote(&w);
+                    for note in &mla.notes {
+                        let sup = crate::model::num_to_superscript(note.index);
+                        if w.contains(&sup) {
+                            dl.referenced_notes.push(note.index);
+                        }
+                    }
+                    lines.push(dl);
                 }
             }
             MlaBlock::SectionHeading { level, text, .. } => {

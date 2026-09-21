@@ -1,16 +1,29 @@
 use super::works_cited::WorksCitedEntry;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NoteTag {
+    pub note_index: usize,
+    #[serde(default)]
+    pub word: String,
+    #[serde(default)]
+    pub offset: usize,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MlaBlock {
     Paragraph {
         id: String,
         text: String,
+        #[serde(default)]
+        note_tags: Vec<NoteTag>,
     },
     BlockQuote {
         id: String,
         text: String,
         citation: String,
+        #[serde(default)]
+        note_tags: Vec<NoteTag>,
     },
     SectionHeading {
         id: String,
@@ -41,6 +54,22 @@ impl MlaBlock {
             MlaBlock::Paragraph { text, .. } => text,
             MlaBlock::BlockQuote { text, .. } => text,
             MlaBlock::SectionHeading { text, .. } => text,
+        }
+    }
+
+    pub fn note_tags(&self) -> &[NoteTag] {
+        match self {
+            MlaBlock::Paragraph { note_tags, .. } => note_tags,
+            MlaBlock::BlockQuote { note_tags, .. } => note_tags,
+            MlaBlock::SectionHeading { .. } => &[],
+        }
+    }
+
+    pub fn note_tags_mut(&mut self) -> Option<&mut Vec<NoteTag>> {
+        match self {
+            MlaBlock::Paragraph { note_tags, .. } => Some(note_tags),
+            MlaBlock::BlockQuote { note_tags, .. } => Some(note_tags),
+            MlaBlock::SectionHeading { .. } => None,
         }
     }
 
@@ -95,6 +124,8 @@ pub struct ExplanatoryNote {
     pub text: String,
     #[serde(default)]
     pub block_id: String,
+    #[serde(default)]
+    pub word: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -133,6 +164,7 @@ impl MlaDocument {
             blocks: vec![MlaBlock::Paragraph {
                 id: generate_block_id(1),
                 text: String::new(),
+                note_tags: Vec::new(),
             }],
             works_cited: Vec::new(),
             notes: Vec::new(),
@@ -209,6 +241,7 @@ impl MlaDocument {
                 self.blocks.push(MlaBlock::Paragraph {
                     id: generate_block_id(1),
                     text: String::new(),
+                    note_tags: Vec::new(),
                 });
             }
         }
@@ -232,6 +265,7 @@ impl MlaDocument {
                     id: generate_block_id(i + 1),
                     text: stripped.to_string(),
                     citation: String::new(),
+                    note_tags: Vec::new(),
                 });
             } else if let Some(stripped) = trimmed.strip_prefix("## ") {
                 new_blocks.push(MlaBlock::SectionHeading {
@@ -249,6 +283,7 @@ impl MlaDocument {
                 new_blocks.push(MlaBlock::Paragraph {
                     id: generate_block_id(i + 1),
                     text: trimmed.to_string(),
+                    note_tags: Vec::new(),
                 });
             }
         }
@@ -256,6 +291,7 @@ impl MlaDocument {
             new_blocks.push(MlaBlock::Paragraph {
                 id: generate_block_id(1),
                 text: String::new(),
+                note_tags: Vec::new(),
             });
         }
         self.blocks = new_blocks;
@@ -299,6 +335,7 @@ impl MlaDocument {
         let new_block = MlaBlock::Paragraph {
             id: generate_block_id(self.blocks.len() + 1),
             text: String::new(),
+            note_tags: Vec::new(),
         };
         self.is_dirty = true;
         let idx = match after_index {
@@ -320,6 +357,7 @@ impl MlaDocument {
             id: generate_block_id(self.blocks.len() + 1),
             text: String::new(),
             citation: String::new(),
+            note_tags: Vec::new(),
         };
         self.is_dirty = true;
         let idx = match after_index {
@@ -405,6 +443,7 @@ impl MlaDocument {
             index: next_idx,
             text,
             block_id: block_id.to_string(),
+            word: String::new(),
         });
         self.reindex_notes();
         self.is_dirty = true;
@@ -417,25 +456,51 @@ impl MlaDocument {
 
     pub fn delete_explanatory_note(&mut self, index: usize) {
         if let Some(pos) = self.notes.iter().position(|n| n.index == index) {
-            self.notes.remove(pos);
-            self.reindex_notes();
-            self.is_dirty = true;
+            let note_id = self.notes[pos].id.clone();
+            self.delete_note_by_id(&note_id);
         }
     }
 
     pub fn delete_note_by_id(&mut self, id: &str) {
         if let Some(pos) = self.notes.iter().position(|n| n.id == id) {
+            let deleted_idx = self.notes[pos].index;
             self.notes.remove(pos);
+
+            for block in &mut self.blocks {
+                if let Some(tags) = block.note_tags_mut() {
+                    tags.retain(|t| t.note_index != deleted_idx);
+                }
+            }
+
             self.reindex_notes();
             self.is_dirty = true;
         }
+    }
+
+    pub fn link_note_from_shortcut(&mut self, block_id: &str, note_index: usize, word: &str) {
+        if let Some(note) = self.notes.iter_mut().find(|n| n.index == note_index) {
+            note.block_id = block_id.to_string();
+            if !word.is_empty() {
+                note.word = word.to_string();
+            }
+        } else {
+            self.notes.push(ExplanatoryNote {
+                id: generate_block_id(note_index),
+                index: note_index,
+                text: String::new(),
+                block_id: block_id.to_string(),
+                word: word.to_string(),
+            });
+            self.reindex_notes();
+        }
+        self.is_dirty = true;
     }
 
     pub fn notes_for_block(&self, block_id: &str) -> Vec<&ExplanatoryNote> {
         self.notes.iter().filter(|n| n.block_id == block_id).collect()
     }
 
-    /// Re-indexes all notes sequentially based on document block order.
+    /// Re-indexes all notes sequentially based on document block order, keeping note_tags in lockstep.
     pub fn reindex_notes(&mut self) {
         let block_order: std::collections::HashMap<&str, usize> = self
             .blocks
@@ -451,22 +516,36 @@ impl MlaDocument {
             )
         });
 
+        let mut old_to_new = std::collections::HashMap::new();
         for (i, note) in self.notes.iter_mut().enumerate() {
-            note.index = i + 1;
+            let new_index = i + 1;
+            old_to_new.insert(note.index, new_index);
+            note.index = new_index;
+        }
+
+        for block in &mut self.blocks {
+            if let Some(tags) = block.note_tags_mut() {
+                for tag in tags.iter_mut() {
+                    if let Some(&new_idx) = old_to_new.get(&tag.note_index) {
+                        tag.note_index = new_idx;
+                    }
+                }
+            }
         }
     }
 
     pub fn toggle_block_type(&mut self, idx: usize) {
         if idx < self.blocks.len() {
             match &self.blocks[idx] {
-                MlaBlock::Paragraph { id, text } => {
+                MlaBlock::Paragraph { id, text, note_tags } => {
                     self.blocks[idx] = MlaBlock::BlockQuote {
                         id: id.clone(),
                         text: text.clone(),
                         citation: String::new(),
+                        note_tags: note_tags.clone(),
                     };
                 }
-                MlaBlock::BlockQuote { id, text, citation } => {
+                MlaBlock::BlockQuote { id, text, citation, note_tags } => {
                     let mut combined = text.clone();
                     if !citation.trim().is_empty() {
                         combined.push(' ');
@@ -475,12 +554,14 @@ impl MlaDocument {
                     self.blocks[idx] = MlaBlock::Paragraph {
                         id: id.clone(),
                         text: combined,
+                        note_tags: note_tags.clone(),
                     };
                 }
                 MlaBlock::SectionHeading { id, text, .. } => {
                     self.blocks[idx] = MlaBlock::Paragraph {
                         id: id.clone(),
                         text: text.clone(),
+                        note_tags: Vec::new(),
                     };
                 }
             }
@@ -511,6 +592,124 @@ impl MlaDocument {
 
         self.reindex_notes();
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NoteShortcutResult {
+    pub note_index: usize,
+    pub word: String,
+}
+
+/// Parses shorthand note creation e.g. `word^(1)` followed by a space.
+/// When user hits spacebar to confirm the note, `^(1)` is removed without deleting the associated word,
+/// and a NoteTag is added to the block's `note_tags`.
+pub fn try_parse_and_apply_note_shortcut(
+    text: &mut String,
+    note_tags: &mut Vec<NoteTag>,
+) -> Option<NoteShortcutResult> {
+    let open_idx = text.find("^(")?;
+    let after_open = &text[open_idx + 2..];
+    let close_rel = after_open.find(')')?;
+    let close_idx = open_idx + 2 + close_rel;
+
+    let digits_str = &text[open_idx + 2..close_idx];
+    let note_num: usize = digits_str.parse().ok()?;
+    if note_num == 0 {
+        return None;
+    }
+
+    let after_close = &text[close_idx + 1..];
+    if !after_close.starts_with(' ') && !after_close.starts_with('\t') && !after_close.is_empty() {
+        return None;
+    }
+
+    let preceding_text = &text[..open_idx];
+    let word = preceding_text
+        .split_whitespace()
+        .last()
+        .unwrap_or("")
+        .trim_matches(|c: char| {
+            c == '"' || c == '\'' || c == '(' || c == '[' || c == '“' || c == '”' || c == ',' || c == '.' || c == ';' || c == ':'
+        })
+        .to_string();
+
+    let replace_end = if after_close.starts_with(' ') {
+        close_idx + 2
+    } else {
+        close_idx + 1
+    };
+
+    text.replace_range(open_idx..replace_end, " ");
+    let offset = open_idx;
+
+    if let Some(existing) = note_tags.iter_mut().find(|t| t.note_index == note_num) {
+        existing.word = word.clone();
+        existing.offset = offset;
+    } else {
+        note_tags.push(NoteTag {
+            note_index: note_num,
+            word: word.clone(),
+            offset,
+        });
+        note_tags.sort_by_key(|t| t.offset);
+    }
+
+    Some(NoteShortcutResult {
+        note_index: note_num,
+        word,
+    })
+}
+
+/// Renders block text by embedding superscript representations right after the tagged words,
+/// falling back to appending block notes to the end if no inline tags exist.
+pub fn render_text_with_note_tags(
+    text: &str,
+    tags: &[NoteTag],
+    fallback_notes: &[&ExplanatoryNote],
+    format_sup: impl Fn(usize) -> String,
+) -> String {
+    if tags.is_empty() {
+        if fallback_notes.is_empty() {
+            return text.to_string();
+        } else {
+            let sups: String = fallback_notes.iter().map(|n| format_sup(n.index)).collect();
+            return format!("{}{}", text, sups);
+        }
+    }
+
+    let mut sorted_tags = tags.to_vec();
+    // Sort descending by offset so that insertions do not shift earlier character offsets
+    sorted_tags.sort_by(|a, b| b.offset.cmp(&a.offset));
+
+    let mut result = text.to_string();
+    for tag in sorted_tags {
+        let sup = format_sup(tag.note_index);
+        let mut inserted = false;
+
+        if tag.offset <= result.len() && result.is_char_boundary(tag.offset) {
+            let prefix = &result[..tag.offset];
+            if prefix.ends_with(&tag.word) || tag.word.is_empty() {
+                result.insert_str(tag.offset, &sup);
+                inserted = true;
+            }
+        }
+
+        if !inserted && !tag.word.is_empty() {
+            if let Some(pos) = result.rfind(&tag.word) {
+                let insert_pos = pos + tag.word.len();
+                if result.is_char_boundary(insert_pos) {
+                    result.insert_str(insert_pos, &sup);
+                    inserted = true;
+                }
+            }
+        }
+
+        if !inserted {
+            result.push_str(&sup);
+        }
+    }
+
+    result
 }
 
 pub fn count_words(s: &str) -> usize {

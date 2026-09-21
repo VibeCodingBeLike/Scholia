@@ -36,28 +36,36 @@ pub fn generate_mla_text(doc: &MlaDocument) -> String {
     // Blocks
     for block in &doc.blocks {
         let block_notes = doc.notes_for_block(block.id());
-        let sups: String = block_notes
-            .iter()
-            .map(|n| crate::model::num_to_superscript(n.index))
-            .collect();
 
         match block {
             MlaBlock::Paragraph { text, .. } => {
                 let trimmed = text.trim();
                 if !trimmed.is_empty() {
+                    let text_with_notes = crate::model::render_text_with_note_tags(
+                        trimmed,
+                        block.note_tags(),
+                        &block_notes,
+                        crate::model::num_to_superscript,
+                    );
                     // 0.5 in indent is typically 5 spaces in plain text
-                    out.push_str(&format!("     {}{}\n\n", trimmed, sups));
+                    out.push_str(&format!("     {}\n\n", text_with_notes));
                 }
             }
             MlaBlock::BlockQuote { text, citation, .. } => {
                 let trimmed = text.trim();
                 if !trimmed.is_empty() {
+                    let text_with_notes = crate::model::render_text_with_note_tags(
+                        trimmed,
+                        block.note_tags(),
+                        &block_notes,
+                        crate::model::num_to_superscript,
+                    );
                     let cite = if citation.trim().is_empty() {
                         String::new()
                     } else {
                         format!(" {}", citation.trim())
                     };
-                    out.push_str(&format!("          {}{}{}\n\n", trimmed, sups, cite));
+                    out.push_str(&format!("          {}{}\n\n", text_with_notes, cite));
                 }
             }
             MlaBlock::SectionHeading { level, text, .. } => {

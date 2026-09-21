@@ -111,20 +111,17 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
     // --- Body Blocks ---
     for block in &doc.blocks {
         let block_notes = doc.notes_for_block(block.id());
-        let sups: String = block_notes
-            .iter()
-            .map(|n| crate::model::num_to_superscript(n.index))
-            .collect();
 
         match block {
             MlaBlock::Paragraph { text, .. } => {
                 let trimmed = text.trim();
                 if !trimmed.is_empty() {
-                    let formatted_text = if sups.is_empty() {
-                        trimmed.to_string()
-                    } else {
-                        format!("{}{}", trimmed, sups)
-                    };
+                    let formatted_text = crate::model::render_text_with_note_tags(
+                        trimmed,
+                        block.note_tags(),
+                        &block_notes,
+                        crate::model::num_to_superscript,
+                    );
                     // MLA First-Line Indent: 0.5 in (720 dxa)
                     let p = Paragraph::new()
                         .align(AlignmentType::Left)
@@ -138,11 +135,12 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
             MlaBlock::BlockQuote { text, citation, .. } => {
                 let trimmed = text.trim();
                 if !trimmed.is_empty() {
-                    let formatted_text = if sups.is_empty() {
-                        trimmed.to_string()
-                    } else {
-                        format!("{}{}", trimmed, sups)
-                    };
+                    let formatted_text = crate::model::render_text_with_note_tags(
+                        trimmed,
+                        block.note_tags(),
+                        &block_notes,
+                        crate::model::num_to_superscript,
+                    );
                     // MLA Blockquote: 0.5 in left margin, double spaced, citation outside
                     let mut p = Paragraph::new()
                         .align(AlignmentType::Left)

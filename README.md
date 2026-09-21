@@ -121,12 +121,17 @@ flowchart TD
 ## 📝 Notes & Explanatory Footnotes Architecture
 
 MLA 9 differentiates between short in-text parenthetical citations and content/explanatory notes:
-1. **In the GUI Editor**:
+1. **Interactive In-Text Trigger**:
+   - Type a word followed by `^(<number>)` and press **Space** (e.g. `quixotic^(1) `).
+   - Spacebar confirms the note: `^(1)` is absorbed without deleting the associated word, and a structured `note_tags` JSON tag is registered in the paragraph block linked to that note number in `.mladoc`.
+   - The editor displays a clean visual chip (`Note ¹ on “quixotic” [✕]`) with two-way sync: deleting the chip removes the note, and deleting the note removes the chip.
+2. **In the GUI Editor**:
    - Notes display as a separate page sheet (`────── Page Break: Notes ──────`) immediately preceding the Works Cited page.
    - If no notes exist, the Notes page is **completely absent** from the canvas.
-   - When a note is added (`Ctrl+Shift+W`), a superscript marker is inserted into the active paragraph, and the Notes page appears with the note entry.
-2. **On Export (PDF, Word DOCX, HTML)**:
-   - Notes are compiled into the **page footer** above the bottom margin with the standard MLA 1.5-inch rule divider (`______________________`) in 10pt font.
+   - Hotkey `Ctrl+Shift+W` (or `Ctrl+Alt+N`) also adds a note linked to the active block.
+3. **On Export (PDF, Word DOCX, HTML, Plain Text)**:
+   - The exporter reads the paragraph's JSON tags and embeds the superscript callout (`¹`) directly attached to the tagged word.
+   - If a note is on the page, it is placed into that page's **footer** above the bottom margin with the standard MLA 1.5-inch rule divider (`______________________`) in 10pt font, complying with MLA 9.
    - Export documents never include an artificial standalone "Notes" body page.
 
 ---
