@@ -269,7 +269,7 @@ pub fn render_editor_page(
                                             .desired_width(printable_width)
                                             .desired_rows(2)
                                             .hint_text(
-                                                RichText::new("Begin typing your paragraph here... (type word^(1) + space for note, /cite for citation)")
+                                                RichText::new("Begin typing your paragraph here... (type example^1 + space for note, /cite for citation)")
                                                     .italics()
                                                     .color(muted_col),
                                             ),
@@ -455,7 +455,7 @@ pub fn render_editor_page(
                                                     .desired_rows(3)
                                                     .hint_text(
                                                         RichText::new(
-                                                            "Enter quoted passage (required for prose >4 lines)... (type word^(1) + space for note, /cite for citation)",
+                                                            "Enter quoted passage (required for prose >4 lines)... (type example^1 + space for note, /cite for citation)",
                                                         )
                                                         .italics()
                                                         .color(muted_col),

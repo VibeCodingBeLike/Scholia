@@ -122,9 +122,9 @@ flowchart TD
 
 MLA 9 differentiates between short in-text parenthetical citations and content/explanatory notes:
 1. **Interactive In-Text Trigger**:
-   - Type a word followed by `^(<number>)` and press **Space** (e.g. `quixotic^(1) `).
-   - Spacebar confirms the note: `^(1)` is absorbed without deleting the associated word, and a structured `note_tags` JSON tag is registered in the paragraph block linked to that note number in `.mladoc`.
-   - The editor displays a clean visual chip (`Note ¹ on “quixotic” [✕]`) with two-way sync: deleting the chip removes the note, and deleting the note removes the chip.
+   - Type a word followed by `^<number>` and press **Space** (e.g. `example^1 ` or `example^13 `).
+   - Spacebar confirms the note: `^1` is absorbed without deleting the associated word, and a structured `note_tags` JSON tag is registered in the paragraph block linked to that note number in `.mladoc`.
+   - The editor displays a clean visual chip (`Note ¹ on “example” [✕]`) with two-way sync: deleting the chip removes the note, and deleting the note removes the chip.
 2. **In the GUI Editor**:
    - Notes display as a separate page sheet (`────── Page Break: Notes ──────`) immediately preceding the Works Cited page.
    - If no notes exist, the Notes page is **completely absent** from the canvas.

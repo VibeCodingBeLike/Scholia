@@ -600,64 +600,112 @@ pub struct NoteShortcutResult {
     pub word: String,
 }
 
-/// Parses shorthand note creation e.g. `word^(1)` followed by a space.
-/// When user hits spacebar to confirm the note, `^(1)` is removed without deleting the associated word,
+/// Parses shorthand note creation e.g. `example^1` or `example^13` (or `example^(1)`) followed by a space.
+/// When user hits spacebar to confirm the note, `^1` is removed without deleting the associated word,
 /// and a NoteTag is added to the block's `note_tags`.
 pub fn try_parse_and_apply_note_shortcut(
     text: &mut String,
     note_tags: &mut Vec<NoteTag>,
 ) -> Option<NoteShortcutResult> {
-    let open_idx = text.find("^(")?;
-    let after_open = &text[open_idx + 2..];
-    let close_rel = after_open.find(')')?;
-    let close_idx = open_idx + 2 + close_rel;
+    let mut search_start = 0;
+    while let Some(rel_open) = text[search_start..].find('^') {
+        let open_idx = search_start + rel_open;
+        let after_caret = &text[open_idx + 1..];
 
-    let digits_str = &text[open_idx + 2..close_idx];
-    let note_num: usize = digits_str.parse().ok()?;
-    if note_num == 0 {
-        return None;
-    }
+        let (note_num, replace_end) = if after_caret.starts_with('(') {
+            // Case 1: ^(digits)
+            if let Some(close_rel) = after_caret.find(')') {
+                let digits_str = &after_caret[1..close_rel];
+                if let Ok(num) = digits_str.parse::<usize>() {
+                    if num > 0 {
+                        let after_close = &after_caret[close_rel + 1..];
+                        if after_close.starts_with(' ') || after_close.starts_with('\t') {
+                            let end = open_idx + 1 + close_rel + 2;
+                            (num, end)
+                        } else if after_close.is_empty() {
+                            let end = open_idx + 1 + close_rel + 1;
+                            (num, end)
+                        } else {
+                            search_start = open_idx + 1;
+                            continue;
+                        }
+                    } else {
+                        search_start = open_idx + 1;
+                        continue;
+                    }
+                } else {
+                    search_start = open_idx + 1;
+                    continue;
+                }
+            } else {
+                search_start = open_idx + 1;
+                continue;
+            }
+        } else {
+            // Case 2: ^digits (e.g. ^1, ^13)
+            let digit_len = after_caret.chars().take_while(|c| c.is_ascii_digit()).count();
+            if digit_len > 0 {
+                let digits_str = &after_caret[..digit_len];
+                if let Ok(num) = digits_str.parse::<usize>() {
+                    if num > 0 {
+                        let after_digits = &after_caret[digit_len..];
+                        if after_digits.starts_with(' ') || after_digits.starts_with('\t') {
+                            let end = open_idx + 1 + digit_len + 1;
+                            (num, end)
+                        } else if after_digits.is_empty() {
+                            let end = open_idx + 1 + digit_len;
+                            (num, end)
+                        } else {
+                            search_start = open_idx + 1;
+                            continue;
+                        }
+                    } else {
+                        search_start = open_idx + 1;
+                        continue;
+                    }
+                } else {
+                    search_start = open_idx + 1;
+                    continue;
+                }
+            } else {
+                search_start = open_idx + 1;
+                continue;
+            }
+        };
 
-    let after_close = &text[close_idx + 1..];
-    if !after_close.starts_with(' ') && !after_close.starts_with('\t') && !after_close.is_empty() {
-        return None;
-    }
+        // Extract preceding word
+        let preceding_text = &text[..open_idx];
+        let word = preceding_text
+            .split_whitespace()
+            .last()
+            .unwrap_or("")
+            .trim_matches(|c: char| {
+                c == '"' || c == '\'' || c == '(' || c == '[' || c == '“' || c == '”' || c == ',' || c == '.' || c == ';' || c == ':'
+            })
+            .to_string();
 
-    let preceding_text = &text[..open_idx];
-    let word = preceding_text
-        .split_whitespace()
-        .last()
-        .unwrap_or("")
-        .trim_matches(|c: char| {
-            c == '"' || c == '\'' || c == '(' || c == '[' || c == '“' || c == '”' || c == ',' || c == '.' || c == ';' || c == ':'
-        })
-        .to_string();
+        text.replace_range(open_idx..replace_end, " ");
+        let offset = open_idx;
 
-    let replace_end = if after_close.starts_with(' ') {
-        close_idx + 2
-    } else {
-        close_idx + 1
-    };
+        if let Some(existing) = note_tags.iter_mut().find(|t| t.note_index == note_num) {
+            existing.word = word.clone();
+            existing.offset = offset;
+        } else {
+            note_tags.push(NoteTag {
+                note_index: note_num,
+                word: word.clone(),
+                offset,
+            });
+            note_tags.sort_by_key(|t| t.offset);
+        }
 
-    text.replace_range(open_idx..replace_end, " ");
-    let offset = open_idx;
-
-    if let Some(existing) = note_tags.iter_mut().find(|t| t.note_index == note_num) {
-        existing.word = word.clone();
-        existing.offset = offset;
-    } else {
-        note_tags.push(NoteTag {
+        return Some(NoteShortcutResult {
             note_index: note_num,
-            word: word.clone(),
-            offset,
+            word,
         });
-        note_tags.sort_by_key(|t| t.offset);
     }
 
-    Some(NoteShortcutResult {
-        note_index: note_num,
-        word,
-    })
+    None
 }
 
 /// Renders block text by embedding superscript representations right after the tagged words,
