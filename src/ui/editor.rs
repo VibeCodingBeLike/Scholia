@@ -40,37 +40,25 @@ pub fn render_editor_page(
             let sidebar_width = 208.0f32;
             let gap = 16.0f32;
 
-            // Show keybind sidebar ONLY if the left margin is wide enough to fit it comfortably without displacing the centered page!
+            // Show keybind sidebar ONLY if the left margin is wide enough to fit it comfortably
             let show_sidebar = !focus_mode && (page_margin_left >= sidebar_width + gap + 10.0);
 
-            // Center container
-            ui.horizontal_top(|ui| {
-                ui.spacing_mut().item_spacing.x = 0.0;
-
-                if show_sidebar {
-                    // Position sidebar within the left margin so page stays exactly centered
-                    let space_before_sidebar = (page_margin_left - sidebar_width - gap).max(0.0);
-                    if space_before_sidebar > 0.0 {
-                        ui.add_space(space_before_sidebar);
-                    }
-
-                    // --- KEYBIND PREVIEW PANEL ON THE LEFT ---
-                    ui.vertical(|ui| {
-                        ui.set_width(sidebar_width);
-                        ui.set_min_width(sidebar_width);
-                        ui.set_max_width(sidebar_width);
+            if show_sidebar {
+                let sidebar_x = (page_margin_left - sidebar_width - gap).max(18.0);
+                egui::Area::new(egui::Id::new("editor_keybind_preview_sidebar"))
+                    .fixed_pos(egui::pos2(sidebar_x, 70.0))
+                    .show(ui.ctx(), |ui| {
                         if let Some(act) = render_keybind_preview_panel(ui, theme, keybinds, sidebar_width) {
                             action = Some(EditorAction::TriggerAction(act));
                         }
                     });
+            }
 
-                    // Space between sidebar and page to hit exactly page_margin_left
-                    let space_after_sidebar = page_margin_left - (space_before_sidebar + sidebar_width);
-                    if space_after_sidebar > 0.0 {
-                        ui.add_space(space_after_sidebar);
-                    }
-                } else if page_margin_left > 0.0 {
-                    // Page is strictly centered
+            // Center container holding strictly the manuscript page
+            ui.horizontal_top(|ui| {
+                ui.spacing_mut().item_spacing.x = 0.0;
+
+                if page_margin_left > 0.0 {
                     ui.add_space(page_margin_left);
                 }
 
