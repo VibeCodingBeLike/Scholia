@@ -50,7 +50,7 @@ pub fn render_status_bar(ui: &mut Ui, doc: &MlaDocument, theme: &ThemeConfig) {
 
             ui.label(
                 egui::RichText::new(format!(
-                    "{} ~{} Page{} (PDF)",
+                    "{} ~{} Page{}",
                     icons::FILE_NEW,
                     est_pages,
                     if est_pages == 1 { "" } else { "s" }
