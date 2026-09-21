@@ -32,6 +32,7 @@ pub fn render_toolbar(
 ) -> Option<ToolbarEvent> {
     let mut event = None;
     let text_col = theme.text_color();
+    let muted_col = theme.muted_text_color();
     let accent_col = theme.accent_color();
 
     ui.horizontal_wrapped(|ui| {
@@ -243,6 +244,31 @@ pub fn render_toolbar(
         {
             event = Some(ToolbarEvent::OpenCompliance);
         }
+
+        // Live Document Stats: Page count (estimated PDF) & Word count
+        let word_count = doc.total_word_count();
+        let page_count = doc.estimated_page_count();
+        let stats_text = format!(
+            "📄 {} {}  •  📝 {} {}",
+            page_count,
+            if page_count == 1 { "Page" } else { "Pages" },
+            word_count,
+            if word_count == 1 { "Word" } else { "Words" }
+        );
+
+        let avail = ui.available_width();
+        let stats_approx_w = 210.0;
+        if avail > stats_approx_w + 12.0 {
+            ui.add_space(avail - stats_approx_w);
+        } else {
+            ui.add_space(10.0);
+        }
+
+        ui.label(
+            RichText::new(stats_text)
+                .size(12.5)
+                .color(muted_col),
+        );
     });
 
     event

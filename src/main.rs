@@ -164,35 +164,16 @@ impl MlaApp {
                 }
             }
             Action::AddParagraph => {
-                if !self.doc.body.ends_with('\n') && !self.doc.body.is_empty() {
-                    self.doc.body.push('\n');
-                }
-                self.doc.sync_blocks_from_body();
-                self.doc.is_dirty = true;
+                self.doc.add_paragraph(None);
             }
             Action::InsertBlockQuote => {
-                if !self.doc.body.ends_with('\n') && !self.doc.body.is_empty() {
-                    self.doc.body.push('\n');
-                }
-                self.doc.body.push_str("> Blockquote quotation here...\n");
-                self.doc.sync_blocks_from_body();
-                self.doc.is_dirty = true;
+                self.doc.add_blockquote(None);
             }
             Action::InsertHeading1 => {
-                if !self.doc.body.ends_with('\n') && !self.doc.body.is_empty() {
-                    self.doc.body.push('\n');
-                }
-                self.doc.body.push_str("# Section Heading\n");
-                self.doc.sync_blocks_from_body();
-                self.doc.is_dirty = true;
+                self.doc.add_heading(1, None);
             }
             Action::InsertHeading2 => {
-                if !self.doc.body.ends_with('\n') && !self.doc.body.is_empty() {
-                    self.doc.body.push('\n');
-                }
-                self.doc.body.push_str("## Subheading\n");
-                self.doc.sync_blocks_from_body();
-                self.doc.is_dirty = true;
+                self.doc.add_heading(2, None);
             }
             Action::InsertCitation => {
                 self.citation_state.open(None);
@@ -288,8 +269,17 @@ impl eframe::App for MlaApp {
         // Outer App Container with customizable window opacity & tint
         egui::Frame::new()
             .fill(self.theme.window_fill_color())
-            .inner_margin(egui::Margin::symmetric(14, 10))
+            .inner_margin(egui::Margin::symmetric(14, 8))
             .show(ui, |ui| {
+                // Pinned Bottom Status Bar (always visible at bottom of app, hidden in Focus Mode)
+                if !self.focus_mode {
+                    ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+                        ui.add_space(2.0);
+                        render_status_bar(ui, &self.doc, &self.theme);
+                        ui.separator();
+                    });
+                }
+
                 // Top Toolbar (hidden in Focus Mode for total immersion)
                 if !self.focus_mode {
                     if let Some(tb_event) =
@@ -386,12 +376,6 @@ impl eframe::App for MlaApp {
                             self.handle_action(act);
                         }
                     }
-                }
-
-                // Bottom Status Bar
-                if !self.focus_mode {
-                    ui.separator();
-                    render_status_bar(ui, &self.doc, &self.theme);
                 }
             });
 

@@ -158,25 +158,43 @@ impl MlaDocument {
 
     pub fn ensure_body_synced(&mut self) {
         if self.body.trim().is_empty() && !self.blocks.is_empty() {
-            let parts: Vec<String> = self
-                .blocks
-                .iter()
-                .map(|b| match b {
-                    MlaBlock::Paragraph { text, .. } => text.clone(),
-                    MlaBlock::BlockQuote { text, citation, .. } => {
-                        if citation.trim().is_empty() {
-                            format!("> {}", text)
-                        } else {
-                            format!("> {} {}", text, citation.trim())
-                        }
-                    }
-                    MlaBlock::SectionHeading { level, text, .. } => {
-                        format!("{} {}", "#".repeat(*level as usize), text)
-                    }
-                })
-                .collect();
-            self.body = parts.join("\n\n");
+            self.sync_body_from_blocks();
         }
+    }
+
+    pub fn sync_body_from_blocks(&mut self) {
+        let parts: Vec<String> = self
+            .blocks
+            .iter()
+            .map(|b| match b {
+                MlaBlock::Paragraph { text, .. } => text.clone(),
+                MlaBlock::BlockQuote { text, citation, .. } => {
+                    if citation.trim().is_empty() {
+                        format!("> {}", text)
+                    } else {
+                        format!("> {} {}", text, citation.trim())
+                    }
+                }
+                MlaBlock::SectionHeading { level, text, .. } => {
+                    format!("{} {}", "#".repeat(*level as usize), text)
+                }
+            })
+            .collect();
+        self.body = parts.join("\n\n");
+    }
+
+    pub fn ensure_blocks_initialized(&mut self) {
+        if self.blocks.is_empty() {
+            if !self.body.trim().is_empty() {
+                self.sync_blocks_from_body();
+            } else {
+                self.blocks.push(MlaBlock::Paragraph {
+                    id: generate_block_id(1),
+                    text: String::new(),
+                });
+            }
+        }
+        self.sync_body_from_blocks();
     }
 
     pub fn sync_blocks_from_body(&mut self) {
@@ -263,7 +281,7 @@ impl MlaDocument {
             text: String::new(),
         };
         self.is_dirty = true;
-        match after_index {
+        let inserted_idx = match after_index {
             Some(idx) if idx < self.blocks.len() => {
                 self.blocks.insert(idx + 1, new_block);
                 idx + 1
@@ -272,7 +290,9 @@ impl MlaDocument {
                 self.blocks.push(new_block);
                 self.blocks.len() - 1
             }
-        }
+        };
+        self.sync_body_from_blocks();
+        inserted_idx
     }
 
     pub fn add_blockquote(&mut self, after_index: Option<usize>) -> usize {
@@ -282,7 +302,7 @@ impl MlaDocument {
             citation: String::new(),
         };
         self.is_dirty = true;
-        match after_index {
+        let inserted_idx = match after_index {
             Some(idx) if idx < self.blocks.len() => {
                 self.blocks.insert(idx + 1, new_block);
                 idx + 1
@@ -291,7 +311,9 @@ impl MlaDocument {
                 self.blocks.push(new_block);
                 self.blocks.len() - 1
             }
-        }
+        };
+        self.sync_body_from_blocks();
+        inserted_idx
     }
 
     pub fn add_heading(&mut self, level: u8, after_index: Option<usize>) -> usize {
@@ -301,7 +323,7 @@ impl MlaDocument {
             text: String::new(),
         };
         self.is_dirty = true;
-        match after_index {
+        let inserted_idx = match after_index {
             Some(idx) if idx < self.blocks.len() => {
                 self.blocks.insert(idx + 1, new_block);
                 idx + 1
@@ -310,12 +332,15 @@ impl MlaDocument {
                 self.blocks.push(new_block);
                 self.blocks.len() - 1
             }
-        }
+        };
+        self.sync_body_from_blocks();
+        inserted_idx
     }
 
     pub fn remove_block(&mut self, index: usize) {
         if self.blocks.len() > 1 && index < self.blocks.len() {
             self.blocks.remove(index);
+            self.sync_body_from_blocks();
             self.is_dirty = true;
         }
     }
@@ -323,6 +348,7 @@ impl MlaDocument {
     pub fn move_block_up(&mut self, index: usize) {
         if index > 0 && index < self.blocks.len() {
             self.blocks.swap(index, index - 1);
+            self.sync_body_from_blocks();
             self.is_dirty = true;
         }
     }
@@ -330,6 +356,7 @@ impl MlaDocument {
     pub fn move_block_down(&mut self, index: usize) {
         if index + 1 < self.blocks.len() {
             self.blocks.swap(index, index + 1);
+            self.sync_body_from_blocks();
             self.is_dirty = true;
         }
     }
