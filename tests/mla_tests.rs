@@ -406,25 +406,37 @@ fn test_word_superscript_note_shortcut_and_json_tag() {
     let mut doc = MlaDocument::new_blank();
     let block_id = doc.blocks[0].id().to_string();
 
-    // 1. User types in a paragraph: "The example^1 " and "another^13 " (without brackets, followed by spacebar)
+    // 0. Verify that notes wait for spacebar: typing without spacebar does NOT trigger note
+    let mut no_space_single = "The example^1".to_string();
+    let mut tags_temp: Vec<NoteTag> = Vec::new();
+    assert!(try_parse_and_apply_note_shortcut(&mut no_space_single, &mut tags_temp).is_none(),
+        "Must wait for spacebar: example^1 without space must not trigger");
+
+    let mut no_space_multi = "The example^10".to_string();
+    assert!(try_parse_and_apply_note_shortcut(&mut no_space_multi, &mut tags_temp).is_none(),
+        "Must wait for spacebar: example^10 without space must not trigger");
+
+    // 1. User types in a paragraph: "The example^1 " and "another^13 " (followed by spacebar confirmation)
     let mut input_text = "The example^1 and another^13 quest continued.".to_string();
     let mut tags: Vec<NoteTag> = Vec::new();
 
-    // First shortcut: example^1
+    // First shortcut: example^1 confirmed with spacebar
     let result1 = try_parse_and_apply_note_shortcut(&mut input_text, &mut tags);
     assert!(result1.is_some(), "Shortcut example^1 should be recognized upon typing space");
     let res1 = result1.unwrap();
     assert_eq!(res1.note_index, 1);
     assert_eq!(res1.word, "example");
-    assert_eq!(input_text, "The example and another^13 quest continued.");
+    // Displays superscript character in the editor text!
+    assert_eq!(input_text, "The example¹ and another^13 quest continued.");
 
-    // Second shortcut: another^13
+    // Second shortcut: another^13 confirmed with spacebar
     let result2 = try_parse_and_apply_note_shortcut(&mut input_text, &mut tags);
     assert!(result2.is_some(), "Shortcut another^13 should be recognized upon typing space");
     let res2 = result2.unwrap();
     assert_eq!(res2.note_index, 13);
     assert_eq!(res2.word, "another");
-    assert_eq!(input_text, "The example and another quest continued.");
+    // Displays superscript character in the editor text!
+    assert_eq!(input_text, "The example¹ and another¹³ quest continued.");
 
     // 2. Adding notes does NOT delete the associated words
     assert!(input_text.contains("example"));
@@ -461,19 +473,21 @@ fn test_word_superscript_note_shortcut_and_json_tag() {
     assert_eq!(deserialized.blocks[0].note_tags().len(), 2);
     assert_eq!(deserialized.blocks[0].note_tags()[0].word, "example");
 
-    // 6. Test Exporter text rendering: superscripts placed right after the words!
+    // 6. Test Exporter text rendering: superscripts placed right after the words without duplication!
     let block_notes = doc.notes_for_block(&block_id);
-    let rendered_text = render_text_with_note_tags(&input_text, doc.blocks[0].note_tags(), &block_notes, num_to_superscript);
+    let rendered_text = render_text_with_note_tags(&doc.blocks[0].text(), doc.blocks[0].note_tags(), &block_notes, num_to_superscript);
     assert_eq!(rendered_text, "The example¹ and another² quest continued.");
 
-    let rendered_html = render_text_with_note_tags(&input_text, doc.blocks[0].note_tags(), &block_notes, |idx| format!("<sup>{}</sup>", idx));
+    let rendered_html = render_text_with_note_tags(&doc.blocks[0].text(), doc.blocks[0].note_tags(), &block_notes, |idx| format!("<sup>{}</sup>", idx));
     assert_eq!(rendered_html, "The example<sup>1</sup> and another<sup>2</sup> quest continued.");
 
-    // 7. Deleting note removes note tag from paragraph
+    // 7. Deleting note removes note tag AND removes superscript from paragraph text
     doc.delete_explanatory_note(1);
     assert_eq!(doc.notes.len(), 1);
     assert_eq!(doc.blocks[0].note_tags().len(), 1);
     assert_eq!(doc.blocks[0].note_tags()[0].word, "another");
+    assert!(!doc.blocks[0].text().contains("example¹"), "Deleted note superscript must be removed from text");
+    assert!(doc.blocks[0].text().contains("another¹"), "Remaining note should reindex to ¹ in text");
 }
 
 #[test]
@@ -542,3 +556,26 @@ fn test_notes_exported_in_footer_not_separate_page() {
     let _ = std::fs::remove_file(&pdf_path);
 }
 
+#[test]
+fn test_transparent_button_visuals() {
+    let dark_theme = scholia::theme::ThemeConfig::preset_frosted_dark();
+    let dark_visuals = dark_theme.create_egui_visuals();
+
+    // Inactive buttons must have completely transparent background
+    assert_eq!(dark_visuals.widgets.inactive.bg_fill, egui::Color32::TRANSPARENT);
+    assert_eq!(dark_visuals.widgets.inactive.weak_bg_fill, egui::Color32::TRANSPARENT);
+
+    // Hovered buttons should be softly tinted, not solid opaque gray (egui default is from_gray(70) with alpha 255)
+    assert_ne!(dark_visuals.widgets.hovered.bg_fill, egui::Color32::from_gray(70));
+    assert_ne!(dark_visuals.widgets.hovered.bg_fill.a(), 255);
+
+    // Active buttons should also be translucent
+    assert_ne!(dark_visuals.widgets.active.bg_fill, egui::Color32::from_gray(55));
+    assert_ne!(dark_visuals.widgets.active.bg_fill.a(), 255);
+
+    // Test light theme as well
+    let light_theme = scholia::theme::ThemeConfig::preset_frosted_light();
+    let light_visuals = light_theme.create_egui_visuals();
+    assert_eq!(light_visuals.widgets.inactive.bg_fill, egui::Color32::TRANSPARENT);
+    assert_eq!(light_visuals.widgets.inactive.weak_bg_fill, egui::Color32::TRANSPARENT);
+}

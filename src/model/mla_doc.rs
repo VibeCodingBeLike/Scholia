@@ -464,9 +464,13 @@ impl MlaDocument {
     pub fn delete_note_by_id(&mut self, id: &str) {
         if let Some(pos) = self.notes.iter().position(|n| n.id == id) {
             let deleted_idx = self.notes[pos].index;
+            let del_sup = num_to_superscript(deleted_idx);
             self.notes.remove(pos);
 
             for block in &mut self.blocks {
+                if block.text().contains(&del_sup) {
+                    *block.text_mut() = block.text().replace(&del_sup, "");
+                }
                 if let Some(tags) = block.note_tags_mut() {
                     tags.retain(|t| t.note_index != deleted_idx);
                 }
@@ -524,12 +528,22 @@ impl MlaDocument {
         }
 
         for block in &mut self.blocks {
+            let mut replacements = Vec::new();
             if let Some(tags) = block.note_tags_mut() {
                 for tag in tags.iter_mut() {
                     if let Some(&new_idx) = old_to_new.get(&tag.note_index) {
-                        tag.note_index = new_idx;
+                        if tag.note_index != new_idx {
+                            let old_sup = num_to_superscript(tag.note_index);
+                            let new_sup = num_to_superscript(new_idx);
+                            replacements.push((old_sup, new_sup));
+                            tag.note_index = new_idx;
+                        }
                     }
                 }
+            }
+            for (old_sup, new_sup) in replacements {
+                let updated = block.text().replace(&old_sup, &new_sup);
+                *block.text_mut() = updated;
             }
         }
     }
@@ -582,14 +596,6 @@ impl MlaDocument {
             }
         }
 
-        // Clean out any raw unicode superscripts from block text
-        for block in &mut self.blocks {
-            let cleaned = clean_superscripts(block.text());
-            if cleaned != block.text() {
-                *block.text_mut() = cleaned;
-            }
-        }
-
         self.reindex_notes();
     }
 }
@@ -619,11 +625,9 @@ pub fn try_parse_and_apply_note_shortcut(
                 if let Ok(num) = digits_str.parse::<usize>() {
                     if num > 0 {
                         let after_close = &after_caret[close_rel + 1..];
+                        // Strictly wait for spacebar confirmation
                         if after_close.starts_with(' ') || after_close.starts_with('\t') {
                             let end = open_idx + 1 + close_rel + 2;
-                            (num, end)
-                        } else if after_close.is_empty() {
-                            let end = open_idx + 1 + close_rel + 1;
                             (num, end)
                         } else {
                             search_start = open_idx + 1;
@@ -642,18 +646,16 @@ pub fn try_parse_and_apply_note_shortcut(
                 continue;
             }
         } else {
-            // Case 2: ^digits (e.g. ^1, ^13)
+            // Case 2: ^digits (e.g. ^1, ^10, ^13)
             let digit_len = after_caret.chars().take_while(|c| c.is_ascii_digit()).count();
             if digit_len > 0 {
                 let digits_str = &after_caret[..digit_len];
                 if let Ok(num) = digits_str.parse::<usize>() {
                     if num > 0 {
                         let after_digits = &after_caret[digit_len..];
+                        // Strictly wait for spacebar confirmation so typing e.g. 10 does not trigger on 1
                         if after_digits.starts_with(' ') || after_digits.starts_with('\t') {
                             let end = open_idx + 1 + digit_len + 1;
-                            (num, end)
-                        } else if after_digits.is_empty() {
-                            let end = open_idx + 1 + digit_len;
                             (num, end)
                         } else {
                             search_start = open_idx + 1;
@@ -684,7 +686,9 @@ pub fn try_parse_and_apply_note_shortcut(
             })
             .to_string();
 
-        text.replace_range(open_idx..replace_end, " ");
+        let sup_char = num_to_superscript(note_num);
+        let replacement = format!("{} ", sup_char);
+        text.replace_range(open_idx..replace_end, &replacement);
         let offset = open_idx;
 
         if let Some(existing) = note_tags.iter_mut().find(|t| t.note_index == note_num) {
@@ -716,12 +720,14 @@ pub fn render_text_with_note_tags(
     fallback_notes: &[&ExplanatoryNote],
     format_sup: impl Fn(usize) -> String,
 ) -> String {
+    // Strip any raw unicode superscripts so format_sup does not duplicate them
+    let base_text = clean_superscripts(text);
     if tags.is_empty() {
         if fallback_notes.is_empty() {
-            return text.to_string();
+            return base_text;
         } else {
             let sups: String = fallback_notes.iter().map(|n| format_sup(n.index)).collect();
-            return format!("{}{}", text, sups);
+            return format!("{}{}", base_text, sups);
         }
     }
 
@@ -729,7 +735,7 @@ pub fn render_text_with_note_tags(
     // Sort descending by offset so that insertions do not shift earlier character offsets
     sorted_tags.sort_by(|a, b| b.offset.cmp(&a.offset));
 
-    let mut result = text.to_string();
+    let mut result = base_text;
     for tag in sorted_tags {
         let sup = format_sup(tag.note_index);
         let mut inserted = false;

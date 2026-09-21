@@ -38,7 +38,9 @@ fn main() -> eframe::Result<()> {
         native_options,
         Box::new(|cc| {
             fonts::configure_fonts(&cc.egui_ctx);
-            Ok(Box::new(MlaApp::new()))
+            let app = MlaApp::new();
+            cc.egui_ctx.set_visuals(app.theme.create_egui_visuals());
+            Ok(Box::new(app))
         }),
     )
 }
@@ -288,6 +290,11 @@ impl eframe::App for MlaApp {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+        // Apply theme visuals so all buttons, dialogs, and widgets are transparent
+        let theme_visuals = self.theme.create_egui_visuals();
+        ui.ctx().set_visuals(theme_visuals.clone());
+        ui.style_mut().visuals = theme_visuals;
+
         // Ensure no 1px white line / border is drawn on borderless window
         ui.style_mut().visuals.window_stroke = egui::Stroke::NONE;
 

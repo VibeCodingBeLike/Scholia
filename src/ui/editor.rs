@@ -235,18 +235,8 @@ pub fn render_editor_page(
                         let mut focus_target_id = None;
                         let mut focus_navigate: Option<(usize, bool)> = None;
                         let mut blocks_changed = false;
-                        let mut note_to_delete_id: Option<String> = None;
-                        let mut note_to_add_block_id: Option<String> = None;
+                        let mut note_to_delete_index: Option<usize> = None;
                         let mut note_shortcut_to_link: Option<(String, usize, String)> = None;
-
-                        // Pre-group notes by block_id for visual superscript chip rendering
-                        let mut notes_by_block: std::collections::HashMap<String, Vec<(String, usize, String, String)>> = std::collections::HashMap::new();
-                        for note in &doc.notes {
-                            notes_by_block
-                                .entry(note.block_id.clone())
-                                .or_default()
-                                .push((note.id.clone(), note.index, note.text.clone(), note.word.clone()));
-                        }
 
                         let total_blocks = doc.blocks.len();
                         for b_idx in 0..total_blocks {
@@ -277,9 +267,19 @@ pub fn render_editor_page(
 
                                     if resp.changed() {
                                         blocks_changed = true;
-                                        // Note shorthand: word^(N) followed by spacebar confirmation
+                                        // Note shorthand: word^N or word^(N) followed by spacebar confirmation
                                         if let Some(res) = crate::model::try_parse_and_apply_note_shortcut(text, note_tags) {
                                             note_shortcut_to_link = Some((block_id.clone(), res.note_index, res.word));
+                                        }
+
+                                        // Two-way sync: if a note tag's superscript was deleted from text, delete the note
+                                        let missing_note_indices: Vec<usize> = note_tags
+                                            .iter()
+                                            .filter(|t| !text.contains(&num_to_superscript(t.note_index)))
+                                            .map(|t| t.note_index)
+                                            .collect();
+                                        for del_idx in missing_note_indices {
+                                            note_to_delete_index = Some(del_idx);
                                         }
 
                                         // Slash command: /cite
@@ -341,73 +341,6 @@ pub fn render_editor_page(
                                             focus_navigate = Some((b_idx + 1, false));
                                         }
                                     }
-
-                                    // Visual note chips attached to this paragraph (purely visual in editor, linked directly to definition)
-                                    if let Some(linked_notes) = notes_by_block.get(&block_id) {
-                                        if !linked_notes.is_empty() {
-                                            ui.add_space(2.0);
-                                            ui.horizontal_wrapped(|ui| {
-                                                ui.add_space(36.0); // Indent to align with paragraph text
-                                                for (note_id, note_idx, note_text, note_word) in linked_notes {
-                                                    let sup = num_to_superscript(*note_idx);
-                                                    let label = if note_word.is_empty() {
-                                                        format!("Note {}", sup)
-                                                    } else {
-                                                        format!("Note {} on “{}”", sup, note_word)
-                                                    };
-                                                    let preview = if note_text.trim().is_empty() {
-                                                        "empty definition (click to write on Notes page)".to_string()
-                                                    } else {
-                                                        let mut s = note_text.trim().replace('\n', " ");
-                                                        if s.chars().count() > 28 {
-                                                            s = s.chars().take(26).collect::<String>() + "...";
-                                                        }
-                                                        s
-                                                    };
-
-                                                    egui::Frame::new()
-                                                        .fill(theme.card_fill_color())
-                                                        .stroke(egui::Stroke::new(1.0, accent_col.gamma_multiply(0.45)))
-                                                        .corner_radius(4.0)
-                                                        .inner_margin(egui::Margin::symmetric(6, 2))
-                                                        .show(ui, |ui| {
-                                                            ui.horizontal(|ui| {
-                                                                ui.label(
-                                                                    RichText::new(label)
-                                                                        .strong()
-                                                                        .size(12.0)
-                                                                        .color(accent_col),
-                                                                );
-                                                                ui.label(
-                                                                    RichText::new(format!(": “{}”", preview))
-                                                                        .italics()
-                                                                        .size(11.0)
-                                                                        .color(text_col),
-                                                                )
-                                                                .on_hover_text(format!(
-                                                                    "Explanatory Note {}: {}\nClick to edit on Notes page.\nClick ✕ to delete note.",
-                                                                    note_idx, note_text
-                                                                ));
-
-                                                                if ui.small_button(RichText::new("✕").size(9.0).color(muted_col))
-                                                                    .on_hover_text(format!("Delete Note {} and definition", note_idx))
-                                                                    .clicked()
-                                                                {
-                                                                    note_to_delete_id = Some(note_id.clone());
-                                                                }
-                                                            });
-                                                        });
-                                                }
-
-                                                if ui.small_button(RichText::new("+ Note").size(10.0).color(muted_col))
-                                                    .on_hover_text("Add another note to this paragraph")
-                                                    .clicked()
-                                                {
-                                                    note_to_add_block_id = Some(block_id.clone());
-                                                }
-                                            });
-                                        }
-                                    }
                                 }
                                 MlaBlock::BlockQuote {
                                     id,
@@ -466,6 +399,14 @@ pub fn render_editor_page(
                                                 if let Some(res) = crate::model::try_parse_and_apply_note_shortcut(text, note_tags) {
                                                     note_shortcut_to_link = Some((block_id.clone(), res.note_index, res.word));
                                                 }
+                                                let missing_note_indices: Vec<usize> = note_tags
+                                                    .iter()
+                                                    .filter(|t| !text.contains(&num_to_superscript(t.note_index)))
+                                                    .map(|t| t.note_index)
+                                                    .collect();
+                                                for del_idx in missing_note_indices {
+                                                    note_to_delete_index = Some(del_idx);
+                                                }
                                                 if text.contains("/cite") {
                                                     *text = text.replace("/cite", "").trim_end().to_string();
                                                     action = Some(EditorAction::OpenCitationModal(Some(b_idx)));
@@ -517,59 +458,6 @@ pub fn render_editor_page(
                                                     doc.active_block_idx = b_idx;
                                                 }
                                             });
-
-                                            // Visual note chips attached to this blockquote
-                                            if let Some(linked_notes) = notes_by_block.get(&block_id) {
-                                                if !linked_notes.is_empty() {
-                                                    ui.horizontal_wrapped(|ui| {
-                                                        for (note_id, note_idx, note_text, note_word) in linked_notes {
-                                                            let sup = num_to_superscript(*note_idx);
-                                                            let label = if note_word.is_empty() {
-                                                                format!("Note {}", sup)
-                                                            } else {
-                                                                format!("Note {} on “{}”", sup, note_word)
-                                                            };
-                                                            let preview = if note_text.trim().is_empty() {
-                                                                "empty definition".to_string()
-                                                            } else {
-                                                                let mut s = note_text.trim().replace('\n', " ");
-                                                                if s.chars().count() > 28 {
-                                                                    s = s.chars().take(26).collect::<String>() + "...";
-                                                                }
-                                                                s
-                                                            };
-
-                                                            egui::Frame::new()
-                                                                .fill(theme.page_fill_color())
-                                                                .stroke(egui::Stroke::new(1.0, accent_col.gamma_multiply(0.45)))
-                                                                .corner_radius(4.0)
-                                                                .inner_margin(egui::Margin::symmetric(6, 2))
-                                                                .show(ui, |ui| {
-                                                                    ui.horizontal(|ui| {
-                                                                        ui.label(
-                                                                            RichText::new(label)
-                                                                                .strong()
-                                                                                .size(11.5)
-                                                                                .color(accent_col),
-                                                                        );
-                                                                        ui.label(
-                                                                            RichText::new(format!(": “{}”", preview))
-                                                                                .italics()
-                                                                                .size(10.5)
-                                                                                .color(text_col),
-                                                                        );
-                                                                        if ui.small_button(RichText::new("✕").size(9.0).color(muted_col))
-                                                                            .on_hover_text(format!("Delete Note {} and definition", note_idx))
-                                                                            .clicked()
-                                                                        {
-                                                                            note_to_delete_id = Some(note_id.clone());
-                                                                        }
-                                                                    });
-                                                                });
-                                                        }
-                                                    });
-                                                }
-                                            }
                                         });
                                 }
                                 MlaBlock::SectionHeading {
@@ -718,13 +606,8 @@ pub fn render_editor_page(
                             blocks_changed = true;
                         }
 
-                        if let Some(id_to_del) = note_to_delete_id {
-                            doc.delete_note_by_id(&id_to_del);
-                            blocks_changed = true;
-                        }
-
-                        if let Some(target_b_id) = note_to_add_block_id {
-                            doc.add_note_to_block(&target_b_id, String::new());
+                        if let Some(del_idx) = note_to_delete_index {
+                            doc.delete_explanatory_note(del_idx);
                             blocks_changed = true;
                         }
 
@@ -757,17 +640,7 @@ pub fn render_editor_page(
                     // 📝 SEPARATE PAGE: NOTES (Only present when notes exist)
                     // ==========================================
                     if !doc.notes.is_empty() {
-                        ui.add_space(32.0);
-                        ui.horizontal(|ui| {
-                            ui.add_space((page_width - 240.0) / 2.0);
-                            ui.label(
-                                RichText::new("────── Page Break: Notes ──────")
-                                    .size(11.5)
-                                    .italics()
-                                    .color(muted_col),
-                            );
-                        });
-                        ui.add_space(12.0);
+                        ui.add_space(36.0);
 
                         let notes_frame = egui::Frame::new()
                             .fill(theme.page_fill_color())
@@ -861,20 +734,7 @@ pub fn render_editor_page(
                     // ==========================================
                     // 📚 PAGE 2: WORKS CITED PAGE
                     // ==========================================
-                    ui.add_space(32.0);
-
-                    // Page break separator line
-                    ui.horizontal(|ui| {
-                        ui.add_space((page_width - 240.0) / 2.0);
-                        ui.label(
-                            RichText::new("────── Page Break: Works Cited ──────")
-                                .size(11.5)
-                                .italics()
-                                .color(muted_col),
-                        );
-                    });
-
-                    ui.add_space(12.0);
+                    ui.add_space(36.0);
 
                     let wc_frame = egui::Frame::new()
                         .fill(theme.page_fill_color())

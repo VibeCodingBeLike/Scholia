@@ -59,8 +59,8 @@ It provides a rich, fluent text editing canvas, but **it is fundamentally imposs
   - Continuous manuscript editing canvas—does not break the editor into simulated paper sheets while drafting.
   - Manuscript typography is locked to authentic **Times New Roman** (12pt, double-spaced).
 - **Separate In-Editor Notes Page**:
-  - Explanatory notes display on an independent page sheet (`────── Page Break: Notes ──────`) with running head `LastName 2`—only present when notes exist.
-  - Adding a note (`Ctrl+Shift+W` or toolbar) inserts a superscript marker (`¹`, `²`) and displays the note card ready for editing. Deleting markers from text automatically cleans up orphaned notes.
+  - Explanatory notes display on an independent page sheet with running head `LastName 2`—only present when notes exist. The main writing page remains distraction-free without bottom note clutter.
+  - Adding a note (`example^1` + Space, or `Ctrl+Shift+W`) displays the superscript character (`¹`, `²`) directly in the editor text. Deleting the marker from the text automatically deletes the note definition, and deleting the note removes the marker.
 - **Strict Footer Notes on Export**:
   - On export (PDF, Word `.docx`, and HTML), notes are compiled directly into the page **footer** with standard MLA 1.5-inch rule divider (`______________________`), never on a separate page.
 - **Native PDF Export**:
@@ -122,11 +122,12 @@ flowchart TD
 
 MLA 9 differentiates between short in-text parenthetical citations and content/explanatory notes:
 1. **Interactive In-Text Trigger**:
-   - Type a word followed by `^<number>` and press **Space** (e.g. `example^1 ` or `example^13 `).
-   - Spacebar confirms the note: `^1` is absorbed without deleting the associated word, and a structured `note_tags` JSON tag is registered in the paragraph block linked to that note number in `.mladoc`.
-   - The editor displays a clean visual chip (`Note ¹ on “example” [✕]`) with two-way sync: deleting the chip removes the note, and deleting the note removes the chip.
+   - Type a word followed by `^<number>` and press **Space** (e.g. `example^1 ` or `example^10 `).
+   - Spacebar confirms the note: typing does not trigger prematurely (allowing double or multi-digit note numbers like `10` or `13`), the typed word is preserved, and the superscript character (e.g. `¹`, `¹⁰`) is displayed directly in the editor text.
+   - A structured `note_tags` JSON tag is registered in the paragraph block linked to that note number in `.mladoc`.
+   - Two-way sync: deleting the note from the Notes page deletes the superscript character from the text, and deleting the superscript from the text removes the note definition.
 2. **In the GUI Editor**:
-   - Notes display as a separate page sheet (`────── Page Break: Notes ──────`) immediately preceding the Works Cited page.
+   - Notes display as a clean, separate page sheet immediately preceding the Works Cited page (separated by natural page spacing without artificial "Page Break:" labels).
    - If no notes exist, the Notes page is **completely absent** from the canvas.
    - Hotkey `Ctrl+Shift+W` (or `Ctrl+Alt+N`) also adds a note linked to the active block.
 3. **On Export (PDF, Word DOCX, HTML, Plain Text)**:

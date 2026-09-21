@@ -323,4 +323,71 @@ impl ThemeConfig {
             }
         }
     }
+
+    pub fn is_dark(&self) -> bool {
+        match self.preset {
+            ThemePreset::FrostedDark | ThemePreset::NordicFrost | ThemePreset::AmberTerminal => true,
+            ThemePreset::FrostedLight => false,
+            ThemePreset::Custom => {
+                let [r, g, b] = self.window_tint_rgb;
+                let lum = 0.299 * (r as f32) + 0.587 * (g as f32) + 0.114 * (b as f32);
+                lum < 128.0
+            }
+        }
+    }
+
+    pub fn create_egui_visuals(&self) -> egui::Visuals {
+        let mut visuals = if self.is_dark() {
+            egui::Visuals::dark()
+        } else {
+            egui::Visuals::light()
+        };
+
+        let text_col = self.text_color();
+        let accent_col = self.accent_color();
+
+        // Inactive widgets: transparent background so frosted glass shines through
+        visuals.widgets.inactive.bg_fill = egui::Color32::TRANSPARENT;
+        visuals.widgets.inactive.weak_bg_fill = egui::Color32::TRANSPARENT;
+        visuals.widgets.inactive.bg_stroke = egui::Stroke::new(1.0, text_col.gamma_multiply(0.18));
+        visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, text_col);
+        visuals.widgets.inactive.corner_radius = egui::CornerRadius::same(5);
+
+        // Hovered widgets: soft frosted highlight with accent stroke
+        visuals.widgets.hovered.bg_fill = accent_col.gamma_multiply(0.20);
+        visuals.widgets.hovered.weak_bg_fill = accent_col.gamma_multiply(0.15);
+        visuals.widgets.hovered.bg_stroke = egui::Stroke::new(1.0, accent_col.gamma_multiply(0.65));
+        visuals.widgets.hovered.fg_stroke = egui::Stroke::new(1.0, text_col);
+        visuals.widgets.hovered.corner_radius = egui::CornerRadius::same(5);
+
+        // Active (clicked/pressed) widgets: deeper accent highlight
+        visuals.widgets.active.bg_fill = accent_col.gamma_multiply(0.35);
+        visuals.widgets.active.weak_bg_fill = accent_col.gamma_multiply(0.30);
+        visuals.widgets.active.bg_stroke = egui::Stroke::new(1.0, accent_col);
+        visuals.widgets.active.fg_stroke = egui::Stroke::new(1.0, text_col);
+        visuals.widgets.active.corner_radius = egui::CornerRadius::same(5);
+
+        // Open widgets (e.g. open dropdowns/menus): translucent accent tint
+        visuals.widgets.open.bg_fill = accent_col.gamma_multiply(0.22);
+        visuals.widgets.open.weak_bg_fill = accent_col.gamma_multiply(0.18);
+        visuals.widgets.open.bg_stroke = egui::Stroke::new(1.0, accent_col.gamma_multiply(0.70));
+        visuals.widgets.open.fg_stroke = egui::Stroke::new(1.0, text_col);
+        visuals.widgets.open.corner_radius = egui::CornerRadius::same(5);
+
+        // Noninteractive widgets (e.g. disabled buttons, label backgrounds): transparent
+        visuals.widgets.noninteractive.bg_fill = egui::Color32::TRANSPARENT;
+        visuals.widgets.noninteractive.weak_bg_fill = egui::Color32::TRANSPARENT;
+        visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, text_col.gamma_multiply(0.10));
+        visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, self.muted_text_color());
+        visuals.widgets.noninteractive.corner_radius = egui::CornerRadius::same(5);
+
+        // Window & dialog styling to match frosted glass
+        visuals.window_fill = self.card_fill_color();
+        visuals.panel_fill = self.window_fill_color();
+        visuals.extreme_bg_color = egui::Color32::TRANSPARENT;
+        visuals.window_stroke = egui::Stroke::new(1.0, text_col.gamma_multiply(0.20));
+
+        visuals
+    }
 }
+
