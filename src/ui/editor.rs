@@ -29,11 +29,8 @@ pub fn render_editor_page(
     doc.ensure_body_synced();
 
     let avail_h = ui.available_height();
-    let scroll_h = if focus_mode {
-        avail_h
-    } else {
-        (avail_h - 34.0).max(150.0)
-    };
+    let status_bar_h = if focus_mode { 0.0 } else { 24.0 };
+    let scroll_h = (avail_h - status_bar_h).max(100.0);
 
     egui::ScrollArea::vertical()
         .auto_shrink([false, false])
@@ -47,39 +44,36 @@ pub fn render_editor_page(
             let page_margin_left = ((total_avail - page_width) / 2.0).max(0.0);
 
             let sidebar_width = 208.0f32;
+            let gap_to_page = 14.0f32;
 
-            // Show keybind sidebar ONLY if enabled in settings, not in focus mode, and left margin is wide enough
+            // Show keybind sidebar ONLY if enabled in settings, not in focus mode, and left margin can fit it
             let show_sidebar = theme.show_shortcuts_panel
                 && !focus_mode
-                && (page_margin_left >= sidebar_width + 20.0);
+                && (page_margin_left >= sidebar_width + gap_to_page + 10.0);
 
-            let page_screen_x = ui.cursor().min.x + page_margin_left;
-            let page_screen_y = ui.cursor().min.y;
+            // Center container holding strictly the manuscript page and outside shortcuts panel
+            ui.horizontal_top(|ui| {
+                ui.spacing_mut().item_spacing.x = 0.0;
 
-            if show_sidebar {
-                let gap_to_page = 14.0f32;
-                let sidebar_x = (page_screen_x - sidebar_width - gap_to_page).max(12.0);
-                let min_pinned_y = ui.clip_rect().min.y + 8.0;
-                let sidebar_y = page_screen_y.max(min_pinned_y);
+                if show_sidebar {
+                    let left_empty = page_margin_left - sidebar_width - gap_to_page;
+                    if left_empty > 0.0 {
+                        ui.add_space(left_empty);
+                    }
 
-                egui::Area::new(egui::Id::new("editor_keybind_preview_sidebar"))
-                    .fixed_pos(egui::pos2(sidebar_x, sidebar_y))
-                    .show(ui.ctx(), |ui| {
+                    ui.vertical(|ui| {
+                        ui.set_width(sidebar_width);
                         if let Some(act) = render_keybind_preview_panel(ui, doc, theme, keybinds, sidebar_width) {
                             action = Some(EditorAction::TriggerAction(act));
                         }
                     });
-            }
 
-            // Center container holding strictly the manuscript page
-            ui.horizontal_top(|ui| {
-                ui.spacing_mut().item_spacing.x = 0.0;
-
-                if page_margin_left > 0.0 {
+                    ui.add_space(gap_to_page);
+                } else if page_margin_left > 0.0 {
                     ui.add_space(page_margin_left);
                 }
 
-                // Vertical column holding the pages
+                // Vertical column holding the pages (strictly centered!)
                 ui.vertical(|ui| {
                     ui.set_width(page_width);
                     ui.set_min_width(page_width);

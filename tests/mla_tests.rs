@@ -285,3 +285,4 @@ fn test_interface_options_and_removed_shortcuts() {
     assert!(!cfg.check_action(Action::ExportDocx, &input));
     assert!(!cfg.check_action(Action::ExportHtmlPdf, &input));
 }
+

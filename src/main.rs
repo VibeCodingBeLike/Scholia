@@ -286,6 +286,10 @@ impl eframe::App for MlaApp {
         // Ensure no 1px white line / border is drawn on borderless window
         ui.style_mut().visuals.window_stroke = egui::Stroke::NONE;
 
+        // Fill the entire window bounds seamlessly with the theme's window fill color
+        let screen_rect = ui.max_rect();
+        ui.painter().rect_filled(screen_rect, 0.0, self.theme.window_fill_color());
+
         // Handle vibrancy application
         if self.vibrancy_dirty {
             if let Some(window) = frame.winit_window() {
@@ -312,13 +316,19 @@ impl eframe::App for MlaApp {
             }
         }
 
-        // Outer App Container with ZERO 1px stroke / border line
+        // Outer App Container with ZERO top/bottom margin gap
         egui::Frame::NONE
             .fill(self.theme.window_fill_color())
-            .inner_margin(egui::Margin::symmetric(14, 10))
+            .inner_margin(egui::Margin {
+                left: 12,
+                right: 12,
+                top: 0,
+                bottom: 2,
+            })
             .show(ui, |ui| {
                 // Top Toolbar (hidden in Focus Mode for total immersion)
                 if !self.focus_mode {
+                    ui.add_space(2.0);
                     if let Some(tb_event) =
                         render_toolbar(ui, &self.doc, &self.theme, &self.keybinds, self.focus_mode)
                     {
@@ -355,7 +365,7 @@ impl eframe::App for MlaApp {
                             }
                         }
                     }
-                    ui.add_space(4.0);
+                    ui.add_space(2.0);
                 }
 
                 // Core Editor Canvas
@@ -389,9 +399,9 @@ impl eframe::App for MlaApp {
                     }
                 }
 
-                // Bottom Status Bar (no grey separator line)
+                // Bottom Status Bar (no grey separator line, flush to bottom)
                 if !self.focus_mode {
-                    ui.add_space(4.0);
+                    ui.add_space(2.0);
                     if let Some(StatusBarEvent::OpenCompliance) =
                         render_status_bar(ui, &self.doc, &self.theme)
                     {
