@@ -82,7 +82,7 @@ jobs:
           $pkgDir = "dist\Scholia-$ver-windows-x64"
           New-Item -ItemType Directory -Path $pkgDir -Force
           Copy-Item "target\${{ matrix.target }}\release\scholia.exe" -Destination "$pkgDir\"
-          Copy-Item "README.md", "LICENSE", "sample_mla_paper.mladoc" -Destination "$pkgDir\"
+          Copy-Item "LICENSE" -Destination "$pkgDir\"
           $zipName = "Scholia-$ver-windows-x64.zip"
           Compress-Archive -Path "$pkgDir\*" -DestinationPath "dist\$zipName" -Force
           Write-Host "Created dist\$zipName"
@@ -96,7 +96,7 @@ jobs:
           PKG_DIR="dist/Scholia-${TAG}-macos-${ARCH}"
           mkdir -p "$PKG_DIR"
           cp "target/${{ matrix.target }}/release/scholia" "$PKG_DIR/"
-          cp README.md LICENSE sample_mla_paper.mladoc "$PKG_DIR/"
+          cp LICENSE "$PKG_DIR/"
           cd dist && zip -r "Scholia-${TAG}-macos-${ARCH}.zip" "Scholia-${TAG}-macos-${ARCH}"
           echo "Created dist/Scholia-${TAG}-macos-${ARCH}.zip"
 
@@ -108,7 +108,7 @@ jobs:
           PKG_DIR="dist/Scholia-${TAG}-linux-x64"
           mkdir -p "$PKG_DIR"
           cp "target/${{ matrix.target }}/release/scholia" "$PKG_DIR/"
-          cp README.md LICENSE sample_mla_paper.mladoc "$PKG_DIR/"
+          cp LICENSE "$PKG_DIR/"
           cd dist && tar -czvf "Scholia-${TAG}-linux-x64.tar.gz" "Scholia-${TAG}-linux-x64"
           echo "Created dist/Scholia-${TAG}-linux-x64.tar.gz"
 

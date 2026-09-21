@@ -4,7 +4,8 @@
 
 ### *The distraction-free, strictly formatted MLA 9 document editor with frosted glass transparency.*
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Version: v0.1.0](https://img.shields.io/badge/Version-v0.1.0-blue.svg)](Cargo.toml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Rust: 1.80+](https://img.shields.io/badge/Rust-1.80%2B-orange.svg?logo=rust)](https://www.rust-lang.org/)
 [![MLA: 9th Edition](https://img.shields.io/badge/MLA%20Standard-9th%20Edition-success.svg)](#-mla-9th-edition-rules-enforced)
 [![Platform: Windows | macOS | Linux](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](#-cross-platform-support)
@@ -24,12 +25,14 @@
 - [Why Scholia?](#-why-scholia)
 - [Key Features](#-key-features)
 - [MLA 9th Edition Rules Enforced](#-mla-9th-edition-rules-enforced)
+- [Notes & Explanatory Footnotes Architecture](#-notes--explanatory-footnotes-architecture)
 - [Architecture & Design](#-architecture--design)
 - [Custom Keybindings](#-custom-keybindings)
 - [Frosted Glass & Transparency Engine](#-frosted-glass--transparency-engine)
 - [Exporters & File Formats](#-exporters--file-formats)
 - [Quick Start & Portable Build](#-quick-start--portable-build)
 - [Production Release & Installers](#-production-release--installers)
+- [Automated Testing](#-automated-testing)
 - [Contributing](#-contributing)
 - [License](#-license)
 
@@ -46,33 +49,44 @@ Traditional word processors like Microsoft Word, Google Docs, and LibreOffice ar
 - Putting citation punctuation inside quotes instead of after the parenthetical reference.
 
 **Scholia eliminates formatting errors by construction**:
-It gives you a rich, fluent text editing canvas, but **it is fundamentally impossible to break MLA formatting**. All margins, font sizes, running headers, paragraph indents, block quotes, and Works Cited entries are locked to MLA 9th Edition standards.
+It provides a rich, fluent text editing canvas, but **it is fundamentally impossible to break MLA formatting**. All margins, font sizes, running headers, paragraph indents, block quotes, explanatory notes, and Works Cited entries are locked to MLA 9th Edition standards.
 
 ---
 
 ## 🌟 Key Features
 
-- **Authentic Physical Paper Sheet Canvas**:
-  - No forms or boxes—type directly onto authentic 8.5" × 11" US Letter frosted glass pages with standard 1-inch margins and running headers.
-  - Manuscript typography is rendered in authentic **Times New Roman** (12pt, double-spaced).
+- **Distraction-Free Single Canvas**:
+  - Continuous manuscript editing canvas—does not break the editor into simulated paper sheets while drafting.
+  - Manuscript typography is locked to authentic **Times New Roman** (12pt, double-spaced).
+- **Separate In-Editor Notes Page**:
+  - Explanatory notes display on an independent page sheet (`────── Page Break: Notes ──────`) with running head `LastName 2`—only present when notes exist.
+  - Adding a note (`Ctrl+Shift+W` or toolbar) inserts a superscript marker (`¹`, `²`) and displays the note card ready for editing. Deleting markers from text automatically cleans up orphaned notes.
+- **Strict Footer Notes on Export**:
+  - On export (PDF, Word `.docx`, and HTML), notes are compiled directly into the page **footer** with standard MLA 1.5-inch rule divider (`______________________`), never on a separate page.
+- **Native PDF Export**:
+  - Direct PDF generation via `printpdf` with embedded standard fonts, running head, double-spacing, footer footnotes, and Works Cited.
 - **Nerd Font Iconography**:
   - Automatically discovers user-installed Nerd Fonts (e.g. *Symbols Nerd Font*, *JetBrains Mono Nerd Font*) for crisp vector glyphs across all toolbars, buttons, and status indicators.
 - **Translucent Frosted Glass UI**:
   - Native OS background blur (Windows 11 Mica, Windows 10/11 Acrylic, macOS Vibrancy).
-  - The **writing paper sheet itself is transparent** with a customizable opacity slider—letting your desktop wallpaper softly glow through your manuscript.
-- **Strict MLA 9 Enforcement**: 1-inch margins, 2.0 double-spacing throughout, 12pt standard serif fonts, 0.5-inch paragraph indents, 0.5-inch block quote indents, and right-aligned running headers.
-- **MLA 9 Compliance Inspector**: Real-time document linter with a live compliance score (0–100%) and 1-click auto-fix buttons for non-compliant dates, titles, and headers.
-- **Works Cited Manager**: Interactive builder implementing MLA 9's *Nine Core Elements* container model with automatic alphabetical sorting and true hanging indents.
-- **In-Text Citation Assistant**: Instant insertion dialog linking Works Cited entries directly to your active writing paragraph.
-- **Full Custom Keybindings**: 15 dedicated editor actions with a visual in-app key remap manager.
-- **High-Fidelity Exporters**:
-  - Microsoft Word (`.docx`) with exact twip specifications.
-  - Print-Ready HTML (`.html`) with `@page` CSS for 1-click PDF printing.
-  - Formatted Plain Text (`.txt`).
-  - Native Document Project Format (`.mladoc` JSON).
-- **Dual Build Pipelines**:
-  - *Testing / Portable Mode*: Self-contained standalone binary runnable without installation.
-  - *Production Release Mode*: Automated installer pipelines for Windows (Inno Setup), macOS (`.dmg`), and Linux (`.deb`).
+  - The **writing paper sheet itself is transparent** with a customizable opacity slider (5% to 100%)—letting your desktop wallpaper softly glow through your manuscript.
+- **MLA 9 Compliance Inspector**:
+  - Real-time document linter (`Ctrl+L`) with a live compliance score (0–100%) and 1-click auto-fix buttons for non-compliant dates, titles, and headers.
+- **Works Cited Manager**:
+  - Interactive builder (`Ctrl+W`) implementing MLA 9's *Nine Core Elements* container model with automatic alphabetical sorting and true hanging indents.
+- **In-Text Citation Assistant & Slash Commands**:
+  - Instant citation insertion modal (`Ctrl+Shift+C`) or type `/cite` anywhere in prose to open the citation helper.
+- **Smart Block Navigation & Splitting**:
+  - Single `Enter` key automatically splits the current paragraph into a new block at cursor position.
+  - `Up` and `Down` arrow keys navigate seamlessly across adjacent blocks when cursor reaches top/bottom boundaries.
+  - Block quote detection: automatically prompts to convert prose passages exceeding 4 lines or 250 characters into MLA block quotes.
+- **Typographical Cleaning Engine**:
+  - Automatically transforms straight quotes to smart curly quotes (`“ ”`, `‘ ’`) and double dashes `--` to em dashes (`—`).
+- **Customizable Interface**:
+  - Settings dialog (`Ctrl+,`) displays application version (`v0.1.0`).
+  - Option to toggle Windows navigation controls (minimize, maximize, close) in top right.
+  - Option to toggle the shortcuts helper panel on the editor canvas.
+  - Full keybinding remap manager.
 
 ---
 
@@ -85,6 +99,7 @@ flowchart TD
     Doc --> Ttl[Paper Title\nCentered, 12pt, Title Cased, Not Bold]
     Doc --> Bdy[Body Paragraphs\nDouble-spaced, 0.5 in first-line indent]
     Doc --> BQ[Block Quotes\nIndented 0.5 in left, citation outside period]
+    Doc --> FN[Explanatory Notes\nEditor: dedicated Notes page\nExport: 1.5 in divider in footer]
     Doc --> WC[Works Cited\nSeparate page, centered title, 0.5 in hanging indent, A-Z sorted]
 ```
 
@@ -94,11 +109,25 @@ flowchart TD
 | **Typeface** | Legible serif (e.g. Times New Roman) | Locked to approved MLA serifs |
 | **Font Size** | Exactly 12 pt throughout entire paper | Fixed at 12 pt (headings are never oversized) |
 | **Line Spacing** | Strict double spacing (2.0) | Enforced across all blocks and headings |
-| **Heading Block** | Student, Instructor, Course, Date (Day Month Year) | Dedicated left-aligned fields with auto-MLA date |
+| **Heading Block** | Student, Instructor, Course, Date (DD Month YYYY) | Dedicated left-aligned fields with auto-MLA date picker |
 | **Running Head** | `[LastName] [PageNumber]` at top-right 0.5 in | Auto-derived from student name, rendered top-right |
 | **Paragraph Indent**| First line indented exactly 0.5 inches | Automatic 0.5-inch indent on body paragraphs |
 | **Block Quotes** | For quotes >4 lines prose: 0.5 in indent, no quotes | Dedicated blockquote element with terminal citation |
+| **Explanatory Notes**| Brief notes with superscripts, bottom footer rule | In-editor Notes page; export rendered strictly in page footer |
 | **Works Cited** | New page, centered title, 0.5 in hanging indent | Dedicated manager, 9 core elements, auto-sorted |
+
+---
+
+## 📝 Notes & Explanatory Footnotes Architecture
+
+MLA 9 differentiates between short in-text parenthetical citations and content/explanatory notes:
+1. **In the GUI Editor**:
+   - Notes display as a separate page sheet (`────── Page Break: Notes ──────`) immediately preceding the Works Cited page.
+   - If no notes exist, the Notes page is **completely absent** from the canvas.
+   - When a note is added (`Ctrl+Shift+W`), a superscript marker is inserted into the active paragraph, and the Notes page appears with the note entry.
+2. **On Export (PDF, Word DOCX, HTML)**:
+   - Notes are compiled into the **page footer** above the bottom margin with the standard MLA 1.5-inch rule divider (`______________________`) in 10pt font.
+   - Export documents never include an artificial standalone "Notes" body page.
 
 ---
 
@@ -110,7 +139,7 @@ graph LR
         Toolbar[Frosted Toolbar]
         Canvas[Translucent Page Canvas]
         StatusBar[Metrics Status Bar]
-        Modals[Works Cited / Citation / Settings Modals]
+        Modals[Works Cited / Citation / Calendar / Settings Modals]
     end
 
     subgraph Core ["Core Engine (Rust)"]
@@ -121,8 +150,9 @@ graph LR
     end
 
     subgraph IO ["Persistence & Export"]
+        PDF[Native printpdf Engine]
         DOCX[docx-rs Exporter]
-        HTML[HTML/Print PDF Exporter]
+        HTML[HTML Exporter]
         TXT[Plain Text Exporter]
         JSON[Native .mladoc Storage]
     end
@@ -133,13 +163,14 @@ graph LR
 
 - **Renderer**: `eframe` (0.36) with hardware-accelerated WGPU backend.
 - **Window Vibrancy**: `window-vibrancy` crate hooked directly into native OS compositors (DwmSetWindowAttribute on Windows, NSVisualEffectView on macOS).
-- **DOCX Engine**: `docx-rs` emitting valid ISO OpenXML documents with double-spacing attributes (`w:line="480"`), 1440 dxa margins, and 720 dxa indents.
+- **PDF Engine**: `printpdf` generating standard Letter pages with 1-inch margins, embedded serif fonts, running headers, and footer footnotes.
+- **DOCX Engine**: `docx-rs` emitting valid ISO OpenXML documents with double-spacing attributes (`w:line="480"`), 1440 dxa margins, document footer notes, and 720 dxa indents.
 
 ---
 
 ## ⌨️ Custom Keybindings
 
-Every major action in Scholia is bound to an ergonomic shortcut:
+Every action in Scholia is bound to an ergonomic shortcut and can be customized in Settings (`Ctrl+,`):
 
 | Action | Default Shortcut | Description |
 |---|---|---|
@@ -147,17 +178,23 @@ Every major action in Scholia is bound to an ergonomic shortcut:
 | **Open Document** | `Ctrl+O` | Load an existing `.mladoc` project |
 | **Save Document** | `Ctrl+S` | Save current document to disk |
 | **Export DOCX** | `Ctrl+E` | Export to Microsoft Word (`.docx`) |
-| **Export HTML/PDF**| `Ctrl+P` | Export to print-ready HTML/PDF |
-| **Zen / Focus Mode**| `F11` | Toggle distraction-free full-screen writing |
-| **Insert Heading 1**| `Ctrl+1` | Insert Section Heading (Bold, flush left) |
-| **Insert Heading 2**| `Ctrl+2` | Insert Section Heading (Italics, flush left) |
-| **Insert Heading 3**| `Ctrl+3` | Insert Section Heading (Bold, centered) |
-| **Insert Blockquote**| `Ctrl+Q` | Insert block quotation (0.5 in indent) |
-| **Insert Citation** | `Ctrl+Shift+C`| Insert in-text parenthetical citation |
-| **Manage Citations**| `Ctrl+K` | Open Works Cited database |
-| **Check Compliance**| `Ctrl+Shift+L`| Open MLA 9 Compliance Inspector |
-| **Auto-Fix Compliance**| `Ctrl+Shift+F`| Fix capitalization and date formatting |
-| **Preferences** | `Ctrl+,` | Open theme, glass vibrancy & keymap settings |
+| **Export PDF** | Toolbar Button | Export directly to native PDF via `printpdf` |
+| **Works Cited Manager** | `Ctrl+W` | Open Works Cited database & builder |
+| **Add Note / Definition** | `Ctrl+Shift+W` | Insert explanatory note marker & open Notes page (also `Ctrl+Shift+N`) |
+| **MLA Compliance Linter** | `Ctrl+L` | Open MLA 9 Compliance Inspector |
+| **Delete Active Block** | `Ctrl+Backspace` | Delete active paragraph or block |
+| **Insert Block Quote** | `Ctrl+Shift+B` | Insert MLA block quotation (0.5 in indent) |
+| **Insert Heading 1** | `Ctrl+Alt+1` | Insert Section Heading (Bold, flush left) |
+| **Insert Heading 2** | `Ctrl+Alt+2` | Insert Section Heading (Italics, flush left) |
+| **Insert Heading 3** | `Ctrl+Alt+3` | Insert Section Heading (Bold, centered) |
+| **Insert Citation** | `Ctrl+Shift+C` | Insert in-text parenthetical citation (or type `/cite`) |
+| **Move Block Up** | `Alt+Up` | Reorder active block up |
+| **Move Block Down** | `Alt+Down` | Reorder active block down |
+| **Format Title Case** | `Ctrl+Shift+T` | Convert title to strict MLA Title Case |
+| **Preferences / Settings** | `Ctrl+,` | Open theme, transparency, and keymap settings |
+| **Zen / Focus Mode** | `F11` | Toggle distraction-free fullscreen writing |
+| **Block Split** | `Enter` | Split current paragraph into two blocks at cursor |
+| **Block Navigation** | `Up` / `Down` | Move cursor between blocks when at boundary |
 
 ---
 
@@ -165,7 +202,7 @@ Every major action in Scholia is bound to an ergonomic shortcut:
 
 Scholia features a dual-layer transparency model:
 1. **Window Background Vibrancy**: Utilizes native OS blur APIs (Windows 11 Mica / Acrylic, macOS `NSVisualEffectView`).
-2. **Transparent Writing Page**: Unlike normal editors that put an opaque white rectangle in the middle, Scholia features a **Page Sheet Opacity slider (5% to 100%)**. You can write directly on a translucent frosted glass parchment where your desktop wallpaper softly shines through.
+2. **Transparent Writing Page**: Features a **Page Sheet Opacity slider (5% to 100%)** allowing your desktop wallpaper to softly shine through your manuscript canvas.
 3. **Four Built-in Presets**:
    - **Frosted Obsidian**: Dark obsidian glass with frost-cyan accents.
    - **Frosted Parchment**: Translucent light paper with deep sapphire accents.
@@ -200,48 +237,49 @@ Creates:
 Creates:
 - `dist/Scholia-Portable/scholia`
 
+*(Note: Portable and CI release packages contain the standalone executable and license file).*
+
 ---
 
-## 📦 Production Release & Installers
+## 📦 GitHub Actions & Multi-Platform Releases
 
-### Windows Installer (Inno Setup)
-```powershell
-.\build_release.ps1
-```
-This script:
-1. Executes the test suite to verify export and formatting integrity.
-2. Compiles an optimized release binary with Link-Time Optimization (`lto = true`), `codegen-units = 1`, and binary stripping.
-3. Generates the portable zip package.
-4. Compiles `installers\windows\installer.iss` with Inno Setup, generating `Scholia-Setup-v0.1.0.exe` with desktop icons, start menu shortcuts, and automatic `.mladoc` file associations.
+The repository includes a GitHub Actions workflow (`.github/workflows/release.yml`) that builds and publishes releases across all platforms under **one unified GitHub Release**:
+- **Windows x64**: `Scholia-v0.1.0-windows-x64.zip`
+- **macOS Apple Silicon (arm64)**: `Scholia-v0.1.0-macos-arm64.zip`
+- **macOS Intel (x64)**: `Scholia-v0.1.0-macos-x64.zip`
+- **Linux x64**: `Scholia-v0.1.0-linux-x64.tar.gz`
+- **Checksums**: Automatically computed and attached as `SHA256SUMS.txt`.
 
-### macOS App Bundle & DMG
-```bash
-./installers/macos/build_dmg.sh
-```
-Builds the macOS `.app` bundle using `installers/macos/Info.plist` and generates `Scholia-v0.1.0-macOS.dmg`.
-
-### Linux Debian (.deb) Package
-```bash
-./installers/linux/build_deb.sh
-```
-Builds `scholia_0.1.0_amd64.deb` complete with desktop file, icons, and MIME associations.
+Release packages strictly contain the executable binary and `LICENSE` without extraneous sample files or documentation.
 
 ---
 
 ## 🧪 Automated Testing
 
-The project includes an automated test suite verifying MLA capitalization, date parsing, compliance rules, works cited sorting, and document exporters:
+The project includes an automated test suite verifying MLA capitalization, date parsing, compliance rules, works cited sorting, footnote export, and document exporters:
 
 ```bash
 cargo test
 ```
 
-All 5 test suites pass out of the box:
+All 17 test suites pass cleanly out of the box:
 - `test_mla_title_case_capitalization`
 - `test_mla_current_date_format`
 - `test_mla_compliance_linter`
 - `test_works_cited_alphabetization`
-- `test_document_exporters` (DOCX, HTML, Text)
+- `test_document_exporters`
+- `test_notes_exported_in_footer_not_separate_page`
+- `test_explanatory_notes_and_superscript_engine`
+- `test_block_toggle_conversion`
+- `test_document_block_operations_and_sync`
+- `test_block_deletion_focus_and_keybinds`
+- `test_word_count_and_pdf_page_count`
+- `test_editor_page_centering`
+- `test_interface_options_and_removed_shortcuts`
+- `test_calendar_modal_state`
+- `test_typographical_cleaning`
+- `test_font_configuration_and_nerd_icons`
+- `test_semantic_versioning`
 
 ---
 

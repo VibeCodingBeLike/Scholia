@@ -31,18 +31,15 @@ Get-Process -Name "scholia" -ErrorAction SilentlyContinue | Stop-Process -Force 
 Start-Sleep -Milliseconds 500
 
 if (Test-Path $DistDir) {
-    Remove-Item -Recurse -Force $DistDir
+    Get-ChildItem -Path $DistDir | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+} else {
+    New-Item -ItemType Directory -Path $DistDir -Force | Out-Null
 }
-New-Item -ItemType Directory -Path $DistDir -Force | Out-Null
 
 Copy-Item $ExeSource -Destination "$DistDir\scholia.exe" -Force
-Copy-Item "README.md" -Destination "$DistDir\README.md" -Force
 Copy-Item "LICENSE" -Destination "$DistDir\LICENSE" -Force
 if (Test-Path "assets") {
     Copy-Item -Recurse "assets" -Destination "$DistDir\assets" -Force
-}
-if (Test-Path "sample_mla_paper.mladoc") {
-    Copy-Item "sample_mla_paper.mladoc" -Destination "$DistDir\sample_mla_paper.mladoc" -Force
 }
 
 # 3. Create zip archive
