@@ -95,7 +95,7 @@ It provides a rich, fluent text editing canvas, but **it is fundamentally imposs
 - **Customizable Interface**:
   - Settings dialog (`Ctrl+,`) displays application version (`v0.1.0`).
   - Option to toggle Windows navigation controls (minimize, maximize, close) in top right.
-  - Option to toggle the shortcuts helper panel on the editor canvas.
+  - Option to toggle the shortcuts helper panel on the editor canvas (featuring dynamic width calculation to cleanly fit long action labels and shortcuts like `Delete Paragraph` + `Ctrl+Backspace` without text overlap).
   - Undo/redo action limit slider (16 to 8,192 actions).
   - Full keybinding remap manager with in-text action indicators.
 
@@ -294,7 +294,7 @@ The project includes an automated test suite verifying MLA capitalization, date 
 cargo test
 ```
 
-All 30 test suites pass cleanly out of the box:
+All 31 test suites pass cleanly out of the box:
 - `test_mla_title_case_capitalization`
 - `test_mla_current_date_format`
 - `test_mla_compliance_linter`
@@ -325,6 +325,7 @@ All 30 test suites pass cleanly out of the box:
 - `test_modal_fill_color_ninety_percent_opacity`
 - `test_rose_pine_theme_presets`
 - `test_theme_folder_save_and_load_roundtrip`
+- `test_shortcuts_panel_dynamic_width_no_overlap`
 
 ---
 

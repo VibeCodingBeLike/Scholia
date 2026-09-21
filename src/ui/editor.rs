@@ -44,7 +44,7 @@ pub fn render_editor_page(
             let page_width = 816.0f32.min(total_avail - 48.0).max(420.0);
             let page_margin_left = ((total_avail - page_width) / 2.0).max(0.0);
 
-            let sidebar_width = 208.0f32;
+            let sidebar_width = compute_shortcuts_panel_width(ui, keybinds);
             let gap_to_page = 14.0f32;
 
             // Show keybind sidebar ONLY if enabled in settings, not in focus mode, and left margin can fit it
@@ -856,6 +856,62 @@ pub fn render_editor_page(
         });
 
     action
+}
+
+fn compute_shortcuts_panel_width(ui: &egui::Ui, keybinds: &KeybindConfig) -> f32 {
+    let mut max_row_w: f32 = 0.0;
+    let label_font = egui::FontId::proportional(11.0);
+    let sc_font = egui::FontId::monospace(10.0);
+
+    let all_actions: &[(Action, &str, &str)] = &[
+        // Writing
+        (Action::ManageWorksCited, icons::BOOK_CITATIONS, "Works Cited"),
+        (Action::InsertCitation, icons::QUOTE, "Citation"),
+        (Action::AddFootnote, icons::INFO, "Notes"),
+        (Action::InsertBlockQuote, icons::QUOTE, "Block Quote"),
+        (Action::InsertHeading1, icons::HEADING, "Heading 1"),
+        (Action::InsertHeading2, icons::HEADING, "Heading 2"),
+        (Action::InsertHeading3, icons::HEADING, "Heading 3"),
+        // Modify
+        (Action::MoveBlockUp, icons::ARROW_UP, "Move Up"),
+        (Action::MoveBlockDown, icons::ARROW_DOWN, "Move Down"),
+        (Action::MoveSentenceLeft, icons::ARROW_LEFT, "Sentence Left"),
+        (Action::MoveSentenceRight, icons::ARROW_RIGHT, "Sentence Right"),
+        (Action::DeleteBlock, icons::TRASH, "Delete Paragraph"),
+        (Action::Undo, icons::UNDO, "Undo"),
+        (Action::Redo, icons::REDO, "Redo"),
+        // File
+        (Action::SaveDocument, icons::SAVE, "Save"),
+        (Action::NewDocument, icons::FILE_NEW, "New Paper"),
+        (Action::OpenDocument, icons::FOLDER_OPEN, "Open Paper"),
+        // Tools
+        (Action::ToggleFocusMode, icons::FOCUS_MODE, "Zen Mode"),
+        (Action::OpenPreferences, icons::SETTINGS, "Preferences"),
+        (Action::ToggleComplianceCheck, icons::CHECK, "MLA Linter"),
+        (Action::ConvertToMlaTitleCase, icons::TITLE_CASE, "Title Case Title"),
+    ];
+
+    for &(act, icon, label) in all_actions {
+        let label_text = format!("{} {}", icon, label);
+        let label_w = ui.painter().layout_no_wrap(label_text, label_font.clone(), egui::Color32::WHITE).size().x;
+
+        let sc_text = if let Some(hint) = act.in_text_hint() {
+            hint.to_string()
+        } else {
+            keybinds.get_shortcut(act).display_string()
+        };
+        let sc_w = ui.painter().layout_no_wrap(sc_text, sc_font.clone(), egui::Color32::WHITE).size().x;
+
+        // label text + separation space (16.0) + badge text + badge horizontal padding (8.0) + badge stroke (2.0)
+        let row_w = label_w + 16.0 + sc_w + 10.0;
+        if row_w > max_row_w {
+            max_row_w = row_w;
+        }
+    }
+
+    // Frame padding: 12 on left + 12 on right = 24.0, plus safety margin of 8.0
+    let needed = (max_row_w + 32.0).ceil();
+    needed.max(220.0)
 }
 
 fn render_keybind_preview_panel(

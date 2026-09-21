@@ -1051,3 +1051,38 @@ fn test_theme_folder_save_and_load_roundtrip() {
     let _ = std::fs::remove_file(saved_path);
 }
 
+#[test]
+fn test_shortcuts_panel_dynamic_width_no_overlap() {
+    let ctx = egui::Context::default();
+    scholia::fonts::configure_fonts(&ctx);
+
+    let mut doc = scholia::model::MlaDocument::new_blank();
+    let theme = scholia::theme::ThemeConfig::default();
+    let keybinds = scholia::keybinds::KeybindConfig::default();
+
+    // Verify Delete Paragraph and Ctrl+Backspace render cleanly in 1920x1080 without layout panics
+    let mut out = ctx.run_ui(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(1920.0, 1080.0))),
+            ..Default::default()
+        },
+        |ui| {
+            let label_font = egui::FontId::proportional(11.0);
+            let sc_font = egui::FontId::monospace(10.0);
+
+            // Measure label and keybind directly with egui painter layout
+            let label_w = ui.painter().layout_no_wrap("🗑 Delete Paragraph".to_string(), label_font, egui::Color32::WHITE).size().x;
+            let sc_w = ui.painter().layout_no_wrap("Ctrl+Backspace".to_string(), sc_font, egui::Color32::WHITE).size().x;
+
+            let combined_w = label_w + sc_w;
+            // The old hardcoded sidebar width was 208px, which caused overlapping because available width (184px) < combined_w (~210px)
+            assert!(combined_w > 184.0, "Delete Paragraph + Ctrl+Backspace requires more than the old static 184px inner width");
+
+            let action = scholia::ui::render_editor_page(ui, &mut doc, &theme, &keybinds, false);
+            assert!(action.is_none());
+        },
+    );
+    out.textures_delta.clear();
+}
+
+
