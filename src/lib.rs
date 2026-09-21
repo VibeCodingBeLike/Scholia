@@ -1,5 +1,6 @@
 pub mod export;
 pub mod fonts;
+pub mod history;
 pub mod keybinds;
 pub mod mla_rules;
 pub mod model;

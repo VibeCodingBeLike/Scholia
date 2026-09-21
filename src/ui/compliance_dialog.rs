@@ -25,6 +25,7 @@ pub fn render_compliance_modal(
     Window::new("MLA 9th Edition Compliance Inspector")
         .open(&mut open)
         .resizable(true)
+        .frame(theme.modal_frame())
         .default_width(520.0)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .show(ctx, |ui| {

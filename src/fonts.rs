@@ -26,8 +26,12 @@ pub mod icons {
     pub const CHECK: &str = "\u{f00c}"; //  nf-fa-check
     pub const ARROW_UP: &str = "\u{f062}"; //  nf-fa-arrow_up
     pub const ARROW_DOWN: &str = "\u{f063}"; //  nf-fa-arrow_down
+    pub const ARROW_LEFT: &str = "\u{f060}"; //  nf-fa-arrow_left
+    pub const ARROW_RIGHT: &str = "\u{f061}"; //  nf-fa-arrow_right
     pub const TITLE_CASE: &str = "\u{f031}"; //  nf-fa-font
     pub const TIMES: &str = "\u{f00d}"; //  nf-fa-times
+    pub const UNDO: &str = "\u{f0e2}"; //  nf-fa-undo
+    pub const REDO: &str = "\u{f01e}"; //  nf-fa-repeat
 }
 
 pub const MLA_DOC_FONT: &str = "TimesNewRoman";

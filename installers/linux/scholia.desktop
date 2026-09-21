@@ -6,6 +6,6 @@ Icon=scholia
 Terminal=false
 Type=Application
 Categories=Office;WordProcessor;TextEditor;Education;
-MimeType=application/x-mladoc;text/plain;
+MimeType=application/x-mla;text/plain;
 Keywords=MLA;Document;Editor;Paper;Writing;WordProcessor;Scholia;
 StartupNotify=true

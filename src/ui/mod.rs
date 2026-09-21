@@ -5,6 +5,7 @@ pub mod editor;
 pub mod settings_dialog;
 pub mod status_bar;
 pub mod toolbar;
+pub mod unsaved_dialog;
 pub mod works_cited_dialog;
 
 pub use calendar_dialog::{render_calendar_popup, CalendarModalState};
@@ -14,4 +15,5 @@ pub use editor::{render_editor_page, EditorAction};
 pub use settings_dialog::{render_settings_modal, SettingsModalState};
 pub use status_bar::{render_status_bar, StatusBarEvent};
 pub use toolbar::{render_toolbar, ToolbarEvent};
+pub use unsaved_dialog::{render_unsaved_dialog, UnsavedDialogResponse, UnsavedDialogState};
 pub use works_cited_dialog::{render_works_cited_modal, WorksCitedModalState};

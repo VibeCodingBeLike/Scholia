@@ -10,7 +10,7 @@ pub struct NoteTag {
     pub offset: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MlaBlock {
     Paragraph {
         id: String,
@@ -86,7 +86,7 @@ impl MlaBlock {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MlaHeader {
     pub student_name: String,
     pub instructor_name: String,
@@ -128,7 +128,7 @@ pub struct ExplanatoryNote {
     pub word: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MlaDocument {
     pub header: MlaHeader,
     pub title: String,
@@ -173,6 +173,14 @@ impl MlaDocument {
             active_block_idx: 0,
             requested_focus_block_idx: None,
         }
+    }
+
+    pub fn content_equals(&self, other: &Self) -> bool {
+        self.title == other.title
+            && self.header == other.header
+            && self.blocks == other.blocks
+            && self.works_cited == other.works_cited
+            && self.notes == other.notes
     }
 
     pub fn sample_template() -> Self {
@@ -424,6 +432,33 @@ impl MlaDocument {
         }
     }
 
+    pub fn move_sentence_in_active_block(
+        &mut self,
+        cursor_char_idx: usize,
+        direction_left: bool,
+    ) -> Result<usize, &'static str> {
+        let block = self
+            .blocks
+            .get_mut(self.active_block_idx)
+            .ok_or("No active block selected.")?;
+        let text = block.text_mut();
+        if let Some((new_text, new_cursor)) = reorder_sentences(text, cursor_char_idx, direction_left) {
+            *text = new_text;
+            self.is_dirty = true;
+            self.sync_body_from_blocks();
+            Ok(new_cursor)
+        } else {
+            let (_leading, spans) = split_sentences(text);
+            if spans.len() <= 1 {
+                Err("Only one sentence in active paragraph.")
+            } else if direction_left {
+                Err("Already at the first sentence.")
+            } else {
+                Err("Already at the last sentence.")
+            }
+        }
+    }
+
     pub fn sort_works_cited(&mut self) {
         self.works_cited.sort_by_key(|a| a.sort_key());
         self.is_dirty = true;
@@ -481,8 +516,24 @@ impl MlaDocument {
         }
     }
 
-    pub fn link_note_from_shortcut(&mut self, block_id: &str, note_index: usize, word: &str) {
+    pub fn existing_note_indices(&self) -> Vec<usize> {
+        let mut indices: Vec<usize> = self.notes.iter().map(|n| n.index).collect();
+        for block in &self.blocks {
+            for tag in block.note_tags() {
+                if !indices.contains(&tag.note_index) {
+                    indices.push(tag.note_index);
+                }
+            }
+        }
+        indices
+    }
+
+    pub fn link_note_from_shortcut(&mut self, block_id: &str, note_index: usize, word: &str) -> bool {
         if let Some(note) = self.notes.iter_mut().find(|n| n.index == note_index) {
+            if !note.word.is_empty() && note.word != word {
+                // In MLA 9, reusing a note for multiple words is prohibited
+                return false;
+            }
             note.block_id = block_id.to_string();
             if !word.is_empty() {
                 note.word = word.to_string();
@@ -498,6 +549,7 @@ impl MlaDocument {
             self.reindex_notes();
         }
         self.is_dirty = true;
+        true
     }
 
     pub fn notes_for_block(&self, block_id: &str) -> Vec<&ExplanatoryNote> {
@@ -612,7 +664,8 @@ pub struct NoteShortcutResult {
 pub fn try_parse_and_apply_note_shortcut(
     text: &mut String,
     note_tags: &mut Vec<NoteTag>,
-) -> Option<NoteShortcutResult> {
+    existing_note_indices: &[usize],
+) -> Result<Option<NoteShortcutResult>, String> {
     let mut search_start = 0;
     while let Some(rel_open) = text[search_start..].find('^') {
         let open_idx = search_start + rel_open;
@@ -686,6 +739,16 @@ pub fn try_parse_and_apply_note_shortcut(
             })
             .to_string();
 
+        // In MLA 9, reusing note numbers is strictly prohibited: every note callout must have a unique sequential number.
+        if existing_note_indices.contains(&note_num) {
+            // Cancel making the note: remove ^N / ^(N) and replace with a normal space
+            text.replace_range(open_idx..replace_end, " ");
+            return Err(format!(
+                "MLA 9 prohibits reusing note numbers. Note {} is already in use; each note must be numbered consecutively.",
+                note_num
+            ));
+        }
+
         let sup_char = num_to_superscript(note_num);
         let replacement = format!("{} ", sup_char);
         text.replace_range(open_idx..replace_end, &replacement);
@@ -703,13 +766,13 @@ pub fn try_parse_and_apply_note_shortcut(
             note_tags.sort_by_key(|t| t.offset);
         }
 
-        return Some(NoteShortcutResult {
+        return Ok(Some(NoteShortcutResult {
             note_index: note_num,
             word,
-        });
+        }));
     }
 
-    None
+    Ok(None)
 }
 
 /// Renders block text by embedding superscript representations right after the tagged words,
@@ -982,3 +1045,206 @@ pub fn typographical_clean(s: &str) -> String {
 
     result
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SentenceSpan {
+    pub char_start: usize,
+    pub char_end: usize,
+    pub text: String,
+    pub trailing_sep: String,
+}
+
+fn is_abbreviation(word: &str) -> bool {
+    let lower = word.to_lowercase();
+    matches!(
+        lower.as_str(),
+        "dr" | "mr" | "mrs" | "ms" | "prof" | "sr" | "jr" | "vs" | "etc"
+            | "eg" | "ie" | "al" | "vol" | "no" | "ed" | "dept" | "fig"
+            | "co" | "inc" | "corp" | "st" | "gen" | "gov" | "rev"
+            | "approx" | "avg" | "est" | "min" | "max" | "misc" | "stat"
+            | "univ" | "p" | "pp" | "cf" | "ibid" | "op" | "cit"
+    )
+}
+
+fn is_terminal_punct(c: char) -> bool {
+    c == '.' || c == '!' || c == '?' || c == '‽'
+}
+
+fn is_closing_delimiter(c: char) -> bool {
+    matches!(
+        c,
+        '"' | '\'' | '”' | '“' | '’' | '‘' | '»' | '«' | ')' | ']' | '}' | '⁰'
+            | '¹' | '²' | '³' | '⁴' | '⁵' | '⁶' | '⁷' | '⁸' | '⁹'
+    )
+}
+
+pub fn split_sentences(text: &str) -> (String, Vec<SentenceSpan>) {
+    let chars: Vec<char> = text.chars().collect();
+    let total_len = chars.len();
+
+    // 1. Extract leading whitespace
+    let mut leading_end = 0;
+    while leading_end < total_len && chars[leading_end].is_whitespace() {
+        leading_end += 1;
+    }
+    let leading_ws: String = chars[..leading_end].iter().collect();
+
+    if leading_end == total_len {
+        return (leading_ws, Vec::new());
+    }
+
+    let mut spans = Vec::new();
+    let mut curr_start = leading_end;
+    let mut i = leading_end;
+
+    while i < total_len {
+        let c = chars[i];
+        if is_terminal_punct(c) {
+            let mut is_boundary = true;
+
+            // Dot specific exceptions
+            if c == '.' {
+                // Check decimals: e.g. 3.14
+                if i > 0
+                    && chars[i - 1].is_ascii_digit()
+                    && i + 1 < total_len
+                    && chars[i + 1].is_ascii_digit()
+                {
+                    is_boundary = false;
+                }
+                // Check ellipsis: e.g. ... or ..
+                else if (i > 0 && chars[i - 1] == '.')
+                    || (i + 1 < total_len && chars[i + 1] == '.')
+                {
+                    is_boundary = false;
+                }
+                // Check abbreviations & single-letter initials
+                else {
+                    let mut w_start = i;
+                    while w_start > curr_start && chars[w_start - 1].is_alphabetic() {
+                        w_start -= 1;
+                    }
+                    if w_start < i {
+                        let word: String = chars[w_start..i].iter().collect();
+                        if is_abbreviation(&word) {
+                            is_boundary = false;
+                        }
+                    }
+                }
+            }
+
+            if is_boundary {
+                // Consume consecutive terminal punctuation or closing quotes/brackets/superscripts
+                let mut end = i + 1;
+                while end < total_len
+                    && (is_terminal_punct(chars[end]) || is_closing_delimiter(chars[end]))
+                {
+                    end += 1;
+                }
+
+                // Sentence break requires whitespace after the sentence, or reaching the end of text
+                if end == total_len || chars[end].is_whitespace() {
+                    let s_text: String = chars[curr_start..end].iter().collect();
+                    let sep_start = end;
+                    while end < total_len && chars[end].is_whitespace() {
+                        end += 1;
+                    }
+                    let sep: String = chars[sep_start..end].iter().collect();
+
+                    spans.push(SentenceSpan {
+                        char_start: curr_start,
+                        char_end: sep_start,
+                        text: s_text,
+                        trailing_sep: sep,
+                    });
+
+                    curr_start = end;
+                    i = end;
+                    continue;
+                }
+            }
+        }
+        i += 1;
+    }
+
+    // Capture any remaining sentence text (e.g., if paragraph doesn't end in punctuation)
+    if curr_start < total_len {
+        let remainder: String = chars[curr_start..].iter().collect();
+        let trimmed = remainder.trim_end();
+        let trailing = &remainder[trimmed.len()..];
+        let sep_start = curr_start + trimmed.chars().count();
+        spans.push(SentenceSpan {
+            char_start: curr_start,
+            char_end: sep_start,
+            text: trimmed.to_string(),
+            trailing_sep: trailing.to_string(),
+        });
+    }
+
+    (leading_ws, spans)
+}
+
+pub fn reorder_sentences(
+    text: &str,
+    cursor_char_idx: usize,
+    direction_left: bool,
+) -> Option<(String, usize)> {
+    let (leading_ws, spans) = split_sentences(text);
+    if spans.len() <= 1 {
+        return None;
+    }
+
+    // Find active sentence index and relative offset within its text
+    let mut active_idx = None;
+    let mut active_offset = 0;
+
+    for (idx, span) in spans.iter().enumerate() {
+        let span_end = span.char_end + span.trailing_sep.chars().count();
+        let is_last = idx + 1 == spans.len();
+
+        if cursor_char_idx >= span.char_start && (cursor_char_idx < span_end || is_last) {
+            active_idx = Some(idx);
+            let s_text_len = span.text.chars().count();
+            active_offset = cursor_char_idx.saturating_sub(span.char_start).min(s_text_len);
+            break;
+        }
+    }
+
+    let curr_idx = active_idx.unwrap_or(spans.len() - 1);
+
+    let target_idx = if direction_left {
+        if curr_idx == 0 {
+            return None; // Already at first sentence
+        }
+        curr_idx - 1
+    } else {
+        if curr_idx + 1 >= spans.len() {
+            return None; // Already at last sentence
+        }
+        curr_idx + 1
+    };
+
+    // Swap texts
+    let mut texts: Vec<String> = spans.iter().map(|s| s.text.clone()).collect();
+    texts.swap(curr_idx, target_idx);
+
+    // Keep separators in place
+    let seps: Vec<String> = spans.iter().map(|s| s.trailing_sep.clone()).collect();
+
+    let mut new_text = leading_ws.clone();
+    let mut pos = leading_ws.chars().count();
+    let mut new_cursor = 0;
+
+    for k in 0..texts.len() {
+        if k == target_idx {
+            new_cursor = pos + active_offset;
+        }
+        new_text.push_str(&texts[k]);
+        pos += texts[k].chars().count();
+        new_text.push_str(&seps[k]);
+        pos += seps[k].chars().count();
+    }
+
+    Some((new_text, new_cursor))
+}
+

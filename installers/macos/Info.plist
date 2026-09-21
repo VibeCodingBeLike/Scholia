@@ -37,7 +37,7 @@
             <string>Owner</string>
             <key>LSItemContentTypes</key>
             <array>
-                <string>com.scholia.mladoc</string>
+                <string>com.scholia.mla</string>
             </array>
         </dict>
     </array>

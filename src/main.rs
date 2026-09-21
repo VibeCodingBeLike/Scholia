@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 mod export;
 mod fonts;
+mod history;
 mod keybinds;
 mod mla_rules;
 mod model;
@@ -12,14 +13,16 @@ mod theme;
 mod ui;
 
 use export::{export_to_docx, export_to_pdf, export_to_text};
+use history::HistoryManager;
 use keybinds::{Action, KeybindConfig};
-use model::{to_mla_title_case, MlaDocument};
+use model::{to_mla_title_case, MlaBlock, MlaDocument};
 use theme::ThemeConfig;
 use ui::{
     render_calendar_popup, render_citation_modal, render_compliance_modal, render_editor_page,
-    render_settings_modal, render_status_bar, render_toolbar, render_works_cited_modal,
-    CalendarModalState, CitationModalState, ComplianceModalState, EditorAction, SettingsModalState,
-    StatusBarEvent, ToolbarEvent, WorksCitedModalState,
+    render_settings_modal, render_status_bar, render_toolbar, render_unsaved_dialog,
+    render_works_cited_modal, CalendarModalState, CitationModalState, ComplianceModalState,
+    EditorAction, SettingsModalState, StatusBarEvent, ToolbarEvent, UnsavedDialogResponse,
+    UnsavedDialogState, WorksCitedModalState,
 };
 
 fn main() -> eframe::Result<()> {
@@ -47,6 +50,7 @@ fn main() -> eframe::Result<()> {
 
 struct MlaApp {
     doc: MlaDocument,
+    history: HistoryManager,
     theme: ThemeConfig,
     keybinds: KeybindConfig,
 
@@ -56,7 +60,9 @@ struct MlaApp {
     compliance_state: ComplianceModalState,
     settings_state: SettingsModalState,
     calendar_state: CalendarModalState,
+    unsaved_changes_state: UnsavedDialogState,
 
+    confirmed_exit: bool,
     focus_mode: bool,
     vibrancy_dirty: bool,
     notification: Option<(String, std::time::Instant)>,
@@ -64,11 +70,18 @@ struct MlaApp {
 
 impl MlaApp {
     pub fn new() -> Self {
-        // Load saved theme & keybinds if present
-        let (theme, keybinds) = load_config();
+        // Ensure default custom themes exist in themes/ folder
+        theme::ensure_sample_themes();
+
+        // Load saved theme & keybinds & undo history limit if present
+        let (theme, keybinds, undo_limit) = load_config();
+        let doc = MlaDocument::default();
+        let mut history = HistoryManager::new(&doc);
+        history.set_max_depth(undo_limit);
 
         Self {
-            doc: MlaDocument::default(),
+            doc,
+            history,
             theme,
             keybinds,
             works_cited_state: WorksCitedModalState::default(),
@@ -76,6 +89,8 @@ impl MlaApp {
             compliance_state: ComplianceModalState::default(),
             settings_state: SettingsModalState::default(),
             calendar_state: CalendarModalState::default(),
+            unsaved_changes_state: UnsavedDialogState::default(),
+            confirmed_exit: false,
             focus_mode: false,
             vibrancy_dirty: true, // Apply vibrancy on first frame
             notification: None,
@@ -86,15 +101,48 @@ impl MlaApp {
         self.notification = Some((msg.into(), std::time::Instant::now()));
     }
 
-    fn handle_action(&mut self, action: Action) {
+    pub fn save_current_document(&mut self) -> bool {
+        let target_path = self.doc.file_path.clone().map(PathBuf::from).or_else(|| {
+            rfd::FileDialog::new()
+                .set_file_name("paper.mla")
+                .add_filter("MLA Document (*.mla)", &["mla", "mladoc"])
+                .save_file()
+        });
+
+        if let Some(path) = target_path {
+            match serde_json::to_string_pretty(&self.doc) {
+                Ok(json) => match std::fs::write(&path, json) {
+                    Ok(_) => {
+                        self.doc.file_path = Some(path.to_string_lossy().to_string());
+                        self.doc.is_dirty = false;
+                        self.set_notification("Document saved.");
+                        true
+                    }
+                    Err(e) => {
+                        self.set_notification(format!("Error saving file: {}", e));
+                        false
+                    }
+                },
+                Err(e) => {
+                    self.set_notification(format!("Error serializing: {}", e));
+                    false
+                }
+            }
+        } else {
+            false
+        }
+    }
+
+    fn handle_action(&mut self, action: Action, ctx: &egui::Context) {
         match action {
             Action::NewDocument => {
                 self.doc = MlaDocument::new_blank();
+                self.history.reset(&self.doc);
                 self.set_notification("Created new blank MLA document.");
             }
             Action::OpenDocument => {
                 if let Some(path) = rfd::FileDialog::new()
-                    .add_filter("MLA Document (*.mladoc)", &["mladoc"])
+                    .add_filter("MLA Document (*.mla)", &["mla", "mladoc"])
                     .add_filter("JSON Document (*.json)", &["json"])
                     .pick_file()
                 {
@@ -104,6 +152,7 @@ impl MlaApp {
                                 doc.file_path = Some(path.to_string_lossy().to_string());
                                 doc.is_dirty = false;
                                 self.doc = doc;
+                                self.history.reset(&self.doc);
                                 self.set_notification("Document opened successfully.");
                             }
                             Err(e) => {
@@ -115,26 +164,7 @@ impl MlaApp {
                 }
             }
             Action::SaveDocument => {
-                let target_path = self.doc.file_path.clone().map(PathBuf::from).or_else(|| {
-                    rfd::FileDialog::new()
-                        .set_file_name("paper.mladoc")
-                        .add_filter("MLA Document (*.mladoc)", &["mladoc"])
-                        .save_file()
-                });
-
-                if let Some(path) = target_path {
-                    match serde_json::to_string_pretty(&self.doc) {
-                        Ok(json) => match std::fs::write(&path, json) {
-                            Ok(_) => {
-                                self.doc.file_path = Some(path.to_string_lossy().to_string());
-                                self.doc.is_dirty = false;
-                                self.set_notification("Document saved.");
-                            }
-                            Err(e) => self.set_notification(format!("Error saving file: {}", e)),
-                        },
-                        Err(e) => self.set_notification(format!("Error serializing: {}", e)),
-                    }
-                }
+                self.save_current_document();
             }
             Action::ExportDocx => {
                 if let Some(path) = rfd::FileDialog::new()
@@ -165,7 +195,15 @@ impl MlaApp {
                     }
                 }
             }
+            Action::Undo => {
+                self.handle_undo(ctx);
+            }
+            Action::Redo => {
+                self.handle_redo(ctx);
+            }
             Action::AddParagraph => {
+                let cursor = self.get_active_block_cursor(ctx);
+                self.history.record_discrete_action(&self.doc, cursor);
                 self.doc.ensure_blocks_initialized();
                 let current_idx = if self.doc.blocks.is_empty() {
                     None
@@ -178,6 +216,8 @@ impl MlaApp {
                 self.set_notification("Added new body paragraph.");
             }
             Action::InsertBlockQuote => {
+                let cursor = self.get_active_block_cursor(ctx);
+                self.history.record_discrete_action(&self.doc, cursor);
                 self.doc.ensure_blocks_initialized();
                 let current_idx = if self.doc.blocks.is_empty() {
                     None
@@ -190,6 +230,8 @@ impl MlaApp {
                 self.set_notification("Inserted MLA block quotation.");
             }
             Action::InsertHeading1 => {
+                let cursor = self.get_active_block_cursor(ctx);
+                self.history.record_discrete_action(&self.doc, cursor);
                 self.doc.ensure_blocks_initialized();
                 let current_idx = if self.doc.blocks.is_empty() {
                     None
@@ -202,6 +244,8 @@ impl MlaApp {
                 self.set_notification("Inserted Level 1 Heading (Bold).");
             }
             Action::InsertHeading2 => {
+                let cursor = self.get_active_block_cursor(ctx);
+                self.history.record_discrete_action(&self.doc, cursor);
                 self.doc.ensure_blocks_initialized();
                 let current_idx = if self.doc.blocks.is_empty() {
                     None
@@ -214,6 +258,8 @@ impl MlaApp {
                 self.set_notification("Inserted Level 2 Heading (Italic).");
             }
             Action::InsertHeading3 => {
+                let cursor = self.get_active_block_cursor(ctx);
+                self.history.record_discrete_action(&self.doc, cursor);
                 self.doc.ensure_blocks_initialized();
                 let current_idx = if self.doc.blocks.is_empty() {
                     None
@@ -230,6 +276,8 @@ impl MlaApp {
             }
             Action::DeleteBlock => {
                 if self.doc.blocks.len() > 1 {
+                    let cursor = self.get_active_block_cursor(ctx);
+                    self.history.record_discrete_action(&self.doc, cursor);
                     let idx = self.doc.active_block_idx.min(self.doc.blocks.len() - 1);
                     let prev_idx = if idx > 0 { idx - 1 } else { 0 };
                     self.doc.remove_block(idx);
@@ -242,6 +290,8 @@ impl MlaApp {
             }
             Action::MoveBlockUp => {
                 if self.doc.active_block_idx > 0 {
+                    let cursor = self.get_active_block_cursor(ctx);
+                    self.history.record_discrete_action(&self.doc, cursor);
                     self.doc.move_block_up(self.doc.active_block_idx);
                     self.doc.active_block_idx -= 1;
                     self.doc.requested_focus_block_idx = Some(self.doc.active_block_idx);
@@ -250,6 +300,8 @@ impl MlaApp {
             }
             Action::MoveBlockDown => {
                 if self.doc.active_block_idx + 1 < self.doc.blocks.len() {
+                    let cursor = self.get_active_block_cursor(ctx);
+                    self.history.record_discrete_action(&self.doc, cursor);
                     self.doc.move_block_down(self.doc.active_block_idx);
                     self.doc.active_block_idx += 1;
                     self.doc.requested_focus_block_idx = Some(self.doc.active_block_idx);
@@ -260,14 +312,24 @@ impl MlaApp {
                 self.works_cited_state.open_new();
             }
             Action::AddFootnote => {
+                let cursor = self.get_active_block_cursor(ctx);
+                self.history.record_discrete_action(&self.doc, cursor);
                 let note_idx = self.doc.add_explanatory_note(String::new());
                 let sup = model::num_to_superscript(note_idx);
                 self.set_notification(format!("Added Note {} linked to active paragraph.", sup));
             }
             Action::ConvertToMlaTitleCase => {
+                let cursor = self.get_active_block_cursor(ctx);
+                self.history.record_discrete_action(&self.doc, cursor);
                 self.doc.title = to_mla_title_case(&self.doc.title);
                 self.doc.is_dirty = true;
                 self.set_notification("Formatted title to MLA Title Case.");
+            }
+            Action::MoveSentenceLeft => {
+                self.handle_move_sentence(ctx, true);
+            }
+            Action::MoveSentenceRight => {
+                self.handle_move_sentence(ctx, false);
             }
             Action::OpenPreferences => {
                 self.settings_state.is_open = true;
@@ -280,6 +342,109 @@ impl MlaApp {
                 self.set_notification("Entered Zen Mode (Press Esc to exit).");
             }
         }
+    }
+
+    fn handle_move_sentence(&mut self, ctx: &egui::Context, direction_left: bool) {
+        if self.doc.blocks.is_empty() {
+            return;
+        }
+        let b_idx = self.doc.active_block_idx.min(self.doc.blocks.len() - 1);
+        let block = &self.doc.blocks[b_idx];
+        let target_id = match block {
+            MlaBlock::Paragraph { id, .. } => egui::Id::new("p_block").with(id),
+            MlaBlock::BlockQuote { id, .. } => egui::Id::new("bq_block").with(id),
+            MlaBlock::SectionHeading { id, .. } => egui::Id::new("h_block").with(id),
+        };
+
+        let cursor_idx = self.get_active_block_cursor(ctx);
+        self.history.record_discrete_action(&self.doc, cursor_idx);
+
+        match self.doc.move_sentence_in_active_block(cursor_idx, direction_left) {
+            Ok(new_cursor) => {
+                let mut state =
+                    egui::text_edit::TextEditState::load(ctx, target_id).unwrap_or_default();
+                state.cursor.set_char_range(Some(egui::text::CCursorRange::one(
+                    egui::text::CCursor::new(new_cursor),
+                )));
+                state.store(ctx, target_id);
+                ctx.memory_mut(|m| m.request_focus(target_id));
+                let dir_str = if direction_left { "left" } else { "right" };
+                self.set_notification(format!("Moved sentence {dir_str}."));
+            }
+            Err(msg) => {
+                self.set_notification(msg);
+            }
+        }
+    }
+
+    fn get_active_block_cursor(&self, ctx: &egui::Context) -> usize {
+        let b_idx = self.doc.active_block_idx.min(self.doc.blocks.len().saturating_sub(1));
+        self.doc.blocks.get(b_idx).and_then(|block| {
+            let target_id = match block {
+                MlaBlock::Paragraph { id, .. } => egui::Id::new("p_block").with(id),
+                MlaBlock::BlockQuote { id, .. } => egui::Id::new("bq_block").with(id),
+                MlaBlock::SectionHeading { id, .. } => egui::Id::new("h_block").with(id),
+            };
+            egui::text_edit::TextEditState::load(ctx, target_id)
+                .and_then(|s| s.cursor.char_range())
+                .map(|r| r.primary.index.0)
+        }).unwrap_or(0)
+    }
+
+    fn consume_undo_redo_keys(ctx: &egui::Context) {
+        ctx.input_mut(|i| {
+            i.events.retain(|e| match e {
+                egui::Event::Key { key, modifiers, .. } => {
+                    let ctrl = modifiers.command || modifiers.ctrl;
+                    !((*key == egui::Key::Z || *key == egui::Key::Y) && ctrl)
+                }
+                _ => true,
+            });
+        });
+    }
+
+    fn apply_snapshot(&mut self, snapshot: crate::history::Snapshot, ctx: &egui::Context) {
+        self.doc = snapshot.doc;
+        self.doc.is_dirty = true;
+        self.doc.sync_body_from_blocks();
+
+        let b_idx = self.doc.active_block_idx.min(self.doc.blocks.len().saturating_sub(1));
+        if let Some(block) = self.doc.blocks.get(b_idx) {
+            let target_id = match block {
+                MlaBlock::Paragraph { id, .. } => egui::Id::new("p_block").with(id),
+                MlaBlock::BlockQuote { id, .. } => egui::Id::new("bq_block").with(id),
+                MlaBlock::SectionHeading { id, .. } => egui::Id::new("h_block").with(id),
+            };
+            let mut state = egui::text_edit::TextEditState::load(ctx, target_id).unwrap_or_default();
+            let safe_cursor = snapshot.cursor_pos.min(block.text().chars().count());
+            state.cursor.set_char_range(Some(egui::text::CCursorRange::one(
+                egui::text::CCursor::new(safe_cursor),
+            )));
+            state.store(ctx, target_id);
+            ctx.memory_mut(|m| m.request_focus(target_id));
+        }
+    }
+
+    fn handle_undo(&mut self, ctx: &egui::Context) {
+        let cursor = self.get_active_block_cursor(ctx);
+        if let Some(snapshot) = self.history.undo(&self.doc, cursor) {
+            self.apply_snapshot(snapshot, ctx);
+            self.set_notification("Undo");
+        } else {
+            self.set_notification("Nothing to undo.");
+        }
+        Self::consume_undo_redo_keys(ctx);
+    }
+
+    fn handle_redo(&mut self, ctx: &egui::Context) {
+        let cursor = self.get_active_block_cursor(ctx);
+        if let Some(snapshot) = self.history.redo(&self.doc, cursor) {
+            self.apply_snapshot(snapshot, ctx);
+            self.set_notification("Redo");
+        } else {
+            self.set_notification("Nothing to redo.");
+        }
+        Self::consume_undo_redo_keys(ctx);
     }
 }
 
@@ -310,11 +475,23 @@ impl eframe::App for MlaApp {
             }
         }
 
+        // Intercept close requests across all mechanisms (OS close, Alt+F4, Ctrl+Q, Toolbar close button)
+        let mut close_requested = ui.ctx().input(|i| i.viewport().close_requested());
+
+        // Keyboard shortcuts to close the application (Alt+F4 or Ctrl+Q)
+        ui.ctx().input(|i| {
+            if (i.modifiers.alt && i.key_pressed(egui::Key::F4))
+                || (i.modifiers.command && i.key_pressed(egui::Key::Q))
+            {
+                close_requested = true;
+            }
+        });
+
         // Check global custom shortcuts
         let input = ui.input(|i| i.clone());
         for &action in Action::all() {
             if self.keybinds.check_action(action, &input) {
-                self.handle_action(action);
+                self.handle_action(action, ui.ctx());
                 break;
             }
         }
@@ -344,11 +521,13 @@ impl eframe::App for MlaApp {
                         render_toolbar(ui, &self.doc, &self.theme, &self.keybinds, self.focus_mode)
                     {
                         match tb_event {
-                            ToolbarEvent::NewDoc => self.handle_action(Action::NewDocument),
-                            ToolbarEvent::OpenDoc => self.handle_action(Action::OpenDocument),
-                            ToolbarEvent::SaveDoc => self.handle_action(Action::SaveDocument),
-                            ToolbarEvent::ExportDocx => self.handle_action(Action::ExportDocx),
-                            ToolbarEvent::ExportHtml => self.handle_action(Action::ExportHtmlPdf),
+                            ToolbarEvent::NewDoc => self.handle_action(Action::NewDocument, ui.ctx()),
+                            ToolbarEvent::OpenDoc => self.handle_action(Action::OpenDocument, ui.ctx()),
+                            ToolbarEvent::SaveDoc => self.handle_action(Action::SaveDocument, ui.ctx()),
+                            ToolbarEvent::Undo => self.handle_action(Action::Undo, ui.ctx()),
+                            ToolbarEvent::Redo => self.handle_action(Action::Redo, ui.ctx()),
+                            ToolbarEvent::ExportDocx => self.handle_action(Action::ExportDocx, ui.ctx()),
+                            ToolbarEvent::ExportHtml => self.handle_action(Action::ExportHtmlPdf, ui.ctx()),
                             ToolbarEvent::ExportText => {
                                 if let Some(path) = rfd::FileDialog::new()
                                     .set_file_name("MLA_Paper.txt")
@@ -360,24 +539,38 @@ impl eframe::App for MlaApp {
                                 }
                             }
                             ToolbarEvent::AddBlockquote => {
-                                self.handle_action(Action::InsertBlockQuote)
+                                self.handle_action(Action::InsertBlockQuote, ui.ctx())
                             }
                             ToolbarEvent::AddHeading(level) => {
                                 if level == 1 {
-                                    self.handle_action(Action::InsertHeading1);
+                                    self.handle_action(Action::InsertHeading1, ui.ctx());
                                 } else if level == 2 {
-                                    self.handle_action(Action::InsertHeading2);
+                                    self.handle_action(Action::InsertHeading2, ui.ctx());
                                 } else {
-                                    self.handle_action(Action::InsertHeading3);
+                                    self.handle_action(Action::InsertHeading3, ui.ctx());
                                 }
                             }
                             ToolbarEvent::OpenWorksCited => {
-                                self.handle_action(Action::ManageWorksCited)
+                                self.handle_action(Action::ManageWorksCited, ui.ctx())
                             }
                             ToolbarEvent::AddFootnote => {
-                                self.handle_action(Action::AddFootnote)
+                                self.handle_action(Action::AddFootnote, ui.ctx())
+                            }
+                            ToolbarEvent::CloseApp => {
+                                close_requested = true;
                             }
                         }
+                    }
+                }
+
+                // Handle close request confirmation popup
+                if close_requested {
+                    if self.doc.is_dirty && !self.confirmed_exit {
+                        ui.ctx().send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                        self.unsaved_changes_state.is_open = true;
+                    } else {
+                        save_config(&self.theme, &self.keybinds, self.history.max_depth);
+                        ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                     }
                 }
 
@@ -407,7 +600,10 @@ impl eframe::App for MlaApp {
                             self.calendar_state.open_at(pos, &self.doc.header.date);
                         }
                         EditorAction::TriggerAction(act) => {
-                            self.handle_action(act);
+                            self.handle_action(act, ui.ctx());
+                        }
+                        EditorAction::ShowNotification(msg) => {
+                            self.set_notification(msg);
                         }
                     }
                 }
@@ -464,6 +660,8 @@ impl eframe::App for MlaApp {
         );
 
         if let Some(cite_str) = citation_insert {
+            let cursor = self.get_active_block_cursor(ui.ctx());
+            self.history.record_discrete_action(&self.doc, cursor);
             self.doc.ensure_blocks_initialized();
             if let Some(target_idx) = self.citation_state.target_block_index {
                 if target_idx < self.doc.blocks.len() {
@@ -528,6 +726,7 @@ impl eframe::App for MlaApp {
             &mut self.settings_state,
             &mut self.theme,
             &mut self.keybinds,
+            &mut self.history.max_depth,
             &mut self.vibrancy_dirty,
         );
 
@@ -538,6 +737,32 @@ impl eframe::App for MlaApp {
             &mut self.doc.is_dirty,
             &self.theme,
         );
+
+        let unsaved_resp = render_unsaved_dialog(
+            ui.ctx(),
+            &mut self.unsaved_changes_state,
+            &self.doc,
+            &self.theme,
+        );
+        match unsaved_resp {
+            UnsavedDialogResponse::Save => {
+                if self.save_current_document() {
+                    self.confirmed_exit = true;
+                    save_config(&self.theme, &self.keybinds, self.history.max_depth);
+                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+            }
+            UnsavedDialogResponse::Discard => {
+                self.confirmed_exit = true;
+                save_config(&self.theme, &self.keybinds, self.history.max_depth);
+                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+            UnsavedDialogResponse::Cancel | UnsavedDialogResponse::None => {}
+        }
+
+        // Commit continuous typing / word groups at end of frame
+        let cursor = self.get_active_block_cursor(ui.ctx());
+        self.history.on_frame_end(&self.doc, cursor);
     }
 }
 
@@ -545,6 +770,7 @@ impl eframe::App for MlaApp {
 struct SavedConfig {
     theme: Option<ThemeConfig>,
     keybinds: Option<KeybindConfig>,
+    undo_limit: Option<usize>,
 }
 
 fn config_path() -> PathBuf {
@@ -556,15 +782,28 @@ fn config_path() -> PathBuf {
     local.to_path_buf()
 }
 
-fn load_config() -> (ThemeConfig, KeybindConfig) {
+fn save_config(theme: &ThemeConfig, keybinds: &KeybindConfig, undo_limit: usize) {
+    let path = config_path();
+    let cfg = SavedConfig {
+        theme: Some(theme.clone()),
+        keybinds: Some(keybinds.clone()),
+        undo_limit: Some(undo_limit.clamp(16, 8192)),
+    };
+    if let Ok(json) = serde_json::to_string_pretty(&cfg) {
+        let _ = std::fs::write(&path, json);
+    }
+}
+
+fn load_config() -> (ThemeConfig, KeybindConfig, usize) {
     let path = config_path();
     if let Ok(content) = std::fs::read_to_string(&path) {
         if let Ok(cfg) = serde_json::from_str::<SavedConfig>(&content) {
             return (
                 cfg.theme.unwrap_or_default(),
                 cfg.keybinds.unwrap_or_default(),
+                cfg.undo_limit.unwrap_or(512).clamp(16, 8192),
             );
         }
     }
-    (ThemeConfig::default(), KeybindConfig::default())
+    (ThemeConfig::default(), KeybindConfig::default(), 512)
 }

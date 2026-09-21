@@ -17,12 +17,16 @@ pub enum Action {
     DeleteBlock,
     MoveBlockUp,
     MoveBlockDown,
+    MoveSentenceLeft,
+    MoveSentenceRight,
     ManageWorksCited,
     AddFootnote,
     ConvertToMlaTitleCase,
     OpenPreferences,
     ToggleComplianceCheck,
     ToggleFocusMode,
+    Undo,
+    Redo,
 }
 
 impl Action {
@@ -30,7 +34,7 @@ impl Action {
         match self {
             Action::NewDocument => "New MLA Document",
             Action::OpenDocument => "Open Document",
-            Action::SaveDocument => "Save Document (.mladoc)",
+            Action::SaveDocument => "Save Document (.mla)",
             Action::ExportDocx => "Export to Word (.docx)",
             Action::ExportHtmlPdf => "Export to Printable HTML / PDF",
             Action::AddParagraph => "Add New Body Paragraph",
@@ -39,39 +43,63 @@ impl Action {
             Action::InsertHeading2 => "Insert Section Heading 2 (Italics)",
             Action::InsertHeading3 => "Insert Section Heading 3 (Centered)",
             Action::InsertCitation => "Insert In-Text Parenthetical Citation",
-            Action::DeleteBlock => "Delete Active Block",
+            Action::DeleteBlock => "Delete Paragraph",
             Action::MoveBlockUp => "Move Active Block Up",
             Action::MoveBlockDown => "Move Active Block Down",
+            Action::MoveSentenceLeft => "Move Sentence Left",
+            Action::MoveSentenceRight => "Move Sentence Right",
             Action::ManageWorksCited => "Open Works Cited Manager",
             Action::AddFootnote => "Add Note / Definition",
             Action::ConvertToMlaTitleCase => "Format Title to MLA Title Case",
             Action::OpenPreferences => "Theme & Transparency Settings",
             Action::ToggleComplianceCheck => "Run MLA Compliance Inspector",
             Action::ToggleFocusMode => "Toggle Zen / Focus Mode",
+            Action::Undo => "Undo",
+            Action::Redo => "Redo",
         }
     }
 
     pub fn category(&self) -> &'static str {
         match self {
+            Action::ManageWorksCited
+            | Action::InsertCitation
+            | Action::AddFootnote
+            | Action::InsertBlockQuote
+            | Action::InsertHeading1
+            | Action::InsertHeading2
+            | Action::InsertHeading3 => "Writing",
+
+            Action::MoveBlockUp
+            | Action::MoveBlockDown
+            | Action::MoveSentenceLeft
+            | Action::MoveSentenceRight
+            | Action::DeleteBlock
+            | Action::AddParagraph
+            | Action::Undo
+            | Action::Redo => "Modify",
+
             Action::NewDocument
             | Action::OpenDocument
             | Action::SaveDocument
             | Action::ExportDocx
-            | Action::ExportHtmlPdf => "File & Export",
-            Action::AddParagraph
-            | Action::InsertBlockQuote
-            | Action::InsertHeading1
-            | Action::InsertHeading2
-            | Action::InsertHeading3
-            | Action::InsertCitation
-            | Action::DeleteBlock
-            | Action::MoveBlockUp
-            | Action::MoveBlockDown
-            | Action::ConvertToMlaTitleCase => "Editing & MLA Blocks",
-            Action::ManageWorksCited | Action::AddFootnote => "Works Cited & Notes",
-            Action::OpenPreferences | Action::ToggleComplianceCheck | Action::ToggleFocusMode => {
-                "View & Tools"
-            }
+            | Action::ExportHtmlPdf => "File",
+
+            Action::ToggleFocusMode
+            | Action::OpenPreferences
+            | Action::ToggleComplianceCheck
+            | Action::ConvertToMlaTitleCase => "Tools",
+        }
+    }
+
+    pub fn is_in_text_action(&self) -> bool {
+        matches!(self, Action::InsertCitation | Action::AddFootnote)
+    }
+
+    pub fn in_text_hint(&self) -> Option<&'static str> {
+        match self {
+            Action::InsertCitation => Some("/cite"),
+            Action::AddFootnote => Some("^N"),
+            _ => None,
         }
     }
 
@@ -82,6 +110,8 @@ impl Action {
             Action::SaveDocument,
             Action::ExportDocx,
             Action::ExportHtmlPdf,
+            Action::Undo,
+            Action::Redo,
             Action::AddParagraph,
             Action::InsertBlockQuote,
             Action::InsertHeading1,
@@ -91,6 +121,8 @@ impl Action {
             Action::DeleteBlock,
             Action::MoveBlockUp,
             Action::MoveBlockDown,
+            Action::MoveSentenceLeft,
+            Action::MoveSentenceRight,
             Action::ManageWorksCited,
             Action::AddFootnote,
             Action::ConvertToMlaTitleCase,
@@ -109,8 +141,9 @@ pub struct Shortcut {
     pub key: KeyName,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum KeyName {
+    None,
     N,
     O,
     S,
@@ -133,11 +166,48 @@ pub enum KeyName {
     Backspace,
     Up,
     Down,
+    Left,
+    Right,
+    Z,
+    Y,
 }
 
 impl KeyName {
+    pub fn all() -> &'static [KeyName] {
+        &[
+            KeyName::None,
+            KeyName::N,
+            KeyName::O,
+            KeyName::S,
+            KeyName::E,
+            KeyName::B,
+            KeyName::C,
+            KeyName::F,
+            KeyName::L,
+            KeyName::W,
+            KeyName::T,
+            KeyName::V,
+            KeyName::P,
+            KeyName::Z,
+            KeyName::Y,
+            KeyName::Comma,
+            KeyName::Enter,
+            KeyName::F11,
+            KeyName::Num1,
+            KeyName::Num2,
+            KeyName::Num3,
+            KeyName::Delete,
+            KeyName::Backspace,
+            KeyName::Up,
+            KeyName::Down,
+            KeyName::Left,
+            KeyName::Right,
+        ]
+    }
+
     pub fn to_egui_key(self) -> Key {
         match self {
+            KeyName::None => Key::Escape, // Unused: matches() guards against KeyName::None
             KeyName::N => Key::N,
             KeyName::O => Key::O,
             KeyName::S => Key::S,
@@ -150,6 +220,8 @@ impl KeyName {
             KeyName::T => Key::T,
             KeyName::V => Key::V,
             KeyName::P => Key::P,
+            KeyName::Z => Key::Z,
+            KeyName::Y => Key::Y,
             KeyName::Comma => Key::Comma,
             KeyName::Enter => Key::Enter,
             KeyName::F11 => Key::F11,
@@ -160,11 +232,14 @@ impl KeyName {
             KeyName::Backspace => Key::Backspace,
             KeyName::Up => Key::ArrowUp,
             KeyName::Down => Key::ArrowDown,
+            KeyName::Left => Key::ArrowLeft,
+            KeyName::Right => Key::ArrowRight,
         }
     }
 
     pub fn label(&self) -> &'static str {
         match self {
+            KeyName::None => "None",
             KeyName::N => "N",
             KeyName::O => "O",
             KeyName::S => "S",
@@ -177,6 +252,8 @@ impl KeyName {
             KeyName::T => "T",
             KeyName::V => "V",
             KeyName::P => "P",
+            KeyName::Z => "Z",
+            KeyName::Y => "Y",
             KeyName::Comma => ",",
             KeyName::Enter => "Enter",
             KeyName::F11 => "F11",
@@ -187,6 +264,8 @@ impl KeyName {
             KeyName::Backspace => "Backspace",
             KeyName::Up => "Up",
             KeyName::Down => "Down",
+            KeyName::Left => "Left",
+            KeyName::Right => "Right",
         }
     }
 }
@@ -201,7 +280,19 @@ impl Shortcut {
         }
     }
 
+    pub fn none() -> Self {
+        Self {
+            ctrl: false,
+            shift: false,
+            alt: false,
+            key: KeyName::None,
+        }
+    }
+
     pub fn display_string(&self) -> String {
+        if self.key == KeyName::None {
+            return "None".to_string();
+        }
         let mut parts = Vec::new();
         if self.ctrl {
             #[cfg(target_os = "macos")]
@@ -223,6 +314,9 @@ impl Shortcut {
     }
 
     pub fn matches(&self, input: &egui::InputState) -> bool {
+        if self.key == KeyName::None {
+            return false;
+        }
         let modifier_ctrl = input.modifiers.command || input.modifiers.ctrl;
         let modifier_shift = input.modifiers.shift;
         let modifier_alt = input.modifiers.alt;
@@ -265,12 +359,16 @@ pub struct KeybindConfig {
     pub delete_block: Shortcut,
     pub move_block_up: Shortcut,
     pub move_block_down: Shortcut,
+    pub move_sentence_left: Shortcut,
+    pub move_sentence_right: Shortcut,
     pub manage_works_cited: Shortcut,
     pub add_footnote: Shortcut,
     pub convert_title_case: Shortcut,
     pub open_preferences: Shortcut,
     pub toggle_compliance: Shortcut,
     pub toggle_focus: Shortcut,
+    pub undo: Shortcut,
+    pub redo: Shortcut,
 }
 
 impl Default for KeybindConfig {
@@ -281,17 +379,21 @@ impl Default for KeybindConfig {
             save_doc: Shortcut::new(true, false, false, KeyName::S),
             export_docx: Shortcut::new(true, false, false, KeyName::E),
             export_html: Shortcut::new(true, true, false, KeyName::E),
+            undo: Shortcut::new(true, false, false, KeyName::Z),
+            redo: Shortcut::new(true, false, false, KeyName::Y),
             add_paragraph: Shortcut::new(true, false, false, KeyName::Enter),
             insert_blockquote: Shortcut::new(true, true, false, KeyName::B),
             insert_h1: Shortcut::new(true, false, true, KeyName::Num1),
             insert_h2: Shortcut::new(true, false, true, KeyName::Num2),
             insert_h3: Shortcut::new(true, false, true, KeyName::Num3),
-            insert_citation: Shortcut::new(true, true, false, KeyName::C),
+            insert_citation: Shortcut::none(), // In-text action (/cite) - no keybind
             delete_block: Shortcut::new(true, false, false, KeyName::Backspace),
-            move_block_up: Shortcut::new(false, false, true, KeyName::Up),
-            move_block_down: Shortcut::new(false, false, true, KeyName::Down),
+            move_block_up: Shortcut::new(true, false, true, KeyName::Up),
+            move_block_down: Shortcut::new(true, false, true, KeyName::Down),
+            move_sentence_left: Shortcut::new(true, false, true, KeyName::Left),
+            move_sentence_right: Shortcut::new(true, false, true, KeyName::Right),
             manage_works_cited: Shortcut::new(true, false, false, KeyName::W),
-            add_footnote: Shortcut::new(true, true, false, KeyName::W), // Ctrl+Shift+W (paired with Ctrl+W for Works Cited)
+            add_footnote: Shortcut::none(), // In-text action (^N) - no keybind
             convert_title_case: Shortcut::new(true, true, false, KeyName::T),
             open_preferences: Shortcut::new(true, false, false, KeyName::Comma),
             toggle_compliance: Shortcut::new(true, false, false, KeyName::L),
@@ -317,12 +419,16 @@ impl KeybindConfig {
             Action::DeleteBlock => self.delete_block,
             Action::MoveBlockUp => self.move_block_up,
             Action::MoveBlockDown => self.move_block_down,
+            Action::MoveSentenceLeft => self.move_sentence_left,
+            Action::MoveSentenceRight => self.move_sentence_right,
             Action::ManageWorksCited => self.manage_works_cited,
             Action::AddFootnote => self.add_footnote,
             Action::ConvertToMlaTitleCase => self.convert_title_case,
             Action::OpenPreferences => self.open_preferences,
             Action::ToggleComplianceCheck => self.toggle_compliance,
             Action::ToggleFocusMode => self.toggle_focus,
+            Action::Undo => self.undo,
+            Action::Redo => self.redo,
         }
     }
 
@@ -342,22 +448,35 @@ impl KeybindConfig {
             Action::DeleteBlock => self.delete_block = sc,
             Action::MoveBlockUp => self.move_block_up = sc,
             Action::MoveBlockDown => self.move_block_down = sc,
+            Action::MoveSentenceLeft => self.move_sentence_left = sc,
+            Action::MoveSentenceRight => self.move_sentence_right = sc,
             Action::ManageWorksCited => self.manage_works_cited = sc,
             Action::AddFootnote => self.add_footnote = sc,
             Action::ConvertToMlaTitleCase => self.convert_title_case = sc,
             Action::OpenPreferences => self.open_preferences = sc,
             Action::ToggleComplianceCheck => self.toggle_compliance = sc,
             Action::ToggleFocusMode => self.toggle_focus = sc,
+            Action::Undo => self.undo = sc,
+            Action::Redo => self.redo = sc,
         }
     }
 
     pub fn check_action(&self, action: Action, input: &egui::InputState) -> bool {
         match action {
-            Action::AddParagraph | Action::ExportDocx | Action::ExportHtmlPdf => false,
-            Action::AddFootnote => {
+            Action::AddParagraph
+            | Action::ExportDocx
+            | Action::ExportHtmlPdf
+            | Action::InsertCitation
+            | Action::AddFootnote => false,
+            Action::Undo => {
                 self.get_shortcut(action).matches(input)
-                    || Shortcut::new(true, true, false, KeyName::W).matches(input)
-                    || Shortcut::new(true, true, false, KeyName::N).matches(input)
+                    || Shortcut::new(true, false, false, KeyName::Z).matches(input)
+            }
+            Action::Redo => {
+                self.get_shortcut(action).matches(input)
+                    || Shortcut::new(true, false, false, KeyName::Y).matches(input)
+                    || Shortcut::new(true, true, false, KeyName::Z).matches(input)
+                    || Shortcut::new(true, true, false, KeyName::Y).matches(input)
             }
             _ => self.get_shortcut(action).matches(input),
         }

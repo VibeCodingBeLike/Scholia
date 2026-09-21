@@ -77,6 +77,7 @@ pub fn render_calendar_popup(
         .open(&mut open)
         .collapsible(false)
         .resizable(false)
+        .frame(theme.modal_frame())
         .fixed_size(egui::vec2(256.0, 315.0));
 
     if let Some(pos) = state.popup_pos {

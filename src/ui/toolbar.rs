@@ -8,6 +8,8 @@ pub enum ToolbarEvent {
     NewDoc,
     OpenDoc,
     SaveDoc,
+    Undo,
+    Redo,
     ExportDocx,
     ExportHtml,
     ExportText,
@@ -15,6 +17,7 @@ pub enum ToolbarEvent {
     AddHeading(u8),
     OpenWorksCited,
     AddFootnote,
+    CloseApp,
 }
 
 pub fn render_toolbar(
@@ -62,7 +65,7 @@ pub fn render_toolbar(
         let open_sc = keybinds.get_shortcut(Action::OpenDocument).display_string();
         if ui
             .button(RichText::new(format!("{} Open", icons::FOLDER_OPEN)).color(text_col))
-            .on_hover_text(format!("Open .mladoc file ({})", open_sc))
+            .on_hover_text(format!("Open .mla file ({})", open_sc))
             .clicked()
         {
             event = Some(ToolbarEvent::OpenDoc);
@@ -75,6 +78,24 @@ pub fn render_toolbar(
             .clicked()
         {
             event = Some(ToolbarEvent::SaveDoc);
+        }
+
+        let undo_sc = keybinds.get_shortcut(Action::Undo).display_string();
+        if ui
+            .button(RichText::new(format!("{} Undo", icons::UNDO)).color(text_col))
+            .on_hover_text(format!("Undo last action ({})", undo_sc))
+            .clicked()
+        {
+            event = Some(ToolbarEvent::Undo);
+        }
+
+        let redo_sc = keybinds.get_shortcut(Action::Redo).display_string();
+        if ui
+            .button(RichText::new(format!("{} Redo", icons::REDO)).color(text_col))
+            .on_hover_text(format!("Redo action ({})", redo_sc))
+            .clicked()
+        {
+            event = Some(ToolbarEvent::Redo);
         }
 
         // Export dropdown / buttons (shortcuts removed as requested)
@@ -175,11 +196,10 @@ pub fn render_toolbar(
         }
 
         // Add Footnote / Definition button
-        let fn_sc = keybinds.get_shortcut(Action::AddFootnote).display_string();
         let fn_label = format!("{} Note / Def ({})", icons::INFO, doc.notes.len());
         if ui
             .button(RichText::new(fn_label).color(text_col))
-            .on_hover_text(format!("Insert Explanatory Note / Definition ({})", fn_sc))
+            .on_hover_text("Insert Explanatory Note / Definition (^N + Space)")
             .clicked()
         {
             event = Some(ToolbarEvent::AddFootnote);
@@ -222,7 +242,7 @@ pub fn render_toolbar(
                     .min_size(egui::vec2(26.0, 22.0))
                 ).on_hover_text("Close");
                 if close_btn.clicked() {
-                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                    event = Some(ToolbarEvent::CloseApp);
                 }
 
                 // Maximize / Restore button

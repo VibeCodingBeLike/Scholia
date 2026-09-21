@@ -26,7 +26,7 @@ impl SourceType {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorksCitedEntry {
     pub id: String,
     pub source_type: SourceType,

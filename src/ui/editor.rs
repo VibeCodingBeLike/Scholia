@@ -10,6 +10,7 @@ pub enum EditorAction {
     OpenWorksCitedModal(Option<usize>),
     OpenCalendar(egui::Pos2),
     TriggerAction(Action),
+    ShowNotification(String),
 }
 
 pub fn render_editor_page(
@@ -239,6 +240,7 @@ pub fn render_editor_page(
                         let mut note_shortcut_to_link: Option<(String, usize, String)> = None;
 
                         let total_blocks = doc.blocks.len();
+                        let existing_note_indices_snapshot = doc.existing_note_indices();
                         for b_idx in 0..total_blocks {
                             if b_idx > 0 {
                                 ui.add_space(14.0); // Distinct visual spacing between paragraphs & blocks!
@@ -259,7 +261,7 @@ pub fn render_editor_page(
                                             .desired_width(printable_width)
                                             .desired_rows(2)
                                             .hint_text(
-                                                RichText::new("Begin typing your paragraph here... (type example^1 + space for note, /cite for citation)")
+                                                RichText::new("Begin typing here...")
                                                     .italics()
                                                     .color(muted_col),
                                             ),
@@ -268,8 +270,14 @@ pub fn render_editor_page(
                                     if resp.changed() {
                                         blocks_changed = true;
                                         // Note shorthand: word^N or word^(N) followed by spacebar confirmation
-                                        if let Some(res) = crate::model::try_parse_and_apply_note_shortcut(text, note_tags) {
-                                            note_shortcut_to_link = Some((block_id.clone(), res.note_index, res.word));
+                                        match crate::model::try_parse_and_apply_note_shortcut(text, note_tags, &existing_note_indices_snapshot) {
+                                            Ok(Some(res)) => {
+                                                note_shortcut_to_link = Some((block_id.clone(), res.note_index, res.word));
+                                            }
+                                            Ok(None) => {}
+                                            Err(err_msg) => {
+                                                action = Some(EditorAction::ShowNotification(err_msg));
+                                            }
                                         }
 
                                         // Two-way sync: if a note tag's superscript was deleted from text, delete the note
@@ -388,7 +396,7 @@ pub fn render_editor_page(
                                                     .desired_rows(3)
                                                     .hint_text(
                                                         RichText::new(
-                                                            "Enter quoted passage (required for prose >4 lines)... (type example^1 + space for note, /cite for citation)",
+                                                            "Enter quoted passage (required for prose >4 lines)...",
                                                         )
                                                         .italics()
                                                         .color(muted_col),
@@ -396,8 +404,14 @@ pub fn render_editor_page(
                                             );
                                             if q_resp.changed() {
                                                 blocks_changed = true;
-                                                if let Some(res) = crate::model::try_parse_and_apply_note_shortcut(text, note_tags) {
-                                                    note_shortcut_to_link = Some((block_id.clone(), res.note_index, res.word));
+                                                match crate::model::try_parse_and_apply_note_shortcut(text, note_tags, &existing_note_indices_snapshot) {
+                                                    Ok(Some(res)) => {
+                                                        note_shortcut_to_link = Some((block_id.clone(), res.note_index, res.word));
+                                                    }
+                                                    Ok(None) => {}
+                                                    Err(err_msg) => {
+                                                        action = Some(EditorAction::ShowNotification(err_msg));
+                                                    }
                                                 }
                                                 let missing_note_indices: Vec<usize> = note_tags
                                                     .iter()
@@ -612,7 +626,11 @@ pub fn render_editor_page(
                         }
 
                         if let Some((b_id, n_idx, word)) = note_shortcut_to_link {
-                            doc.link_note_from_shortcut(&b_id, n_idx, &word);
+                            if !doc.link_note_from_shortcut(&b_id, n_idx, &word) {
+                                action = Some(EditorAction::ShowNotification(
+                                    format!("MLA 9: Note {} is already assigned to a different word. Each note number must be unique.", n_idx)
+                                ));
+                            }
                             blocks_changed = true;
                         }
 
@@ -874,32 +892,30 @@ fn render_keybind_preview_panel(
             ui.add_space(2.0);
             ui.separator();
 
-            // Group 1: Writing & MLA
+            // Group 1: Writing
             ui.label(
-                RichText::new("WRITING & MLA")
+                RichText::new("WRITING")
                     .size(9.5)
                     .strong()
                     .color(muted_col),
             );
 
             let actions_writing = [
+                (Action::ManageWorksCited, icons::BOOK_CITATIONS, "Works Cited"),
                 (Action::InsertCitation, icons::QUOTE, "Citation"),
+                (Action::AddFootnote, icons::INFO, "Notes"),
                 (Action::InsertBlockQuote, icons::QUOTE, "Block Quote"),
-                (
-                    Action::ConvertToMlaTitleCase,
-                    icons::TITLE_CASE,
-                    "Title Case",
-                ),
                 (Action::InsertHeading1, icons::HEADING, "Heading 1"),
                 (Action::InsertHeading2, icons::HEADING, "Heading 2"),
                 (Action::InsertHeading3, icons::HEADING, "Heading 3"),
-                (Action::DeleteBlock, icons::TRASH, "Delete Block"),
-                (Action::MoveBlockUp, icons::ARROW_UP, "Move Up"),
-                (Action::MoveBlockDown, icons::ARROW_DOWN, "Move Down"),
             ];
 
             for (act, icon, label) in actions_writing {
-                let sc = keybinds.get_shortcut(act).display_string();
+                let sc = if let Some(hint) = act.in_text_hint() {
+                    hint.to_string()
+                } else {
+                    keybinds.get_shortcut(act).display_string()
+                };
                 if render_keybind_row(ui, theme, icon, label, &sc) {
                     triggered = Some(act);
                 }
@@ -908,9 +924,41 @@ fn render_keybind_preview_panel(
             ui.add_space(3.0);
             ui.separator();
 
-            // Group 2: File & Sources
+            // Group 2: Modify
             ui.label(
-                RichText::new("FILE & SOURCES")
+                RichText::new("MODIFY")
+                    .size(9.5)
+                    .strong()
+                    .color(muted_col),
+            );
+
+            let actions_modify = [
+                (Action::MoveBlockUp, icons::ARROW_UP, "Move Up"),
+                (Action::MoveBlockDown, icons::ARROW_DOWN, "Move Down"),
+                (Action::MoveSentenceLeft, icons::ARROW_LEFT, "Sentence Left"),
+                (Action::MoveSentenceRight, icons::ARROW_RIGHT, "Sentence Right"),
+                (Action::DeleteBlock, icons::TRASH, "Delete Paragraph"),
+                (Action::Undo, icons::UNDO, "Undo"),
+                (Action::Redo, icons::REDO, "Redo"),
+            ];
+
+            for (act, icon, label) in actions_modify {
+                let sc = if let Some(hint) = act.in_text_hint() {
+                    hint.to_string()
+                } else {
+                    keybinds.get_shortcut(act).display_string()
+                };
+                if render_keybind_row(ui, theme, icon, label, &sc) {
+                    triggered = Some(act);
+                }
+            }
+
+            ui.add_space(3.0);
+            ui.separator();
+
+            // Group 3: File
+            ui.label(
+                RichText::new("FILE")
                     .size(9.5)
                     .strong()
                     .color(muted_col),
@@ -918,22 +966,16 @@ fn render_keybind_preview_panel(
 
             let actions_file = [
                 (Action::SaveDocument, icons::SAVE, "Save"),
-                (
-                    Action::ManageWorksCited,
-                    icons::BOOK_CITATIONS,
-                    "Works Cited",
-                ),
-                (
-                    Action::AddFootnote,
-                    icons::INFO,
-                    "Notes",
-                ),
                 (Action::NewDocument, icons::FILE_NEW, "New Paper"),
                 (Action::OpenDocument, icons::FOLDER_OPEN, "Open Paper"),
             ];
 
             for (act, icon, label) in actions_file {
-                let sc = keybinds.get_shortcut(act).display_string();
+                let sc = if let Some(hint) = act.in_text_hint() {
+                    hint.to_string()
+                } else {
+                    keybinds.get_shortcut(act).display_string()
+                };
                 if render_keybind_row(ui, theme, icon, label, &sc) {
                     triggered = Some(act);
                 }
@@ -942,9 +984,9 @@ fn render_keybind_preview_panel(
             ui.add_space(3.0);
             ui.separator();
 
-            // Group 3: View & Tools
+            // Group 4: Tools
             ui.label(
-                RichText::new("VIEW & TOOLS")
+                RichText::new("TOOLS")
                     .size(9.5)
                     .strong()
                     .color(muted_col),
@@ -952,12 +994,17 @@ fn render_keybind_preview_panel(
 
             let actions_tools = [
                 (Action::ToggleFocusMode, icons::FOCUS_MODE, "Zen Mode"),
-                (Action::ToggleComplianceCheck, icons::CHECK, "MLA Linter"),
                 (Action::OpenPreferences, icons::SETTINGS, "Preferences"),
+                (Action::ToggleComplianceCheck, icons::CHECK, "MLA Linter"),
+                (Action::ConvertToMlaTitleCase, icons::TITLE_CASE, "Title Case Title"),
             ];
 
             for (act, icon, label) in actions_tools {
-                let sc = keybinds.get_shortcut(act).display_string();
+                let sc = if let Some(hint) = act.in_text_hint() {
+                    hint.to_string()
+                } else {
+                    keybinds.get_shortcut(act).display_string()
+                };
                 if render_keybind_row(ui, theme, icon, label, &sc) {
                     triggered = Some(act);
                 }

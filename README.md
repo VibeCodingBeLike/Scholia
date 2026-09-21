@@ -74,9 +74,19 @@ It provides a rich, fluent text editing canvas, but **it is fundamentally imposs
   - Real-time document linter (`Ctrl+L`) with a live compliance score (0–100%) and 1-click auto-fix buttons for non-compliant dates, titles, and headers.
 - **Works Cited Manager**:
   - Interactive builder (`Ctrl+W`) implementing MLA 9's *Nine Core Elements* container model with automatic alphabetical sorting and true hanging indents.
-- **In-Text Citation Assistant & Slash Commands**:
-  - Instant citation insertion modal (`Ctrl+Shift+C`) or type `/cite` anywhere in prose to open the citation helper.
-- **Smart Block Navigation & Splitting**:
+- **In-Text Citation Assistant & In-Text Actions**:
+  - Type `/cite` anywhere in prose to instantly open the parenthetical citation helper. In-text actions avoid keybind conflicts and are prominently displayed in the shortcuts panel.
+  - Explanatory notes trigger via `word^N` followed by spacebar (e.g. `example^1 `).
+- **Full Undo / Redo History Engine**:
+  - Full document history supporting `Ctrl+Z` (Undo) and `Ctrl+Y` / `Ctrl+Shift+Z` / `Ctrl+Shift+Y` (Redo).
+  - **Intelligent Word Grouping**: Keystrokes are batched by word instead of letter-by-letter. Pressing Undo rolls back an entire word at once. History states commit at word boundaries (spaces, punctuation, brackets) or natural pauses (> 1.0s).
+  - **Configurable Action Capacity**: Default limit of 512 actions, user-configurable from 16 to 8,192 actions via Preferences and persisted across app launches.
+  - Discrete document actions (sentence swaps, paragraph moves, block creation/deletion, notes, title conversions) are seamlessly recorded in history with cursor position restoration.
+- **Unsaved Changes Protection**:
+  - Intercepts all close mechanisms (OS window close, Alt+F4, Ctrl+Q, toolbar close button) and prompts with an unsaved changes confirmation dialog (`Save`, `Don't Save`, `Cancel`).
+- **Smart Sentence Reordering & Block Navigation**:
+  - `Ctrl+Alt+Left` and `Ctrl+Alt+Right` reorder and swap sentences within the active paragraph, intelligently handling terminal punctuation, abbreviations, quotes, and superscript notes while tracking cursor position.
+  - `Ctrl+Alt+Up` and `Ctrl+Alt+Down` reorder active blocks/paragraphs.
   - Single `Enter` key automatically splits the current paragraph into a new block at cursor position.
   - `Up` and `Down` arrow keys navigate seamlessly across adjacent blocks when cursor reaches top/bottom boundaries.
   - Block quote detection: automatically prompts to convert prose passages exceeding 4 lines or 250 characters into MLA block quotes.
@@ -86,7 +96,8 @@ It provides a rich, fluent text editing canvas, but **it is fundamentally imposs
   - Settings dialog (`Ctrl+,`) displays application version (`v0.1.0`).
   - Option to toggle Windows navigation controls (minimize, maximize, close) in top right.
   - Option to toggle the shortcuts helper panel on the editor canvas.
-  - Full keybinding remap manager.
+  - Undo/redo action limit slider (16 to 8,192 actions).
+  - Full keybinding remap manager with in-text action indicators.
 
 ---
 
@@ -124,8 +135,9 @@ MLA 9 differentiates between short in-text parenthetical citations and content/e
 1. **Interactive In-Text Trigger**:
    - Type a word followed by `^<number>` and press **Space** (e.g. `example^1 ` or `example^10 `).
    - Spacebar confirms the note: typing does not trigger prematurely (allowing double or multi-digit note numbers like `10` or `13`), the typed word is preserved, and the superscript character (e.g. `¹`, `¹⁰`) is displayed directly in the editor text.
-   - A structured `note_tags` JSON tag is registered in the paragraph block linked to that note number in `.mladoc`.
+   - A structured `note_tags` JSON tag is registered in the paragraph block linked to that note number in `.mla`.
    - Two-way sync: deleting the note from the Notes page deletes the superscript character from the text, and deleting the superscript from the text removes the note definition.
+   - **MLA 9 Unique Number Enforcement**: Attempting to reuse an existing note number (e.g. `word^1` when note 1 already exists) is rejected with a toast notification explaining the rule. The `^N` shorthand is automatically removed from text so the editor stays clean. Each note must be numbered consecutively and uniquely — MLA 9 forbids reuse or repetition.
 2. **In the GUI Editor**:
    - Notes display as a clean, separate page sheet immediately preceding the Works Cited page (separated by natural page spacing without artificial "Page Break:" labels).
    - If no notes exist, the Notes page is **completely absent** from the canvas.
@@ -160,7 +172,7 @@ graph LR
         DOCX[docx-rs Exporter]
         HTML[HTML Exporter]
         TXT[Plain Text Exporter]
-        JSON[Native .mladoc Storage]
+        JSON[Native .mla Storage]
     end
 
     UI --> Core
@@ -181,22 +193,26 @@ Every action in Scholia is bound to an ergonomic shortcut and can be customized 
 | Action | Default Shortcut | Description |
 |---|---|---|
 | **New Document** | `Ctrl+N` | Start a clean MLA document |
-| **Open Document** | `Ctrl+O` | Load an existing `.mladoc` project |
+| **Open Document** | `Ctrl+O` | Load an existing `.mla` project |
 | **Save Document** | `Ctrl+S` | Save current document to disk |
 | **Export DOCX** | `Ctrl+E` | Export to Microsoft Word (`.docx`) |
 | **Export PDF** | Toolbar Button | Export directly to native PDF via `printpdf` |
 | **Works Cited Manager** | `Ctrl+W` | Open Works Cited database & builder |
-| **Add Note / Definition** | `Ctrl+Shift+W` | Insert explanatory note marker & open Notes page (also `Ctrl+Shift+N`) |
+| **Add Note / Definition** | `^N` + Space (In-Text) | Insert explanatory note marker (e.g. `word^1 `) |
 | **MLA Compliance Linter** | `Ctrl+L` | Open MLA 9 Compliance Inspector |
-| **Delete Active Block** | `Ctrl+Backspace` | Delete active paragraph or block |
+| **Delete Paragraph** | `Ctrl+Backspace` | Delete active paragraph or block |
 | **Insert Block Quote** | `Ctrl+Shift+B` | Insert MLA block quotation (0.5 in indent) |
 | **Insert Heading 1** | `Ctrl+Alt+1` | Insert Section Heading (Bold, flush left) |
 | **Insert Heading 2** | `Ctrl+Alt+2` | Insert Section Heading (Italics, flush left) |
 | **Insert Heading 3** | `Ctrl+Alt+3` | Insert Section Heading (Bold, centered) |
-| **Insert Citation** | `Ctrl+Shift+C` | Insert in-text parenthetical citation (or type `/cite`) |
-| **Move Block Up** | `Alt+Up` | Reorder active block up |
-| **Move Block Down** | `Alt+Down` | Reorder active block down |
+| **Insert Citation** | `/cite` (In-Text) | Insert in-text parenthetical citation modal |
+| **Move Block Up** | `Ctrl+Alt+Up` | Reorder active block up |
+| **Move Block Down** | `Ctrl+Alt+Down` | Reorder active block down |
+| **Move Sentence Left** | `Ctrl+Alt+Left` | Reorder / swap active sentence with previous sentence |
+| **Move Sentence Right** | `Ctrl+Alt+Right` | Reorder / swap active sentence with next sentence |
 | **Format Title Case** | `Ctrl+Shift+T` | Convert title to strict MLA Title Case |
+| **Undo** | `Ctrl+Z` | Undo last word or discrete action |
+| **Redo** | `Ctrl+Y` / `Ctrl+Shift+Z` | Redo undone action or word |
 | **Preferences / Settings** | `Ctrl+,` | Open theme, transparency, and keymap settings |
 | **Zen / Focus Mode** | `F11` | Toggle distraction-free fullscreen writing |
 | **Block Split** | `Enter` | Split current paragraph into two blocks at cursor |
@@ -209,12 +225,21 @@ Every action in Scholia is bound to an ergonomic shortcut and can be customized 
 Scholia features a dual-layer transparency model:
 1. **Window Background Vibrancy**: Utilizes native OS blur APIs (Windows 11 Mica / Acrylic, macOS `NSVisualEffectView`).
 2. **Transparent Writing Page**: Features a **Page Sheet Opacity slider (5% to 100%)** allowing your desktop wallpaper to softly shine through your manuscript canvas.
-3. **Four Built-in Presets**:
+3. **90% Opaque Modal Windows**: Dialog windows (Preferences, Unsaved Changes, Citations, Works Cited, MLA Compliance, Date Picker) feature a 90% opaque / 10% transparent background (`alpha = 230`), ensuring high contrast and legibility while keeping the main workspace and page completely transparent.
+4. **Seven Curated Theme Presets**:
    - **Frosted Obsidian**: Dark obsidian glass with frost-cyan accents.
    - **Frosted Parchment**: Translucent light paper with deep sapphire accents.
    - **Nordic Frost**: Arctic midnight translucent glass.
    - **Amber Glass**: Warm retro terminal glass.
+   - **Rosé Pine**: All-natural pine, subtle dark lavender, and warm rose accents.
+   - **Rosé Pine Moon**: Deep violet dark variation with muted pastel highlights.
+   - **Rosé Pine Dawn**: Warm parchment pastel daylight variant with delicate rose accents.
    - **Custom**: Granular RGB pickers for window tint, page sheet tint, text, accent, and borders.
+5. **Themes Folder & Sharing (`themes/`)**:
+   - Save your custom color themes as portable `.json` files.
+   - Import community themes with one click.
+   - Open the dedicated `themes/` folder in OS File Explorer (`explorer`, `open`, or `xdg-open`) to easily share themes with colleagues.
+   - Pre-bundled with sample community themes (**Catppuccin Mocha** and **Tokyo Night**).
 
 ---
 
@@ -268,7 +293,7 @@ The project includes an automated test suite verifying MLA capitalization, date 
 cargo test
 ```
 
-All 17 test suites pass cleanly out of the box:
+All 30 test suites pass cleanly out of the box:
 - `test_mla_title_case_capitalization`
 - `test_mla_current_date_format`
 - `test_mla_compliance_linter`
@@ -276,9 +301,12 @@ All 17 test suites pass cleanly out of the box:
 - `test_document_exporters`
 - `test_notes_exported_in_footer_not_separate_page`
 - `test_explanatory_notes_and_superscript_engine`
+- `test_word_superscript_note_shortcut_and_json_tag`
 - `test_block_toggle_conversion`
 - `test_document_block_operations_and_sync`
 - `test_block_deletion_focus_and_keybinds`
+- `test_sentence_splitting_and_reordering`
+- `test_document_sentence_reordering_and_keybinds`
 - `test_word_count_and_pdf_page_count`
 - `test_editor_page_centering`
 - `test_interface_options_and_removed_shortcuts`
@@ -286,6 +314,16 @@ All 17 test suites pass cleanly out of the box:
 - `test_typographical_cleaning`
 - `test_font_configuration_and_nerd_icons`
 - `test_semantic_versioning`
+- `test_transparent_button_visuals`
+- `test_word_grouping_undo_and_redo`
+- `test_multi_word_boundary_grouping`
+- `test_discrete_actions_undo_and_redo`
+- `test_undo_redo_shortcuts_and_keybinds`
+- `test_history_limits_and_configuration`
+- `test_unsaved_changes_dialog_behavior`
+- `test_modal_fill_color_ninety_percent_opacity`
+- `test_rose_pine_theme_presets`
+- `test_theme_folder_save_and_load_roundtrip`
 
 ---
 

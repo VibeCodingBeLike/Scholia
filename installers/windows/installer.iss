@@ -30,16 +30,16 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "associate"; Description: "Associate .mladoc files with Scholia"; GroupDescription: "File Associations:"
+Name: "associate"; Description: "Associate .mla files with Scholia"; GroupDescription: "File Associations:"
 
 [Files]
 Source: "..\..\target\release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\..\sample_mla_paper.mladoc"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\sample_mla_paper.mla"; DestDir: "{app}"; Flags: ignoreversion
 
 [Registry]
-; Register .mladoc file extension
-Root: HKA; Subkey: "Software\Classes\.mladoc"; ValueType: string; ValueName: ""; ValueData: "Scholia.Document"; Flags: uninsdeletevalue; Tasks: associate
+; Register .mla file extension
+Root: HKA; Subkey: "Software\Classes\.mla"; ValueType: string; ValueName: ""; ValueData: "Scholia.Document"; Flags: uninsdeletevalue; Tasks: associate
 Root: HKA; Subkey: "Software\Classes\Scholia.Document"; ValueType: string; ValueName: ""; ValueData: "MLA 9th Edition Document"; Flags: uninsdeletekey; Tasks: associate
 Root: HKA; Subkey: "Software\Classes\Scholia.Document\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: associate
 Root: HKA; Subkey: "Software\Classes\Scholia.Document\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: associate

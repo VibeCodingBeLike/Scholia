@@ -25,17 +25,73 @@ pub enum ThemePreset {
     FrostedLight,
     NordicFrost,
     AmberTerminal,
+    RosePine,
+    RosePineMoon,
+    RosePineDawn,
     Custom,
 }
 
 impl ThemePreset {
+    pub fn all_presets() -> &'static [ThemePreset] {
+        &[
+            ThemePreset::FrostedDark,
+            ThemePreset::FrostedLight,
+            ThemePreset::NordicFrost,
+            ThemePreset::AmberTerminal,
+            ThemePreset::RosePine,
+            ThemePreset::RosePineMoon,
+            ThemePreset::RosePineDawn,
+        ]
+    }
+
     pub fn display_name(&self) -> &'static str {
         match self {
-            ThemePreset::FrostedDark => "Frosted Obsidian (Dark Glass)",
-            ThemePreset::FrostedLight => "Frosted Parchment (Light Glass)",
-            ThemePreset::NordicFrost => "Nordic Frost (Deep Blue Glass)",
+            ThemePreset::FrostedDark => "Frosted Obsidian (Dark)",
+            ThemePreset::FrostedLight => "Frosted Parchment (Light)",
+            ThemePreset::NordicFrost => "Nordic Frost (Deep Blue)",
             ThemePreset::AmberTerminal => "Amber Glass (Warm Retro)",
-            ThemePreset::Custom => "Custom",
+            ThemePreset::RosePine => "Rosé Pine (Dark Rose)",
+            ThemePreset::RosePineMoon => "Rosé Pine Moon (Deep Violet)",
+            ThemePreset::RosePineDawn => "Rosé Pine Dawn (Warm Pastel)",
+            ThemePreset::Custom => "Custom Theme",
+        }
+    }
+
+    pub fn icon(&self) -> &'static str {
+        match self {
+            ThemePreset::FrostedDark => "🌙",
+            ThemePreset::FrostedLight => "☀️",
+            ThemePreset::NordicFrost => "❄️",
+            ThemePreset::AmberTerminal => "🕯️",
+            ThemePreset::RosePine => "🌹",
+            ThemePreset::RosePineMoon => "🌑",
+            ThemePreset::RosePineDawn => "🌅",
+            ThemePreset::Custom => "🎨",
+        }
+    }
+
+    pub fn is_dark(&self) -> bool {
+        match self {
+            ThemePreset::FrostedDark
+            | ThemePreset::NordicFrost
+            | ThemePreset::AmberTerminal
+            | ThemePreset::RosePine
+            | ThemePreset::RosePineMoon => true,
+            ThemePreset::FrostedLight | ThemePreset::RosePineDawn => false,
+            ThemePreset::Custom => true,
+        }
+    }
+
+    pub fn preview_palette(&self) -> ([u8; 3], [u8; 3], [u8; 3], [u8; 3]) {
+        match self {
+            ThemePreset::FrostedDark => ([18, 20, 26], [28, 32, 42], [240, 243, 248], [70, 145, 235]),
+            ThemePreset::FrostedLight => ([235, 240, 245], [255, 255, 255], [20, 25, 30], [30, 110, 210]),
+            ThemePreset::NordicFrost => ([15, 23, 34], [24, 34, 48], [236, 242, 248], [136, 192, 208]),
+            ThemePreset::AmberTerminal => ([22, 18, 14], [35, 28, 22], [255, 205, 120], [240, 150, 40]),
+            ThemePreset::RosePine => ([25, 23, 36], [31, 29, 46], [224, 222, 244], [235, 188, 186]),
+            ThemePreset::RosePineMoon => ([35, 33, 54], [42, 39, 63], [224, 222, 244], [234, 154, 151]),
+            ThemePreset::RosePineDawn => ([250, 244, 237], [255, 250, 243], [87, 82, 121], [215, 130, 126]),
+            ThemePreset::Custom => ([20, 20, 25], [30, 30, 40], [240, 240, 245], [150, 150, 200]),
         }
     }
 }
@@ -43,6 +99,8 @@ impl ThemePreset {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThemeConfig {
     pub preset: ThemePreset,
+    #[serde(default)]
+    pub custom_name: Option<String>,
     pub blur_mode: BlurMode,
 
     /// Opacity of the background application window (0.05 to 1.0)
@@ -118,6 +176,7 @@ impl ThemeConfig {
     pub fn preset_frosted_dark() -> Self {
         Self {
             preset: ThemePreset::FrostedDark,
+            custom_name: None,
             blur_mode: BlurMode::Acrylic,
             window_opacity: 0.65,
             page_opacity: 0.40, // Elegant translucent frosted writing sheet!
@@ -137,6 +196,7 @@ impl ThemeConfig {
     pub fn preset_frosted_light() -> Self {
         Self {
             preset: ThemePreset::FrostedLight,
+            custom_name: None,
             blur_mode: BlurMode::Acrylic,
             window_opacity: 0.75,
             page_opacity: 0.55,
@@ -156,6 +216,7 @@ impl ThemeConfig {
     pub fn preset_nordic_frost() -> Self {
         Self {
             preset: ThemePreset::NordicFrost,
+            custom_name: None,
             blur_mode: BlurMode::Mica,
             window_opacity: 0.60,
             page_opacity: 0.38,
@@ -175,6 +236,7 @@ impl ThemeConfig {
     pub fn preset_amber_terminal() -> Self {
         Self {
             preset: ThemePreset::AmberTerminal,
+            custom_name: None,
             blur_mode: BlurMode::Acrylic,
             window_opacity: 0.70,
             page_opacity: 0.45,
@@ -191,6 +253,66 @@ impl ThemeConfig {
         }
     }
 
+    pub fn preset_rose_pine() -> Self {
+        Self {
+            preset: ThemePreset::RosePine,
+            custom_name: None,
+            blur_mode: BlurMode::Acrylic,
+            window_opacity: 0.65,
+            page_opacity: 0.40,
+            window_tint_rgb: [25, 23, 36],     // Base
+            page_tint_rgb: [31, 29, 46],       // Surface
+            text_rgb: [224, 222, 244],         // Text
+            muted_text_rgb: [144, 140, 170],   // Muted
+            accent_rgb: [235, 188, 186],       // Rose
+            page_border_rgb: [64, 61, 82],     // Highlight Med
+            page_border_alpha: 0.40,
+            font_choice: MlaFontChoice::TimesNewRoman,
+            show_window_controls: true,
+            show_shortcuts_panel: true,
+        }
+    }
+
+    pub fn preset_rose_pine_moon() -> Self {
+        Self {
+            preset: ThemePreset::RosePineMoon,
+            custom_name: None,
+            blur_mode: BlurMode::Acrylic,
+            window_opacity: 0.65,
+            page_opacity: 0.40,
+            window_tint_rgb: [35, 33, 54],     // Base
+            page_tint_rgb: [42, 39, 63],       // Surface
+            text_rgb: [224, 222, 244],         // Text
+            muted_text_rgb: [144, 140, 170],   // Muted
+            accent_rgb: [234, 154, 151],       // Rose
+            page_border_rgb: [68, 65, 90],     // Highlight Med
+            page_border_alpha: 0.40,
+            font_choice: MlaFontChoice::TimesNewRoman,
+            show_window_controls: true,
+            show_shortcuts_panel: true,
+        }
+    }
+
+    pub fn preset_rose_pine_dawn() -> Self {
+        Self {
+            preset: ThemePreset::RosePineDawn,
+            custom_name: None,
+            blur_mode: BlurMode::Acrylic,
+            window_opacity: 0.75,
+            page_opacity: 0.55,
+            window_tint_rgb: [250, 244, 237],  // Base
+            page_tint_rgb: [255, 250, 243],    // Surface
+            text_rgb: [87, 82, 121],           // Text
+            muted_text_rgb: [152, 147, 165],   // Muted
+            accent_rgb: [215, 130, 126],       // Rose
+            page_border_rgb: [223, 218, 217],  // Highlight Med
+            page_border_alpha: 0.50,
+            font_choice: MlaFontChoice::TimesNewRoman,
+            show_window_controls: true,
+            show_shortcuts_panel: true,
+        }
+    }
+
     pub fn apply_preset(&mut self, preset: ThemePreset) {
         let font = self.font_choice;
         let win_ctrls = self.show_window_controls;
@@ -200,6 +322,9 @@ impl ThemeConfig {
             ThemePreset::FrostedLight => Self::preset_frosted_light(),
             ThemePreset::NordicFrost => Self::preset_nordic_frost(),
             ThemePreset::AmberTerminal => Self::preset_amber_terminal(),
+            ThemePreset::RosePine => Self::preset_rose_pine(),
+            ThemePreset::RosePineMoon => Self::preset_rose_pine_moon(),
+            ThemePreset::RosePineDawn => Self::preset_rose_pine_dawn(),
             ThemePreset::Custom => {
                 let mut c = self.clone();
                 c.preset = ThemePreset::Custom;
@@ -242,6 +367,27 @@ impl ThemeConfig {
             ((self.page_tint_rgb[2] as f32) * (a as f32 / 255.0)) as u8,
             a,
         )
+    }
+
+    /// Color for modal dialogs and popup windows (10% transparent, 90% opaque)
+    pub fn modal_fill_color(&self) -> egui::Color32 {
+        let a = 230u8; // 90% opaque (10% transparent)
+        egui::Color32::from_rgba_premultiplied(
+            ((self.page_tint_rgb[0] as f32) * (a as f32 / 255.0)) as u8,
+            ((self.page_tint_rgb[1] as f32) * (a as f32 / 255.0)) as u8,
+            ((self.page_tint_rgb[2] as f32) * (a as f32 / 255.0)) as u8,
+            a,
+        )
+    }
+
+    /// Modal dialog window frame with 90% opaque fill and subtle border
+    pub fn modal_frame(&self) -> egui::Frame {
+        let text_col = self.text_color();
+        egui::Frame::new()
+            .fill(self.modal_fill_color())
+            .stroke(egui::Stroke::new(1.0, text_col.gamma_multiply(0.25)))
+            .corner_radius(egui::CornerRadius::same(10))
+            .inner_margin(egui::Margin::same(16))
     }
 
     pub fn text_color(&self) -> egui::Color32 {
@@ -326,8 +472,12 @@ impl ThemeConfig {
 
     pub fn is_dark(&self) -> bool {
         match self.preset {
-            ThemePreset::FrostedDark | ThemePreset::NordicFrost | ThemePreset::AmberTerminal => true,
-            ThemePreset::FrostedLight => false,
+            ThemePreset::FrostedDark
+            | ThemePreset::NordicFrost
+            | ThemePreset::AmberTerminal
+            | ThemePreset::RosePine
+            | ThemePreset::RosePineMoon => true,
+            ThemePreset::FrostedLight | ThemePreset::RosePineDawn => false,
             ThemePreset::Custom => {
                 let [r, g, b] = self.window_tint_rgb;
                 let lum = 0.299 * (r as f32) + 0.587 * (g as f32) + 0.114 * (b as f32);
@@ -381,13 +531,165 @@ impl ThemeConfig {
         visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, self.muted_text_color());
         visuals.widgets.noninteractive.corner_radius = egui::CornerRadius::same(5);
 
-        // Window & dialog styling to match frosted glass
-        visuals.window_fill = self.card_fill_color();
+        // Window & dialog styling: 90% opaque modal fill for readable popups, transparent main background
+        visuals.window_fill = self.modal_fill_color();
         visuals.panel_fill = self.window_fill_color();
         visuals.extreme_bg_color = egui::Color32::TRANSPARENT;
         visuals.window_stroke = egui::Stroke::new(1.0, text_col.gamma_multiply(0.20));
 
         visuals
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Theme Folder Management (Save, Import, Share Themes)
+// ---------------------------------------------------------------------------
+
+pub fn themes_dir() -> std::path::PathBuf {
+    // Check if themes directory exists next to executable
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            let p = parent.join("themes");
+            if p.exists() {
+                return p;
+            }
+        }
+    }
+    // Default to ./themes in current working directory
+    std::path::PathBuf::from("themes")
+}
+
+pub fn ensure_sample_themes() {
+    let dir = themes_dir();
+    if !dir.exists() {
+        let _ = std::fs::create_dir_all(&dir);
+    }
+
+    // Catppuccin Mocha sample
+    let mocha_path = dir.join("Catppuccin Mocha.json");
+    if !mocha_path.exists() {
+        let mocha = ThemeConfig {
+            preset: ThemePreset::Custom,
+            custom_name: Some("Catppuccin Mocha".to_string()),
+            blur_mode: BlurMode::Acrylic,
+            window_opacity: 0.65,
+            page_opacity: 0.40,
+            window_tint_rgb: [30, 30, 46],      // Base
+            page_tint_rgb: [24, 24, 37],        // Mantle
+            text_rgb: [205, 214, 244],          // Text
+            muted_text_rgb: [147, 154, 183],    // Overlay0
+            accent_rgb: [203, 166, 247],        // Mauve
+            page_border_rgb: [69, 71, 90],      // Surface1
+            page_border_alpha: 0.40,
+            font_choice: MlaFontChoice::TimesNewRoman,
+            show_window_controls: true,
+            show_shortcuts_panel: true,
+        };
+        if let Ok(json) = serde_json::to_string_pretty(&mocha) {
+            let _ = std::fs::write(&mocha_path, json);
+        }
+    }
+
+    // Tokyo Night sample
+    let tokyo_path = dir.join("Tokyo Night.json");
+    if !tokyo_path.exists() {
+        let tokyo = ThemeConfig {
+            preset: ThemePreset::Custom,
+            custom_name: Some("Tokyo Night".to_string()),
+            blur_mode: BlurMode::Acrylic,
+            window_opacity: 0.65,
+            page_opacity: 0.40,
+            window_tint_rgb: [26, 27, 38],      // Dark background
+            page_tint_rgb: [22, 22, 30],        // Dark paper
+            text_rgb: [192, 202, 245],          // Text
+            muted_text_rgb: [122, 162, 247],    // Blue muted
+            accent_rgb: [187, 154, 247],        // Magenta accent
+            page_border_rgb: [65, 72, 104],     // Border
+            page_border_alpha: 0.40,
+            font_choice: MlaFontChoice::TimesNewRoman,
+            show_window_controls: true,
+            show_shortcuts_panel: true,
+        };
+        if let Ok(json) = serde_json::to_string_pretty(&tokyo) {
+            let _ = std::fs::write(&tokyo_path, json);
+        }
+    }
+}
+
+pub fn list_custom_themes() -> Vec<(String, std::path::PathBuf)> {
+    let dir = themes_dir();
+    let mut themes = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("json") {
+                let stem = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("Unnamed")
+                    .to_string();
+                themes.push((stem, path));
+            }
+        }
+    }
+    themes.sort_by(|a, b| a.0.cmp(&b.0));
+    themes
+}
+
+pub fn save_custom_theme(theme: &ThemeConfig, name: &str) -> Result<std::path::PathBuf, String> {
+    let dir = themes_dir();
+    if !dir.exists() {
+        std::fs::create_dir_all(&dir)
+            .map_err(|e| format!("Failed to create themes directory: {e}"))?;
+    }
+    let safe_name: String = name
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-' || *c == '_')
+        .collect();
+    let trimmed = safe_name.trim();
+    if trimmed.is_empty() {
+        return Err("Theme name cannot be empty".to_string());
+    }
+    let mut saved_theme = theme.clone();
+    saved_theme.preset = ThemePreset::Custom;
+    saved_theme.custom_name = Some(trimmed.to_string());
+    let json = serde_json::to_string_pretty(&saved_theme)
+        .map_err(|e| format!("Failed to serialize theme: {e}"))?;
+    let file_path = dir.join(format!("{}.json", trimmed));
+    std::fs::write(&file_path, json)
+        .map_err(|e| format!("Failed to write theme file: {e}"))?;
+    Ok(file_path)
+}
+
+pub fn load_theme_file(path: &std::path::Path) -> Result<ThemeConfig, String> {
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read theme file: {e}"))?;
+    let mut theme: ThemeConfig = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse theme JSON: {e}"))?;
+    if theme.custom_name.is_none() {
+        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+            theme.custom_name = Some(stem.to_string());
+        }
+    }
+    Ok(theme)
+}
+
+pub fn open_themes_folder() {
+    let dir = themes_dir();
+    if !dir.exists() {
+        let _ = std::fs::create_dir_all(&dir);
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("explorer").arg(&dir).spawn();
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").arg(&dir).spawn();
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let _ = std::process::Command::new("xdg-open").arg(&dir).spawn();
     }
 }
 

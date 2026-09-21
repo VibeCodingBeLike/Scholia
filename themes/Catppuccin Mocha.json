@@ -1,0 +1,41 @@
+{
+  "preset": "Custom",
+  "custom_name": "Catppuccin Mocha",
+  "blur_mode": "Acrylic",
+  "window_opacity": 0.65,
+  "page_opacity": 0.4,
+  "window_tint_rgb": [
+    30,
+    30,
+    46
+  ],
+  "page_tint_rgb": [
+    24,
+    24,
+    37
+  ],
+  "text_rgb": [
+    205,
+    214,
+    244
+  ],
+  "muted_text_rgb": [
+    147,
+    154,
+    183
+  ],
+  "accent_rgb": [
+    203,
+    166,
+    247
+  ],
+  "page_border_rgb": [
+    69,
+    71,
+    90
+  ],
+  "page_border_alpha": 0.4,
+  "font_choice": "TimesNewRoman",
+  "show_window_controls": true,
+  "show_shortcuts_panel": true
+}

@@ -38,6 +38,7 @@ pub fn render_citation_modal(
     Window::new("Insert MLA In-Text Citation")
         .open(&mut open)
         .resizable(false)
+        .frame(theme.modal_frame())
         .default_width(450.0)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .show(ctx, |ui| {

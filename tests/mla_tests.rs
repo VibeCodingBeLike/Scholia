@@ -21,7 +21,6 @@ fn test_mla_title_case_capitalization() {
     );
 }
 
-
 #[test]
 fn test_mla_current_date_format() {
     let d = format_current_mla_date();
@@ -288,8 +287,8 @@ fn test_block_deletion_focus_and_keybinds() {
     // Verify keybinds are registered
     let cfg = KeybindConfig::default();
     assert_eq!(cfg.get_shortcut(Action::DeleteBlock).display_string(), "Ctrl+Backspace");
-    assert_eq!(cfg.get_shortcut(Action::MoveBlockUp).display_string(), "Alt+Up");
-    assert_eq!(cfg.get_shortcut(Action::MoveBlockDown).display_string(), "Alt+Down");
+    assert_eq!(cfg.get_shortcut(Action::MoveBlockUp).display_string(), "Ctrl+Alt+Up");
+    assert_eq!(cfg.get_shortcut(Action::MoveBlockDown).display_string(), "Ctrl+Alt+Down");
     assert_eq!(cfg.get_shortcut(Action::InsertHeading3).display_string(), "Ctrl+Alt+3");
 }
 
@@ -302,16 +301,33 @@ fn test_interface_options_and_removed_shortcuts() {
     assert!(theme.show_window_controls);
     assert!(theme.show_shortcuts_panel);
 
-    // Verify shortcuts for AddParagraph and Exports are disabled in check_action
+    // Verify shortcuts for AddParagraph, Exports, and in-text actions are disabled in check_action
     let cfg = KeybindConfig::default();
     let input = egui::InputState::default();
     assert!(!cfg.check_action(Action::AddParagraph, &input));
     assert!(!cfg.check_action(Action::ExportDocx, &input));
     assert!(!cfg.check_action(Action::ExportHtmlPdf, &input));
 
-    // Verify Works Cited shortcut is Ctrl+W and Notes is Ctrl+Shift+W (similar to Works Cited)
+    // Anything that has an in-text action (^N, /cite) shouldn't have a keybind
+    assert!(!cfg.check_action(Action::InsertCitation, &input));
+    assert!(!cfg.check_action(Action::AddFootnote, &input));
+    assert_eq!(cfg.get_shortcut(Action::InsertCitation).display_string(), "None");
+    assert_eq!(cfg.get_shortcut(Action::AddFootnote).display_string(), "None");
+    assert!(Action::InsertCitation.is_in_text_action());
+    assert!(Action::AddFootnote.is_in_text_action());
+    assert_eq!(Action::InsertCitation.in_text_hint(), Some("/cite"));
+    assert_eq!(Action::AddFootnote.in_text_hint(), Some("^N"));
+
+    // Verify Works Cited shortcut is Ctrl+W
     assert_eq!(cfg.get_shortcut(Action::ManageWorksCited).display_string(), "Ctrl+W");
-    assert_eq!(cfg.get_shortcut(Action::AddFootnote).display_string(), "Ctrl+Shift+W");
+
+    // Verify categories and renamed actions
+    assert_eq!(Action::DeleteBlock.display_name(), "Delete Paragraph");
+    assert_eq!(Action::SaveDocument.display_name(), "Save Document (.mla)");
+    assert_eq!(Action::ManageWorksCited.category(), "Writing");
+    assert_eq!(Action::DeleteBlock.category(), "Modify");
+    assert_eq!(Action::SaveDocument.category(), "File");
+    assert_eq!(Action::ConvertToMlaTitleCase.category(), "Tools");
 }
 
 #[test]
@@ -409,19 +425,23 @@ fn test_word_superscript_note_shortcut_and_json_tag() {
     // 0. Verify that notes wait for spacebar: typing without spacebar does NOT trigger note
     let mut no_space_single = "The example^1".to_string();
     let mut tags_temp: Vec<NoteTag> = Vec::new();
-    assert!(try_parse_and_apply_note_shortcut(&mut no_space_single, &mut tags_temp).is_none(),
-        "Must wait for spacebar: example^1 without space must not trigger");
+    assert!(
+        try_parse_and_apply_note_shortcut(&mut no_space_single, &mut tags_temp, &[]).unwrap().is_none(),
+        "Must wait for spacebar: example^1 without space must not trigger"
+    );
 
     let mut no_space_multi = "The example^10".to_string();
-    assert!(try_parse_and_apply_note_shortcut(&mut no_space_multi, &mut tags_temp).is_none(),
-        "Must wait for spacebar: example^10 without space must not trigger");
+    assert!(
+        try_parse_and_apply_note_shortcut(&mut no_space_multi, &mut tags_temp, &[]).unwrap().is_none(),
+        "Must wait for spacebar: example^10 without space must not trigger"
+    );
 
     // 1. User types in a paragraph: "The example^1 " and "another^13 " (followed by spacebar confirmation)
     let mut input_text = "The example^1 and another^13 quest continued.".to_string();
     let mut tags: Vec<NoteTag> = Vec::new();
 
     // First shortcut: example^1 confirmed with spacebar
-    let result1 = try_parse_and_apply_note_shortcut(&mut input_text, &mut tags);
+    let result1 = try_parse_and_apply_note_shortcut(&mut input_text, &mut tags, &[]).unwrap();
     assert!(result1.is_some(), "Shortcut example^1 should be recognized upon typing space");
     let res1 = result1.unwrap();
     assert_eq!(res1.note_index, 1);
@@ -429,14 +449,22 @@ fn test_word_superscript_note_shortcut_and_json_tag() {
     // Displays superscript character in the editor text!
     assert_eq!(input_text, "The example¹ and another^13 quest continued.");
 
-    // Second shortcut: another^13 confirmed with spacebar
-    let result2 = try_parse_and_apply_note_shortcut(&mut input_text, &mut tags);
+    // Second shortcut: another^13 confirmed with spacebar (note 1 is already in-use so we pass [1])
+    let result2 = try_parse_and_apply_note_shortcut(&mut input_text, &mut tags, &[1]).unwrap();
     assert!(result2.is_some(), "Shortcut another^13 should be recognized upon typing space");
     let res2 = result2.unwrap();
     assert_eq!(res2.note_index, 13);
     assert_eq!(res2.word, "another");
     // Displays superscript character in the editor text!
     assert_eq!(input_text, "The example¹ and another¹³ quest continued.");
+
+    // 1a. Verify that reusing an existing note number returns Err and cancels the note
+    let mut reuse_text = "test^1 ".to_string();
+    let mut reuse_tags: Vec<NoteTag> = Vec::new();
+    let reuse_result = try_parse_and_apply_note_shortcut(&mut reuse_text, &mut reuse_tags, &[1]);
+    assert!(reuse_result.is_err(), "MLA 9: reusing note 1 that is already in use must return Err");
+    // The caret notation should be stripped/cancelled from text
+    assert!(!reuse_text.contains("^"), "Cancelled note shorthand must be removed from text");
 
     // 2. Adding notes does NOT delete the associated words
     assert!(input_text.contains("example"));
@@ -454,8 +482,8 @@ fn test_word_superscript_note_shortcut_and_json_tag() {
         *text = input_text.clone();
         *note_tags = tags.clone();
     }
-    doc.link_note_from_shortcut(&block_id, res1.note_index, &res1.word);
-    doc.link_note_from_shortcut(&block_id, res2.note_index, &res2.word);
+    assert!(doc.link_note_from_shortcut(&block_id, res1.note_index, &res1.word), "Linking new note must succeed");
+    assert!(doc.link_note_from_shortcut(&block_id, res2.note_index, &res2.word), "Linking new note must succeed");
 
     // Verify linked in document
     assert_eq!(doc.notes.len(), 2);
@@ -463,6 +491,12 @@ fn test_word_superscript_note_shortcut_and_json_tag() {
     assert_eq!(doc.notes[0].word, "example");
     assert_eq!(doc.notes[1].index, 2); // auto-reindexed to sequential 1, 2
     assert_eq!(doc.notes[1].word, "another");
+
+    // 4a. Verify that linking a note number to a DIFFERENT word fails (MLA 9)
+    assert!(
+        !doc.link_note_from_shortcut(&block_id, 1, "different_word"),
+        "MLA 9: link_note_from_shortcut must reject reuse of note 1 with a different word"
+    );
 
     // 5. Test JSON serialization and deserialization retains note_tags
     let json = serde_json::to_string(&doc).expect("Serialization to JSON must succeed");
@@ -579,3 +613,441 @@ fn test_transparent_button_visuals() {
     assert_eq!(light_visuals.widgets.inactive.bg_fill, egui::Color32::TRANSPARENT);
     assert_eq!(light_visuals.widgets.inactive.weak_bg_fill, egui::Color32::TRANSPARENT);
 }
+
+#[test]
+fn test_sentence_splitting_and_reordering() {
+    use scholia::model::{reorder_sentences, split_sentences};
+
+    // 1. Basic sentence splitting
+    let text1 = "First sentence. Second sentence? Third sentence!";
+    let (ws, spans) = split_sentences(text1);
+    assert_eq!(ws, "");
+    assert_eq!(spans.len(), 3);
+    assert_eq!(spans[0].text, "First sentence.");
+    assert_eq!(spans[0].trailing_sep, " ");
+    assert_eq!(spans[1].text, "Second sentence?");
+    assert_eq!(spans[1].trailing_sep, " ");
+    assert_eq!(spans[2].text, "Third sentence!");
+    assert_eq!(spans[2].trailing_sep, "");
+
+    // 2. Abbreviation and decimal handling
+    let text2 = "Dr. Smith cited p. 42 and 3.14 ratio in vol. 2. Next statement.";
+    let (_, spans2) = split_sentences(text2);
+    assert_eq!(spans2.len(), 2);
+    assert_eq!(spans2[0].text, "Dr. Smith cited p. 42 and 3.14 ratio in vol. 2.");
+    assert_eq!(spans2[1].text, "Next statement.");
+
+    // 3. Quotes, ellipses, and superscripts
+    let text3 = "He shouted, “Watch out!”¹ Then he fled... But wait.";
+    let (_, spans3) = split_sentences(text3);
+    assert_eq!(spans3.len(), 2);
+    assert_eq!(spans3[0].text, "He shouted, “Watch out!”¹");
+    assert_eq!(spans3[1].text, "Then he fled... But wait.");
+
+    // 4. Reorder sentences Alt+Left (swap S1 with S0)
+    // S0 = "A.", S1 = "B.", S2 = "C."
+    let p = "A. B. C.";
+    // Cursor at 'B' (index 3)
+    let (swapped_left, cursor_left) = reorder_sentences(p, 3, true).expect("Should swap left");
+    assert_eq!(swapped_left, "B. A. C.");
+    assert_eq!(cursor_left, 0, "Cursor should follow 'B' to index 0");
+
+    // Reorder sentences Alt+Right from index 0 ("B." swaps with "A.")
+    let (swapped_right, cursor_right) = reorder_sentences(&swapped_left, 0, false).expect("Should swap right");
+    assert_eq!(swapped_right, "A. B. C.");
+    assert_eq!(cursor_right, 3, "Cursor should follow 'B' back to index 3");
+
+    // Bounds checking
+    // Trying to move left on the first sentence must return None
+    assert!(reorder_sentences(p, 0, true).is_none());
+    // Trying to move right on the last sentence must return None
+    assert!(reorder_sentences(p, 6, false).is_none());
+    // Single sentence paragraph returns None
+    assert!(reorder_sentences("Single sentence without period", 5, true).is_none());
+    assert!(reorder_sentences("Single sentence without period", 5, false).is_none());
+}
+
+#[test]
+fn test_document_sentence_reordering_and_keybinds() {
+    use scholia::keybinds::{Action, KeyName, KeybindConfig};
+    use scholia::model::MlaDocument;
+
+    let config = KeybindConfig::default();
+    let left_sc = config.get_shortcut(Action::MoveSentenceLeft);
+    assert!(left_sc.alt, "MoveSentenceLeft must use Alt");
+    assert!(left_sc.ctrl, "MoveSentenceLeft must use Ctrl");
+    assert_eq!(left_sc.key, KeyName::Left, "MoveSentenceLeft key must be Left");
+
+    let right_sc = config.get_shortcut(Action::MoveSentenceRight);
+    assert!(right_sc.alt, "MoveSentenceRight must use Alt");
+    assert!(right_sc.ctrl, "MoveSentenceRight must use Ctrl");
+    assert_eq!(right_sc.key, KeyName::Right, "MoveSentenceRight key must be Right");
+
+    let mut doc = MlaDocument::new_blank();
+    doc.blocks[0] = scholia::model::MlaBlock::Paragraph {
+        id: "p1".to_string(),
+        text: "Sentence one. Sentence two. Sentence three.".to_string(),
+        note_tags: Vec::new(),
+    };
+    doc.active_block_idx = 0;
+
+    // Move second sentence left
+    // Cursor is in "Sentence two." at index 14
+    let res = doc.move_sentence_in_active_block(14, true);
+    assert!(res.is_ok());
+    assert_eq!(doc.blocks[0].text(), "Sentence two. Sentence one. Sentence three.");
+
+    // Move it right again
+    let new_cursor = res.unwrap();
+    let res_right = doc.move_sentence_in_active_block(new_cursor, false);
+    assert!(res_right.is_ok());
+    assert_eq!(doc.blocks[0].text(), "Sentence one. Sentence two. Sentence three.");
+}
+
+#[test]
+fn test_word_grouping_undo_and_redo() {
+    use scholia::history::HistoryManager;
+    use scholia::model::{MlaBlock, MlaDocument};
+
+    let mut doc = MlaDocument::new_blank();
+    let initial_text = doc.blocks[0].text().to_string();
+    let mut history = HistoryManager::new(&doc);
+
+    // Initial state: cannot undo or redo
+    assert!(!history.can_undo());
+    assert!(!history.can_redo());
+
+    // Type letters of a word one by one: 'H', 'e', 'l', 'l', 'o'
+    let letters = ['H', 'e', 'l', 'l', 'o'];
+    let mut current_text = initial_text.clone();
+    for &ch in &letters {
+        current_text.push(ch);
+        if let MlaBlock::Paragraph { text, .. } = &mut doc.blocks[0] {
+            *text = current_text.clone();
+        }
+        history.on_frame_end(&doc, current_text.len());
+        // Mid-word typing retains undoable typing_base without individual letter undo states
+        assert!(history.can_undo());
+        assert!(!history.can_redo());
+    }
+
+    assert_eq!(doc.blocks[0].text(), format!("{initial_text}Hello"));
+
+    // User triggers Undo (Ctrl+Z): whole word undone in a single step!
+    let restored = history.undo(&doc, current_text.len());
+    assert!(restored.is_some());
+    let snapshot = restored.unwrap();
+    doc = snapshot.doc;
+    assert_eq!(doc.blocks[0].text(), initial_text);
+
+    // Redo is now available
+    assert!(history.can_redo());
+
+    // User triggers Redo (Ctrl+Y): whole word restored in a single step!
+    let redone = history.redo(&doc, 0);
+    assert!(redone.is_some());
+    let redo_snapshot = redone.unwrap();
+    doc = redo_snapshot.doc;
+    assert_eq!(doc.blocks[0].text(), format!("{initial_text}Hello"));
+}
+
+#[test]
+fn test_multi_word_boundary_grouping() {
+    use scholia::history::HistoryManager;
+    use scholia::model::{MlaBlock, MlaDocument};
+
+    let mut doc = MlaDocument::new_blank();
+    if let MlaBlock::Paragraph { text, .. } = &mut doc.blocks[0] {
+        *text = "Start".to_string();
+    }
+    let mut history = HistoryManager::new(&doc);
+
+    // Type " one "
+    if let MlaBlock::Paragraph { text, .. } = &mut doc.blocks[0] {
+        *text = "Start one ".to_string();
+    }
+    history.on_frame_end(&doc, 10);
+
+    // Type "two."
+    if let MlaBlock::Paragraph { text, .. } = &mut doc.blocks[0] {
+        *text = "Start one two.".to_string();
+    }
+    history.on_frame_end(&doc, 14);
+
+    assert_eq!(doc.blocks[0].text(), "Start one two.");
+
+    // Sequential undo:
+    // 1st undo rolls back "two."
+    let step1 = history.undo(&doc, 14).expect("Should undo two.");
+    doc = step1.doc;
+    assert_eq!(doc.blocks[0].text(), "Start one ");
+
+    // 2nd undo rolls back "one "
+    let step2 = history.undo(&doc, 10).expect("Should undo one.");
+    doc = step2.doc;
+    assert_eq!(doc.blocks[0].text(), "Start");
+
+    // Sequential redo:
+    let redo1 = history.redo(&doc, 5).expect("Should redo one.");
+    doc = redo1.doc;
+    assert_eq!(doc.blocks[0].text(), "Start one ");
+
+    let redo2 = history.redo(&doc, 10).expect("Should redo two.");
+    doc = redo2.doc;
+    assert_eq!(doc.blocks[0].text(), "Start one two.");
+}
+
+#[test]
+fn test_discrete_actions_undo_and_redo() {
+    use scholia::history::HistoryManager;
+    use scholia::model::{MlaBlock, MlaDocument};
+
+    let mut doc = MlaDocument::new_blank();
+    doc.blocks[0] = MlaBlock::Paragraph {
+        id: "p1".to_string(),
+        text: "Sentence A. Sentence B.".to_string(),
+        note_tags: Vec::new(),
+    };
+    let mut history = HistoryManager::new(&doc);
+
+    // Record discrete action before sentence move
+    history.record_discrete_action(&doc, 15);
+    let _ = doc.move_sentence_in_active_block(15, true);
+    assert_eq!(doc.blocks[0].text(), "Sentence B. Sentence A.");
+
+    // Undo sentence move
+    let s1 = history.undo(&doc, 0).expect("Undo sentence move");
+    doc = s1.doc;
+    assert_eq!(doc.blocks[0].text(), "Sentence A. Sentence B.");
+
+    // Redo sentence move
+    let s2 = history.redo(&doc, 0).expect("Redo sentence move");
+    doc = s2.doc;
+    assert_eq!(doc.blocks[0].text(), "Sentence B. Sentence A.");
+
+    // Discrete action: adding explanatory note
+    history.record_discrete_action(&doc, 0);
+    doc.add_explanatory_note("Note definition".to_string());
+    assert_eq!(doc.notes.len(), 1);
+
+    // Undo note addition
+    let s3 = history.undo(&doc, 0).expect("Undo note");
+    doc = s3.doc;
+    assert_eq!(doc.notes.len(), 0);
+
+    // Redo note addition
+    let s4 = history.redo(&doc, 0).expect("Redo note");
+    doc = s4.doc;
+    assert_eq!(doc.notes.len(), 1);
+}
+
+#[test]
+fn test_undo_redo_shortcuts_and_keybinds() {
+    use scholia::keybinds::{Action, KeybindConfig, KeyName};
+
+    let cfg = KeybindConfig::default();
+    assert_eq!(cfg.get_shortcut(Action::Undo).display_string(), "Ctrl+Z");
+    assert_eq!(cfg.get_shortcut(Action::Redo).display_string(), "Ctrl+Y");
+
+    // Action categories and labels
+    assert_eq!(Action::Undo.category(), "Modify");
+    assert_eq!(Action::Redo.category(), "Modify");
+    assert_eq!(Action::Undo.display_name(), "Undo");
+    assert_eq!(Action::Redo.display_name(), "Redo");
+
+    // KeyName labels
+    assert_eq!(KeyName::Z.label(), "Z");
+    assert_eq!(KeyName::Y.label(), "Y");
+
+    // Test shortcut matching with egui input state
+    let mut input = egui::InputState::default();
+    input.modifiers.command = true;
+    input.modifiers.ctrl = true;
+    input.events.push(egui::Event::Key {
+        key: egui::Key::Z,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: input.modifiers,
+    });
+    assert!(cfg.check_action(Action::Undo, &input));
+
+    // Test Redo with Ctrl+Y
+    let mut input_y = egui::InputState::default();
+    input_y.modifiers.command = true;
+    input_y.modifiers.ctrl = true;
+    input_y.events.push(egui::Event::Key {
+        key: egui::Key::Y,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: input_y.modifiers,
+    });
+    assert!(cfg.check_action(Action::Redo, &input_y));
+
+    // Test Redo with Ctrl+Shift+Z
+    let mut input_shift_z = egui::InputState::default();
+    input_shift_z.modifiers.command = true;
+    input_shift_z.modifiers.ctrl = true;
+    input_shift_z.modifiers.shift = true;
+    input_shift_z.events.push(egui::Event::Key {
+        key: egui::Key::Z,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: input_shift_z.modifiers,
+    });
+    assert!(cfg.check_action(Action::Redo, &input_shift_z));
+
+    // Test Redo with Ctrl+Shift+Y
+    let mut input_shift_y = egui::InputState::default();
+    input_shift_y.modifiers.command = true;
+    input_shift_y.modifiers.ctrl = true;
+    input_shift_y.modifiers.shift = true;
+    input_shift_y.events.push(egui::Event::Key {
+        key: egui::Key::Y,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: input_shift_y.modifiers,
+    });
+    assert!(cfg.check_action(Action::Redo, &input_shift_y));
+}
+
+#[test]
+fn test_history_limits_and_configuration() {
+    use scholia::history::HistoryManager;
+    use scholia::model::MlaDocument;
+
+    let doc = MlaDocument::new_blank();
+    let mut history = HistoryManager::new(&doc);
+
+    // Default limit must be 512 actions
+    assert_eq!(history.max_depth, 512);
+
+    // User can configure from 16 to 8192 actions
+    history.set_max_depth(256);
+    assert_eq!(history.max_depth, 256);
+
+    history.set_max_depth(1024);
+    assert_eq!(history.max_depth, 1024);
+
+    // Enforce lower bound clamp to 16
+    history.set_max_depth(5);
+    assert_eq!(history.max_depth, 16);
+
+    // Enforce upper bound clamp to 8192
+    history.set_max_depth(100_000);
+    assert_eq!(history.max_depth, 8192);
+
+    // Verify trimming of undo stack when depth is reduced
+    history.set_max_depth(20);
+    for i in 0..30 {
+        let mut test_doc = doc.clone();
+        test_doc.title = format!("Title {}", i);
+        history.record_discrete_action(&test_doc, 0);
+    }
+    assert!(history.undo_stack.len() <= 20);
+    assert_eq!(history.undo_stack.len(), 20);
+
+    // When reducing limit to 16, stack trims to 16
+    history.set_max_depth(16);
+    assert_eq!(history.undo_stack.len(), 16);
+}
+
+#[test]
+fn test_unsaved_changes_dialog_behavior() {
+    use scholia::model::MlaDocument;
+    use scholia::theme::ThemeConfig;
+    use scholia::ui::{render_unsaved_dialog, UnsavedDialogResponse, UnsavedDialogState};
+
+    let doc = MlaDocument::new_blank();
+    let theme = ThemeConfig::default();
+    let mut state = UnsavedDialogState { is_open: false };
+
+    let ctx = egui::Context::default();
+
+    // When dialog is not open, returns None
+    let resp = render_unsaved_dialog(&ctx, &mut state, &doc, &theme);
+    assert_eq!(resp, UnsavedDialogResponse::None);
+
+    // When dialog is open, can be opened
+    state.is_open = true;
+    assert!(state.is_open);
+}
+
+#[test]
+fn test_modal_fill_color_ninety_percent_opacity() {
+    use scholia::theme::ThemeConfig;
+
+    let theme = ThemeConfig::default();
+    let modal_color = theme.modal_fill_color();
+    // 90% opaque corresponds to alpha = 230 (or ~0.90 * 255)
+    assert_eq!(modal_color.a(), 230, "Modal dialog background must have alpha = 230 (90% opaque, 10% transparent)");
+
+    // Window fill in visuals should also match modal fill color
+    let visuals = theme.create_egui_visuals();
+    assert_eq!(visuals.window_fill.a(), 230, "Visuals window_fill must match 90% opaque modal fill");
+}
+
+#[test]
+fn test_rose_pine_theme_presets() {
+    use scholia::theme::{ThemeConfig, ThemePreset};
+
+    let presets = ThemePreset::all_presets();
+    assert_eq!(presets.len(), 7, "Should support 7 curated theme presets");
+    assert!(presets.contains(&ThemePreset::RosePine));
+    assert!(presets.contains(&ThemePreset::RosePineMoon));
+    assert!(presets.contains(&ThemePreset::RosePineDawn));
+
+    // Test Rosé Pine (Main Dark)
+    let mut theme = ThemeConfig::default();
+    theme.apply_preset(ThemePreset::RosePine);
+    assert_eq!(theme.preset, ThemePreset::RosePine);
+    assert!(theme.is_dark());
+    assert_eq!(theme.window_tint_rgb, [25, 23, 36]);
+    assert_eq!(theme.accent_rgb, [235, 188, 186]);
+
+    // Test Rosé Pine Moon (Deep Violet Dark)
+    theme.apply_preset(ThemePreset::RosePineMoon);
+    assert_eq!(theme.preset, ThemePreset::RosePineMoon);
+    assert!(theme.is_dark());
+    assert_eq!(theme.window_tint_rgb, [35, 33, 54]);
+    assert_eq!(theme.accent_rgb, [234, 154, 151]);
+
+    // Test Rosé Pine Dawn (Warm Pastel Light)
+    theme.apply_preset(ThemePreset::RosePineDawn);
+    assert_eq!(theme.preset, ThemePreset::RosePineDawn);
+    assert!(!theme.is_dark(), "Rose Pine Dawn must be a light theme");
+    assert_eq!(theme.window_tint_rgb, [250, 244, 237]);
+    assert_eq!(theme.accent_rgb, [215, 130, 126]);
+}
+
+#[test]
+fn test_theme_folder_save_and_load_roundtrip() {
+    use scholia::theme::{load_theme_file, save_custom_theme, ThemeConfig, ThemePreset};
+
+    let mut theme = ThemeConfig::preset_rose_pine();
+    theme.accent_rgb = [123, 234, 45]; // Custom accent
+    theme.page_opacity = 0.42;
+
+    let test_theme_name = "Automated Test Theme";
+    let save_res = save_custom_theme(&theme, test_theme_name);
+    assert!(save_res.is_ok(), "Saving custom theme must succeed: {:?}", save_res);
+
+    let saved_path = save_res.unwrap();
+    assert!(saved_path.exists());
+
+    let load_res = load_theme_file(&saved_path);
+    assert!(load_res.is_ok(), "Loading saved theme file must succeed: {:?}", load_res);
+
+    let loaded = load_res.unwrap();
+    assert_eq!(loaded.preset, ThemePreset::Custom);
+    assert_eq!(loaded.custom_name, Some(test_theme_name.to_string()));
+    assert_eq!(loaded.accent_rgb, [123, 234, 45]);
+    assert_eq!(loaded.page_opacity, 0.42);
+
+    // Clean up temporary test file
+    let _ = std::fs::remove_file(saved_path);
+}
+
