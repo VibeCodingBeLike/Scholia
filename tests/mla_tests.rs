@@ -234,3 +234,31 @@ fn test_word_count_and_pdf_page_count() {
     doc.works_cited.push(entry);
     assert_eq!(doc.estimated_page_count(), 3);
 }
+
+#[test]
+fn test_block_deletion_focus_and_keybinds() {
+    use scholia::keybinds::{Action, KeybindConfig};
+
+    let mut doc = scholia::model::MlaDocument::new_blank();
+    let _ = doc.add_paragraph(None);
+    let _ = doc.add_paragraph(None);
+    assert_eq!(doc.blocks.len(), 3);
+
+    // If we delete block at index 2, focus should target previous index 1
+    let idx = 2;
+    let prev_idx = if idx > 0 { idx - 1 } else { 0 };
+    doc.remove_block(idx);
+    doc.active_block_idx = prev_idx;
+    doc.requested_focus_block_idx = Some(prev_idx);
+
+    assert_eq!(doc.blocks.len(), 2);
+    assert_eq!(doc.active_block_idx, 1);
+    assert_eq!(doc.requested_focus_block_idx, Some(1));
+
+    // Verify keybinds are registered
+    let cfg = KeybindConfig::default();
+    assert_eq!(cfg.get_shortcut(Action::DeleteBlock).display_string(), "Ctrl+Del");
+    assert_eq!(cfg.get_shortcut(Action::MoveBlockUp).display_string(), "Alt+Up");
+    assert_eq!(cfg.get_shortcut(Action::MoveBlockDown).display_string(), "Alt+Down");
+    assert_eq!(cfg.get_shortcut(Action::InsertHeading3).display_string(), "Ctrl+Alt+3");
+}

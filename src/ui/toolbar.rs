@@ -16,6 +16,9 @@ pub enum ToolbarEvent {
     AddBlockquote,
     AddHeading(u8),
     InsertCitation,
+    DeleteBlock,
+    MoveBlockUp,
+    MoveBlockDown,
     FormatTitleCase,
     OpenWorksCited,
     OpenCompliance,
@@ -128,7 +131,7 @@ pub fn render_toolbar(
         if ui
             .button(RichText::new(format!("{} Paragraph", icons::PARAGRAPH)).color(text_col))
             .on_hover_text(format!(
-                "Add double-spaced 0.5\" indented body paragraph ({})",
+                "Add double-spaced 0.5\" indented body paragraph (Enter or {})",
                 p_sc
             ))
             .clicked()
@@ -155,7 +158,7 @@ pub fn render_toolbar(
             .display_string();
         if ui
             .button(RichText::new(format!("{} H1", icons::HEADING)).color(text_col))
-            .on_hover_text(format!("Insert MLA Level 1 Section Heading ({})", h1_sc))
+            .on_hover_text(format!("Insert MLA Level 1 Section Heading (Bold Flush Left) ({})", h1_sc))
             .clicked()
         {
             event = Some(ToolbarEvent::AddHeading(1));
@@ -166,10 +169,21 @@ pub fn render_toolbar(
             .display_string();
         if ui
             .button(RichText::new(format!("{} H2", icons::HEADING)).color(text_col))
-            .on_hover_text(format!("Insert MLA Level 2 Section Heading ({})", h2_sc))
+            .on_hover_text(format!("Insert MLA Level 2 Section Heading (Italic Flush Left) ({})", h2_sc))
             .clicked()
         {
             event = Some(ToolbarEvent::AddHeading(2));
+        }
+
+        let h3_sc = keybinds
+            .get_shortcut(Action::InsertHeading3)
+            .display_string();
+        if ui
+            .button(RichText::new(format!("{} H3", icons::HEADING)).color(text_col))
+            .on_hover_text(format!("Insert MLA Level 3 Section Heading (Bold Centered) ({})", h3_sc))
+            .clicked()
+        {
+            event = Some(ToolbarEvent::AddHeading(3));
         }
 
         let cite_sc = keybinds
@@ -178,12 +192,42 @@ pub fn render_toolbar(
         if ui
             .button(RichText::new(format!("{} Citation", icons::QUOTE)).color(accent_col))
             .on_hover_text(format!(
-                "Insert in-text citation e.g. (Author 42) ({})",
+                "Insert in-text parenthetical citation e.g. (Author 42) ({})",
                 cite_sc
             ))
             .clicked()
         {
             event = Some(ToolbarEvent::InsertCitation);
+        }
+
+        ui.separator();
+
+        // --- Block Arrange & Delete ---
+        let del_sc = keybinds.get_shortcut(Action::DeleteBlock).display_string();
+        if ui
+            .button(RichText::new(format!("{} Delete", icons::TRASH)).color(Color32::from_rgb(230, 90, 90)))
+            .on_hover_text(format!("Delete active block ({})", del_sc))
+            .clicked()
+        {
+            event = Some(ToolbarEvent::DeleteBlock);
+        }
+
+        let up_sc = keybinds.get_shortcut(Action::MoveBlockUp).display_string();
+        if ui
+            .button(RichText::new(format!("{} Up", icons::ARROW_UP)).color(text_col))
+            .on_hover_text(format!("Move active block up ({})", up_sc))
+            .clicked()
+        {
+            event = Some(ToolbarEvent::MoveBlockUp);
+        }
+
+        let dn_sc = keybinds.get_shortcut(Action::MoveBlockDown).display_string();
+        if ui
+            .button(RichText::new(format!("{} Down", icons::ARROW_DOWN)).color(text_col))
+            .on_hover_text(format!("Move active block down ({})", dn_sc))
+            .clicked()
+        {
+            event = Some(ToolbarEvent::MoveBlockDown);
         }
 
         ui.separator();
@@ -242,6 +286,27 @@ pub fn render_toolbar(
             .clicked()
         {
             event = Some(ToolbarEvent::OpenCompliance);
+        }
+
+        ui.separator();
+
+        // Settings & Zen Mode buttons
+        let set_sc = keybinds.get_shortcut(Action::OpenPreferences).display_string();
+        if ui
+            .button(RichText::new(format!("{} Settings", icons::SETTINGS)).color(text_col))
+            .on_hover_text(format!("Open Preferences ({})", set_sc))
+            .clicked()
+        {
+            event = Some(ToolbarEvent::OpenSettings);
+        }
+
+        let zen_sc = keybinds.get_shortcut(Action::ToggleFocusMode).display_string();
+        if ui
+            .button(RichText::new(format!("{} Zen", icons::FOCUS_MODE)).color(accent_col))
+            .on_hover_text(format!("Toggle Zen Mode ({})", zen_sc))
+            .clicked()
+        {
+            event = Some(ToolbarEvent::ToggleFocusMode);
         }
 
         ui.separator();

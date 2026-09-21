@@ -205,8 +205,6 @@ pub fn render_editor_page(
 
                         // --- STRUCTURED MLA BODY BLOCKS EDITOR ---
                         let mut block_to_delete = None;
-                        let mut block_to_move_up = None;
-                        let mut block_to_move_down = None;
                         let mut block_splits: Vec<(usize, String, Vec<String>)> = Vec::new();
                         let mut focus_target_id = None;
                         let mut blocks_changed = false;
@@ -253,20 +251,26 @@ pub fn render_editor_page(
                                         }
                                     }
 
-                                    // If empty paragraph and backspace pressed, remove block (if > 1)
-                                    if resp.has_focus()
-                                        && text.is_empty()
-                                        && total_blocks > 1
-                                        && ui.input(|i| i.key_pressed(egui::Key::Backspace))
-                                    {
-                                        block_to_delete = Some(b_idx);
+                                    if resp.has_focus() {
+                                        doc.active_block_idx = b_idx;
+                                        // If empty paragraph and backspace pressed, remove block (if > 1)
+                                        if text.is_empty()
+                                            && total_blocks > 1
+                                            && ui.input(|i| i.key_pressed(egui::Key::Backspace))
+                                        {
+                                            block_to_delete = Some(b_idx);
+                                        }
                                     }
                                 }
                                 MlaBlock::BlockQuote {
-                                    id: _,
+                                    id,
                                     text,
                                     citation,
                                 } => {
+                                    let block_id = id.clone();
+                                    let q_edit_id = egui::Id::new("bq_block").with(&block_id);
+                                    let c_edit_id = egui::Id::new("bqc_block").with(&block_id);
+
                                     egui::Frame::new()
                                         .fill(theme.card_fill_color())
                                         .stroke(egui::Stroke::new(
@@ -278,48 +282,18 @@ pub fn render_editor_page(
                                         .show(ui, |ui| {
                                             ui.spacing_mut().item_spacing.y = 6.0;
 
-                                            // Top Header bar
-                                            ui.horizontal(|ui| {
-                                                ui.label(
-                                                    RichText::new("❝ MLA Block Quote (0.5\" Indent)")
-                                                        .size(11.5)
-                                                        .strong()
-                                                        .color(accent_col),
-                                                );
+                                            // Header label (clean, no inline buttons)
+                                            ui.label(
+                                                RichText::new("❝ MLA Block Quote (0.5\" Indent)")
+                                                    .size(11.5)
+                                                    .strong()
+                                                    .color(accent_col),
+                                            );
 
-                                                ui.with_layout(
-                                                    egui::Layout::right_to_left(egui::Align::Center),
-                                                    |ui| {
-                                                        if ui
-                                                            .small_button(icons::TRASH)
-                                                            .on_hover_text("Delete Block Quote")
-                                                            .clicked()
-                                                        {
-                                                            block_to_delete = Some(b_idx);
-                                                        }
-                                                        if b_idx + 1 < total_blocks
-                                                            && ui
-                                                                .small_button("▼")
-                                                                .on_hover_text("Move Down")
-                                                                .clicked()
-                                                        {
-                                                            block_to_move_down = Some(b_idx);
-                                                        }
-                                                        if b_idx > 0
-                                                            && ui
-                                                                .small_button("▲")
-                                                                .on_hover_text("Move Up")
-                                                                .clicked()
-                                                        {
-                                                            block_to_move_up = Some(b_idx);
-                                                        }
-                                                    },
-                                                );
-                                            });
-
-                                            // Quotation content (without markdown > prefix!)
+                                            // Quotation content (without markdown > prefix)
                                             let q_resp = ui.add(
                                                 egui::TextEdit::multiline(text)
+                                                    .id(q_edit_id)
                                                     .font(doc_font(15.5))
                                                     .text_color(text_col)
                                                     .desired_width(printable_width - 28.0)
@@ -335,6 +309,16 @@ pub fn render_editor_page(
                                             if q_resp.changed() {
                                                 blocks_changed = true;
                                             }
+                                            if q_resp.has_focus() {
+                                                doc.active_block_idx = b_idx;
+                                                if text.is_empty()
+                                                    && citation.is_empty()
+                                                    && total_blocks > 1
+                                                    && ui.input(|i| i.key_pressed(egui::Key::Backspace))
+                                                {
+                                                    block_to_delete = Some(b_idx);
+                                                }
+                                            }
 
                                             // Parenthetical Citation
                                             ui.horizontal(|ui| {
@@ -345,6 +329,7 @@ pub fn render_editor_page(
                                                 );
                                                 let c_resp = ui.add(
                                                     egui::TextEdit::singleline(citation)
+                                                        .id(c_edit_id)
                                                         .font(doc_font(14.0))
                                                         .text_color(text_col)
                                                         .desired_width(180.0)
@@ -353,26 +338,20 @@ pub fn render_editor_page(
                                                 if c_resp.changed() {
                                                     blocks_changed = true;
                                                 }
-
-                                                if ui
-                                                    .small_button(format!(
-                                                        "{} Pick from Works Cited",
-                                                        icons::BOOK_CITATIONS
-                                                    ))
-                                                    .clicked()
-                                                {
-                                                    action = Some(EditorAction::OpenCitationModal(
-                                                        Some(b_idx),
-                                                    ));
+                                                if c_resp.has_focus() {
+                                                    doc.active_block_idx = b_idx;
                                                 }
                                             });
                                         });
                                 }
                                 MlaBlock::SectionHeading {
-                                    id: _,
+                                    id,
                                     level,
                                     text,
                                 } => {
+                                    let block_id = id.clone();
+                                    let h_edit_id = egui::Id::new("h_block").with(&block_id);
+
                                     egui::Frame::new()
                                         .fill(theme.card_fill_color())
                                         .stroke(egui::Stroke::new(
@@ -384,89 +363,29 @@ pub fn render_editor_page(
                                         .show(ui, |ui| {
                                             ui.spacing_mut().item_spacing.y = 6.0;
 
-                                            // Top header with level selector
-                                            ui.horizontal(|ui| {
-                                                ui.label(
-                                                    RichText::new("Section Heading:")
-                                                        .size(11.5)
-                                                        .color(muted_col),
-                                                );
-
-                                                let h1_active = *level == 1;
-                                                if ui
-                                                    .selectable_label(h1_active, "H1 (Bold Flush Left)")
-                                                    .clicked()
-                                                {
-                                                    *level = 1;
-                                                    blocks_changed = true;
-                                                }
-
-                                                let h2_active = *level == 2;
-                                                if ui
-                                                    .selectable_label(
-                                                        h2_active,
-                                                        "H2 (Italic Flush Left)",
-                                                    )
-                                                    .clicked()
-                                                {
-                                                    *level = 2;
-                                                    blocks_changed = true;
-                                                }
-
-                                                let h3_active = *level == 3;
-                                                if ui
-                                                    .selectable_label(h3_active, "H3 (Bold Centered)")
-                                                    .clicked()
-                                                {
-                                                    *level = 3;
-                                                    blocks_changed = true;
-                                                }
-
-                                                ui.with_layout(
-                                                    egui::Layout::right_to_left(egui::Align::Center),
-                                                    |ui| {
-                                                        if ui
-                                                            .small_button(icons::TRASH)
-                                                            .on_hover_text("Delete Heading")
-                                                            .clicked()
-                                                        {
-                                                            block_to_delete = Some(b_idx);
-                                                        }
-                                                        if b_idx + 1 < total_blocks
-                                                            && ui
-                                                                .small_button("▼")
-                                                                .on_hover_text("Move Down")
-                                                                .clicked()
-                                                        {
-                                                            block_to_move_down = Some(b_idx);
-                                                        }
-                                                        if b_idx > 0
-                                                            && ui
-                                                                .small_button("▲")
-                                                                .on_hover_text("Move Up")
-                                                                .clicked()
-                                                        {
-                                                            block_to_move_up = Some(b_idx);
-                                                        }
-                                                    },
-                                                );
-                                            });
-
-                                            // Styled Heading Input (without markdown # prefix!)
-                                            let (hint, font_style) = match *level {
+                                            let (level_title, hint, font_style) = match *level {
                                                 1 => (
+                                                    "§ Section Heading 1 (Bold Flush Left)",
                                                     "Level 1 Heading (Bold Flush Left)",
                                                     doc_font(17.0),
                                                 ),
                                                 2 => (
+                                                    "§ Section Heading 2 (Italic Flush Left)",
                                                     "Level 2 Heading (Italic Flush Left)",
                                                     doc_font(16.0),
                                                 ),
                                                 _ => (
+                                                    "§ Section Heading 3 (Bold Centered)",
                                                     "Level 3 Heading (Bold Centered)",
                                                     doc_font(16.0),
                                                 ),
                                             };
+
+                                            ui.label(
+                                                RichText::new(level_title)
+                                                    .size(11.5)
+                                                    .color(muted_col),
+                                            );
 
                                             let align = if *level == 3 {
                                                 egui::Align::Center
@@ -476,6 +395,7 @@ pub fn render_editor_page(
 
                                             let h_resp = ui.add(
                                                 egui::TextEdit::singleline(text)
+                                                    .id(h_edit_id)
                                                     .font(font_style)
                                                     .text_color(text_col)
                                                     .horizontal_align(align)
@@ -488,6 +408,15 @@ pub fn render_editor_page(
                                             );
                                             if h_resp.changed() {
                                                 blocks_changed = true;
+                                            }
+                                            if h_resp.has_focus() {
+                                                doc.active_block_idx = b_idx;
+                                                if text.is_empty()
+                                                    && total_blocks > 1
+                                                    && ui.input(|i| i.key_pressed(egui::Key::Backspace))
+                                                {
+                                                    block_to_delete = Some(b_idx);
+                                                }
                                             }
                                         });
                                 }
@@ -504,6 +433,7 @@ pub fn render_editor_page(
                                 ins_idx = doc.add_paragraph(Some(ins_idx));
                                 if let MlaBlock::Paragraph { text, id } = &mut doc.blocks[ins_idx] {
                                     *text = p_text;
+                                    doc.active_block_idx = ins_idx;
                                     focus_target_id =
                                         Some(egui::Id::new("p_block").with(id.clone()));
                                 }
@@ -515,17 +445,12 @@ pub fn render_editor_page(
                             ui.ctx().memory_mut(|m| m.request_focus(target_id));
                         }
 
-                        // Apply delete/reorder actions
+                        // Apply delete actions
                         if let Some(idx) = block_to_delete {
+                            let prev_idx = if idx > 0 { idx - 1 } else { 0 };
                             doc.remove_block(idx);
-                            blocks_changed = true;
-                        }
-                        if let Some(idx) = block_to_move_up {
-                            doc.move_block_up(idx);
-                            blocks_changed = true;
-                        }
-                        if let Some(idx) = block_to_move_down {
-                            doc.move_block_down(idx);
+                            doc.active_block_idx = prev_idx;
+                            doc.requested_focus_block_idx = Some(prev_idx);
                             blocks_changed = true;
                         }
 
@@ -534,44 +459,17 @@ pub fn render_editor_page(
                             doc.sync_body_from_blocks();
                         }
 
-                        // Insert block buttons below manuscript
-                        ui.add_space(16.0);
-                        ui.horizontal(|ui| {
-                            ui.spacing_mut().item_spacing.x = 8.0;
-
-                            if ui
-                                .button(
-                                    RichText::new(format!("{} Paragraph", icons::PLUS))
-                                        .color(accent_col),
-                                )
-                                .on_hover_text("Add new body paragraph")
-                                .clicked()
-                            {
-                                doc.add_paragraph(None);
+                        // Focus requested block (e.g. after deletion or insertion)
+                        if let Some(target_idx) = doc.requested_focus_block_idx.take() {
+                            if let Some(target_block) = doc.blocks.get(target_idx) {
+                                let target_id = match target_block {
+                                    MlaBlock::Paragraph { id, .. } => egui::Id::new("p_block").with(id),
+                                    MlaBlock::BlockQuote { id, .. } => egui::Id::new("bq_block").with(id),
+                                    MlaBlock::SectionHeading { id, .. } => egui::Id::new("h_block").with(id),
+                                };
+                                ui.ctx().memory_mut(|m| m.request_focus(target_id));
                             }
-
-                            if ui
-                                .button(
-                                    RichText::new(format!("{} Block Quote", icons::QUOTE))
-                                        .color(text_col),
-                                )
-                                .on_hover_text("Insert MLA block quotation")
-                                .clicked()
-                            {
-                                doc.add_blockquote(None);
-                            }
-
-                            if ui
-                                .button(
-                                    RichText::new(format!("{} Heading", icons::HEADING))
-                                        .color(text_col),
-                                )
-                                .on_hover_text("Insert section heading")
-                                .clicked()
-                            {
-                                doc.add_heading(1, None);
-                            }
-                        });
+                        }
                     });
 
                     // ==========================================
@@ -642,7 +540,7 @@ pub fn render_editor_page(
                         if doc.works_cited.is_empty() {
                             ui.vertical_centered(|ui| {
                                 ui.label(
-                                    RichText::new("No entries in Works Cited yet.")
+                                    RichText::new("No entries in Works Cited yet. Use toolbar or Ctrl+W to add sources.")
                                         .font(doc_font(14.0))
                                         .italics()
                                         .color(muted_col),
@@ -650,7 +548,6 @@ pub fn render_editor_page(
                             });
                         } else {
                             let mut entry_to_edit = None;
-                            let mut entry_to_delete = None;
 
                             for (idx, entry) in doc.works_cited.iter().enumerate() {
                                 let formatted = entry.format_markdown();
@@ -665,49 +562,28 @@ pub fn render_editor_page(
 
                                     ui.add_space(4.0);
 
-                                    let _entry_lbl = ui.add(
+                                    let entry_lbl = ui.add(
                                         egui::Label::new(
                                             RichText::new(formatted)
                                                 .font(doc_font(15.0))
                                                 .color(text_col),
                                         )
-                                        .wrap(),
-                                    );
+                                        .wrap()
+                                        .sense(egui::Sense::click()),
+                                    ).on_hover_text("Click to edit or delete entry in Works Cited manager");
 
-                                    // Action buttons on the side
-                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                        if ui.small_button(icons::TRASH).on_hover_text("Delete entry").clicked() {
-                                            entry_to_delete = Some(idx);
-                                        }
-                                        if ui.small_button(format!("{} Edit", icons::EDIT)).clicked() {
-                                            entry_to_edit = Some(idx);
-                                        }
-                                    });
+                                    if entry_lbl.clicked() {
+                                        entry_to_edit = Some(idx);
+                                    }
                                 });
 
                                 ui.add_space(6.0);
                             }
 
-                            if let Some(idx) = entry_to_delete {
-                                doc.works_cited.remove(idx);
-                                doc.is_dirty = true;
-                            }
                             if let Some(idx) = entry_to_edit {
                                 action = Some(EditorAction::OpenWorksCitedModal(Some(idx)));
                             }
                         }
-
-                        // Bottom Works Cited Action Bar
-                        ui.add_space(14.0);
-                        ui.horizontal(|ui| {
-                            if ui.button(RichText::new(format!("{} Add MLA 9 Source Entry", icons::PLUS)).strong().color(accent_col)).clicked() {
-                                action = Some(EditorAction::OpenWorksCitedModal(None));
-                            }
-
-                            if doc.works_cited.len() > 1 && ui.button(format!("{} Sort Alphabetically", icons::PARAGRAPH)).clicked() {
-                                doc.sort_works_cited();
-                            }
-                        });
                     });
 
                     ui.add_space(40.0);
@@ -840,6 +716,10 @@ fn render_keybind_preview_panel(
                 ),
                 (Action::InsertHeading1, icons::HEADING, "Heading 1"),
                 (Action::InsertHeading2, icons::HEADING, "Heading 2"),
+                (Action::InsertHeading3, icons::HEADING, "Heading 3"),
+                (Action::DeleteBlock, icons::TRASH, "Delete Block"),
+                (Action::MoveBlockUp, icons::ARROW_UP, "Move Up"),
+                (Action::MoveBlockDown, icons::ARROW_DOWN, "Move Down"),
             ];
 
             for (act, icon, label) in actions_writing {

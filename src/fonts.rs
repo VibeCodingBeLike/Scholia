@@ -33,6 +33,10 @@ pub mod icons {
 
 pub const MLA_DOC_FONT: &str = "TimesNewRoman";
 
+/// Packaged JetBrains Mono Nerd Font directly bundled inside the application binary
+pub const EMBEDDED_NERD_FONT: &[u8] =
+    include_bytes!("../assets/fonts/JetBrainsMonoNerdFont-Regular.ttf");
+
 pub fn doc_font_family() -> FontFamily {
     FontFamily::Name(Arc::from(MLA_DOC_FONT))
 }
@@ -41,14 +45,18 @@ pub fn doc_font(size: f32) -> FontId {
     FontId::new(size, doc_font_family())
 }
 
-/// Load Times New Roman and user-installed Nerd Fonts into egui
+/// Load packaged Nerd Font and Times New Roman into egui
 pub fn configure_fonts(ctx: &egui::Context) {
     let mut fonts = FontDefinitions::default();
 
-    let mut times_loaded = false;
-    let mut nerd_loaded = false;
+    // 1. Packaged JetBrains Mono Nerd Font - Always available and self-contained
+    fonts.font_data.insert(
+        "NerdFont".to_string(),
+        Arc::new(FontData::from_static(EMBEDDED_NERD_FONT)),
+    );
 
-    // 1. Locate and load Times New Roman
+    // 2. Locate and load Times New Roman for MLA paper manuscript if available
+    let mut times_loaded = false;
     if let Some(times_path) = find_times_new_roman() {
         if let Ok(bytes) = std::fs::read(&times_path) {
             fonts.font_data.insert(
@@ -59,37 +67,22 @@ pub fn configure_fonts(ctx: &egui::Context) {
         }
     }
 
-    // 2. Locate and load a Nerd Font (Symbols Nerd Font or JetBrains Mono Nerd Font, etc.)
-    if let Some(nerd_path) = find_nerd_font() {
-        if let Ok(bytes) = std::fs::read(&nerd_path) {
-            fonts.font_data.insert(
-                "NerdFont".to_string(),
-                Arc::new(FontData::from_owned(bytes)),
-            );
-            nerd_loaded = true;
-        }
+    // 3. Use the Nerd Font for the ENTIRE APP (UI, buttons, menus, dialogs, badges) and icons
+    if let Some(prop) = fonts.families.get_mut(&FontFamily::Proportional) {
+        prop.insert(0, "NerdFont".to_string());
+    }
+    if let Some(mono) = fonts.families.get_mut(&FontFamily::Monospace) {
+        mono.insert(0, "NerdFont".to_string());
     }
 
-    // Register MLA Document Family (Times New Roman with fallbacks)
+    // 4. Register MLA Document Family (Times New Roman with NerdFont fallback for symbols/icons)
     let mut doc_family_list = Vec::new();
     if times_loaded {
         doc_family_list.push(MLA_DOC_FONT.to_string());
     }
-    if nerd_loaded {
-        doc_family_list.push("NerdFont".to_string());
-    }
+    doc_family_list.push("NerdFont".to_string());
     doc_family_list.push("Hack".to_string());
     fonts.families.insert(doc_font_family(), doc_family_list);
-
-    // If Nerd Font is loaded, append it as fallback for standard UI Proportional & Monospace
-    if nerd_loaded {
-        if let Some(prop) = fonts.families.get_mut(&FontFamily::Proportional) {
-            prop.push("NerdFont".to_string());
-        }
-        if let Some(mono) = fonts.families.get_mut(&FontFamily::Monospace) {
-            mono.push("NerdFont".to_string());
-        }
-    }
 
     ctx.set_fonts(fonts);
 }
@@ -130,71 +123,5 @@ fn find_times_new_roman() -> Option<PathBuf> {
             return Some(path.clone());
         }
     }
-    None
-}
-
-fn find_nerd_font() -> Option<PathBuf> {
-    let localappdata = std::env::var("LOCALAPPDATA").unwrap_or_default();
-    let local_fonts = PathBuf::from(&localappdata).join(r"Microsoft\Windows\Fonts");
-
-    let direct_candidates = [
-        local_fonts.join("SymbolsNerdFont-Regular.ttf"),
-        local_fonts.join("SymbolsNerdFontMono-Regular.ttf"),
-        local_fonts.join("JetBrainsMonoNerdFont-Regular.ttf"),
-        local_fonts.join("DepartureMonoNerdFont-Regular.otf"),
-        local_fonts.join("ProggyCleanNerdFont-Regular.ttf"),
-        local_fonts.join("TerminessNerdFont-Regular.ttf"),
-        PathBuf::from(r"C:\Windows\Fonts\SymbolsNerdFont-Regular.ttf"),
-        PathBuf::from(r"C:\Windows\Fonts\JetBrainsMonoNerdFont-Regular.ttf"),
-    ];
-
-    for path in &direct_candidates {
-        if path.exists() && path.is_file() {
-            return Some(path.clone());
-        }
-    }
-
-    let mut search_dirs = Vec::new();
-    if local_fonts.exists() {
-        search_dirs.push(local_fonts);
-    }
-    let win_fonts = PathBuf::from(r"C:\Windows\Fonts");
-    if win_fonts.exists() {
-        search_dirs.push(win_fonts);
-    }
-
-    if let Ok(home) = std::env::var("HOME") {
-        let mac_user_fonts = PathBuf::from(&home).join("Library/Fonts");
-        if mac_user_fonts.exists() {
-            search_dirs.push(mac_user_fonts);
-        }
-        let linux_user_fonts = PathBuf::from(&home).join(".local/share/fonts");
-        if linux_user_fonts.exists() {
-            search_dirs.push(linux_user_fonts);
-        }
-    }
-    let mac_sys_fonts = PathBuf::from("/Library/Fonts");
-    if mac_sys_fonts.exists() {
-        search_dirs.push(mac_sys_fonts);
-    }
-    let linux_sys_fonts = PathBuf::from("/usr/share/fonts");
-    if linux_sys_fonts.exists() {
-        search_dirs.push(linux_sys_fonts);
-    }
-
-    for dir in search_dirs {
-        if let Ok(entries) = std::fs::read_dir(&dir) {
-            for entry in entries.flatten() {
-                let p = entry.path();
-                if let Some(fname) = p.file_name().and_then(|n| n.to_str()) {
-                    let fl = fname.to_lowercase();
-                    if fl.contains("nerd") && (fl.ends_with(".ttf") || fl.ends_with(".otf")) {
-                        return Some(p);
-                    }
-                }
-            }
-        }
-    }
-
     None
 }

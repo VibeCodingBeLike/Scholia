@@ -38,6 +38,9 @@ New-Item -ItemType Directory -Path $DistDir -Force | Out-Null
 Copy-Item $ExeSource -Destination "$DistDir\scholia.exe" -Force
 Copy-Item "README.md" -Destination "$DistDir\README.md" -Force
 Copy-Item "LICENSE" -Destination "$DistDir\LICENSE" -Force
+if (Test-Path "assets") {
+    Copy-Item -Recurse "assets" -Destination "$DistDir\assets" -Force
+}
 if (Test-Path "sample_mla_paper.mladoc") {
     Copy-Item "sample_mla_paper.mladoc" -Destination "$DistDir\sample_mla_paper.mladoc" -Force
 }

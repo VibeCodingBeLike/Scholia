@@ -12,7 +12,11 @@ pub enum Action {
     InsertBlockQuote,
     InsertHeading1,
     InsertHeading2,
+    InsertHeading3,
     InsertCitation,
+    DeleteBlock,
+    MoveBlockUp,
+    MoveBlockDown,
     ManageWorksCited,
     ConvertToMlaTitleCase,
     OpenPreferences,
@@ -32,7 +36,11 @@ impl Action {
             Action::InsertBlockQuote => "Insert MLA Block Quote (>4 lines)",
             Action::InsertHeading1 => "Insert Section Heading 1 (Bold)",
             Action::InsertHeading2 => "Insert Section Heading 2 (Italics)",
+            Action::InsertHeading3 => "Insert Section Heading 3 (Centered)",
             Action::InsertCitation => "Insert In-Text Parenthetical Citation",
+            Action::DeleteBlock => "Delete Active Block",
+            Action::MoveBlockUp => "Move Active Block Up",
+            Action::MoveBlockDown => "Move Active Block Down",
             Action::ManageWorksCited => "Open Works Cited Manager",
             Action::ConvertToMlaTitleCase => "Format Title to MLA Title Case",
             Action::OpenPreferences => "Theme & Transparency Settings",
@@ -52,7 +60,11 @@ impl Action {
             | Action::InsertBlockQuote
             | Action::InsertHeading1
             | Action::InsertHeading2
+            | Action::InsertHeading3
             | Action::InsertCitation
+            | Action::DeleteBlock
+            | Action::MoveBlockUp
+            | Action::MoveBlockDown
             | Action::ConvertToMlaTitleCase => "Editing & MLA Blocks",
             Action::ManageWorksCited => "Works Cited",
             Action::OpenPreferences | Action::ToggleComplianceCheck | Action::ToggleFocusMode => {
@@ -72,7 +84,11 @@ impl Action {
             Action::InsertBlockQuote,
             Action::InsertHeading1,
             Action::InsertHeading2,
+            Action::InsertHeading3,
             Action::InsertCitation,
+            Action::DeleteBlock,
+            Action::MoveBlockUp,
+            Action::MoveBlockDown,
             Action::ManageWorksCited,
             Action::ConvertToMlaTitleCase,
             Action::OpenPreferences,
@@ -107,6 +123,11 @@ pub enum KeyName {
     F11,
     Num1,
     Num2,
+    Num3,
+    Delete,
+    Backspace,
+    Up,
+    Down,
 }
 
 impl KeyName {
@@ -127,6 +148,11 @@ impl KeyName {
             KeyName::F11 => Key::F11,
             KeyName::Num1 => Key::Num1,
             KeyName::Num2 => Key::Num2,
+            KeyName::Num3 => Key::Num3,
+            KeyName::Delete => Key::Delete,
+            KeyName::Backspace => Key::Backspace,
+            KeyName::Up => Key::ArrowUp,
+            KeyName::Down => Key::ArrowDown,
         }
     }
 
@@ -147,6 +173,11 @@ impl KeyName {
             KeyName::F11 => "F11",
             KeyName::Num1 => "1",
             KeyName::Num2 => "2",
+            KeyName::Num3 => "3",
+            KeyName::Delete => "Del",
+            KeyName::Backspace => "Backspace",
+            KeyName::Up => "Up",
+            KeyName::Down => "Down",
         }
     }
 }
@@ -220,7 +251,11 @@ pub struct KeybindConfig {
     pub insert_blockquote: Shortcut,
     pub insert_h1: Shortcut,
     pub insert_h2: Shortcut,
+    pub insert_h3: Shortcut,
     pub insert_citation: Shortcut,
+    pub delete_block: Shortcut,
+    pub move_block_up: Shortcut,
+    pub move_block_down: Shortcut,
     pub manage_works_cited: Shortcut,
     pub convert_title_case: Shortcut,
     pub open_preferences: Shortcut,
@@ -240,7 +275,11 @@ impl Default for KeybindConfig {
             insert_blockquote: Shortcut::new(true, true, false, KeyName::B),
             insert_h1: Shortcut::new(true, false, true, KeyName::Num1),
             insert_h2: Shortcut::new(true, false, true, KeyName::Num2),
+            insert_h3: Shortcut::new(true, false, true, KeyName::Num3),
             insert_citation: Shortcut::new(true, true, false, KeyName::C),
+            delete_block: Shortcut::new(true, false, false, KeyName::Delete),
+            move_block_up: Shortcut::new(false, false, true, KeyName::Up),
+            move_block_down: Shortcut::new(false, false, true, KeyName::Down),
             manage_works_cited: Shortcut::new(true, true, false, KeyName::W),
             convert_title_case: Shortcut::new(true, true, false, KeyName::T),
             open_preferences: Shortcut::new(true, false, false, KeyName::Comma),
@@ -262,7 +301,11 @@ impl KeybindConfig {
             Action::InsertBlockQuote => self.insert_blockquote,
             Action::InsertHeading1 => self.insert_h1,
             Action::InsertHeading2 => self.insert_h2,
+            Action::InsertHeading3 => self.insert_h3,
             Action::InsertCitation => self.insert_citation,
+            Action::DeleteBlock => self.delete_block,
+            Action::MoveBlockUp => self.move_block_up,
+            Action::MoveBlockDown => self.move_block_down,
             Action::ManageWorksCited => self.manage_works_cited,
             Action::ConvertToMlaTitleCase => self.convert_title_case,
             Action::OpenPreferences => self.open_preferences,
@@ -282,7 +325,11 @@ impl KeybindConfig {
             Action::InsertBlockQuote => self.insert_blockquote = sc,
             Action::InsertHeading1 => self.insert_h1 = sc,
             Action::InsertHeading2 => self.insert_h2 = sc,
+            Action::InsertHeading3 => self.insert_h3 = sc,
             Action::InsertCitation => self.insert_citation = sc,
+            Action::DeleteBlock => self.delete_block = sc,
+            Action::MoveBlockUp => self.move_block_up = sc,
+            Action::MoveBlockDown => self.move_block_down = sc,
             Action::ManageWorksCited => self.manage_works_cited = sc,
             Action::ConvertToMlaTitleCase => self.convert_title_case = sc,
             Action::OpenPreferences => self.open_preferences = sc,

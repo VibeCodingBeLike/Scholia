@@ -101,6 +101,10 @@ pub struct MlaDocument {
     pub file_path: Option<String>,
     #[serde(default)]
     pub is_dirty: bool,
+    #[serde(skip)]
+    pub active_block_idx: usize,
+    #[serde(skip)]
+    pub requested_focus_block_idx: Option<usize>,
 }
 
 impl Default for MlaDocument {
@@ -122,6 +126,8 @@ impl MlaDocument {
             works_cited: Vec::new(),
             file_path: None,
             is_dirty: false,
+            active_block_idx: 0,
+            requested_focus_block_idx: None,
         }
     }
 
@@ -142,6 +148,8 @@ impl MlaDocument {
             works_cited: Vec::new(),
             file_path: None,
             is_dirty: false,
+            active_block_idx: 0,
+            requested_focus_block_idx: None,
         };
 
         doc.sync_blocks_from_body();

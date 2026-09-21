@@ -165,26 +165,94 @@ impl MlaApp {
             }
             Action::AddParagraph => {
                 self.doc.ensure_blocks_initialized();
-                self.doc.add_paragraph(None);
+                let current_idx = if self.doc.blocks.is_empty() {
+                    None
+                } else {
+                    Some(self.doc.active_block_idx.min(self.doc.blocks.len() - 1))
+                };
+                let new_idx = self.doc.add_paragraph(current_idx);
+                self.doc.active_block_idx = new_idx;
+                self.doc.requested_focus_block_idx = Some(new_idx);
                 self.set_notification("Added new body paragraph.");
             }
             Action::InsertBlockQuote => {
                 self.doc.ensure_blocks_initialized();
-                self.doc.add_blockquote(None);
+                let current_idx = if self.doc.blocks.is_empty() {
+                    None
+                } else {
+                    Some(self.doc.active_block_idx.min(self.doc.blocks.len() - 1))
+                };
+                let new_idx = self.doc.add_blockquote(current_idx);
+                self.doc.active_block_idx = new_idx;
+                self.doc.requested_focus_block_idx = Some(new_idx);
                 self.set_notification("Inserted MLA block quotation.");
             }
             Action::InsertHeading1 => {
                 self.doc.ensure_blocks_initialized();
-                self.doc.add_heading(1, None);
+                let current_idx = if self.doc.blocks.is_empty() {
+                    None
+                } else {
+                    Some(self.doc.active_block_idx.min(self.doc.blocks.len() - 1))
+                };
+                let new_idx = self.doc.add_heading(1, current_idx);
+                self.doc.active_block_idx = new_idx;
+                self.doc.requested_focus_block_idx = Some(new_idx);
                 self.set_notification("Inserted Level 1 Heading (Bold).");
             }
             Action::InsertHeading2 => {
                 self.doc.ensure_blocks_initialized();
-                self.doc.add_heading(2, None);
+                let current_idx = if self.doc.blocks.is_empty() {
+                    None
+                } else {
+                    Some(self.doc.active_block_idx.min(self.doc.blocks.len() - 1))
+                };
+                let new_idx = self.doc.add_heading(2, current_idx);
+                self.doc.active_block_idx = new_idx;
+                self.doc.requested_focus_block_idx = Some(new_idx);
                 self.set_notification("Inserted Level 2 Heading (Italic).");
+            }
+            Action::InsertHeading3 => {
+                self.doc.ensure_blocks_initialized();
+                let current_idx = if self.doc.blocks.is_empty() {
+                    None
+                } else {
+                    Some(self.doc.active_block_idx.min(self.doc.blocks.len() - 1))
+                };
+                let new_idx = self.doc.add_heading(3, current_idx);
+                self.doc.active_block_idx = new_idx;
+                self.doc.requested_focus_block_idx = Some(new_idx);
+                self.set_notification("Inserted Level 3 Heading (Centered).");
             }
             Action::InsertCitation => {
                 self.citation_state.open(None);
+            }
+            Action::DeleteBlock => {
+                if self.doc.blocks.len() > 1 {
+                    let idx = self.doc.active_block_idx.min(self.doc.blocks.len() - 1);
+                    let prev_idx = if idx > 0 { idx - 1 } else { 0 };
+                    self.doc.remove_block(idx);
+                    self.doc.active_block_idx = prev_idx;
+                    self.doc.requested_focus_block_idx = Some(prev_idx);
+                    self.set_notification("Deleted block.");
+                } else {
+                    self.set_notification("Cannot delete the only paragraph.");
+                }
+            }
+            Action::MoveBlockUp => {
+                if self.doc.active_block_idx > 0 {
+                    self.doc.move_block_up(self.doc.active_block_idx);
+                    self.doc.active_block_idx -= 1;
+                    self.doc.requested_focus_block_idx = Some(self.doc.active_block_idx);
+                    self.set_notification("Moved block up.");
+                }
+            }
+            Action::MoveBlockDown => {
+                if self.doc.active_block_idx + 1 < self.doc.blocks.len() {
+                    self.doc.move_block_down(self.doc.active_block_idx);
+                    self.doc.active_block_idx += 1;
+                    self.doc.requested_focus_block_idx = Some(self.doc.active_block_idx);
+                    self.set_notification("Moved block down.");
+                }
             }
             Action::ManageWorksCited => {
                 self.works_cited_state.open_new();
@@ -307,12 +375,23 @@ impl eframe::App for MlaApp {
                             ToolbarEvent::AddHeading(level) => {
                                 if level == 1 {
                                     self.handle_action(Action::InsertHeading1);
-                                } else {
+                                } else if level == 2 {
                                     self.handle_action(Action::InsertHeading2);
+                                } else {
+                                    self.handle_action(Action::InsertHeading3);
                                 }
                             }
                             ToolbarEvent::InsertCitation => {
-                                self.handle_action(Action::InsertCitation)
+                                self.handle_action(Action::InsertCitation);
+                            }
+                            ToolbarEvent::DeleteBlock => {
+                                self.handle_action(Action::DeleteBlock);
+                            }
+                            ToolbarEvent::MoveBlockUp => {
+                                self.handle_action(Action::MoveBlockUp);
+                            }
+                            ToolbarEvent::MoveBlockDown => {
+                                self.handle_action(Action::MoveBlockDown);
                             }
                             ToolbarEvent::FormatTitleCase => {
                                 self.handle_action(Action::ConvertToMlaTitleCase)
