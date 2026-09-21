@@ -15,6 +15,10 @@ fn test_mla_title_case_capitalization() {
         to_mla_title_case("waiting for godot: a tragicomedy in two acts"),
         "Waiting for Godot: A Tragicomedy in Two Acts"
     );
+    assert_eq!(
+        to_mla_title_case("the bird is in the sky and it is singing"),
+        "The Bird is in the Sky and it is Singing"
+    );
 }
 
 #[test]
@@ -218,16 +222,17 @@ fn test_word_count_and_pdf_page_count() {
     let mut doc = scholia::model::MlaDocument::new_blank();
     doc.title = "A Scholarly Analysis".to_string();
     assert_eq!(doc.total_word_count(), 3);
-    assert_eq!(doc.estimated_page_count(), 1);
+    // 1 page body + 1 page Works Cited = 2 pages
+    assert_eq!(doc.estimated_page_count(), 2);
 
     // Add 300 words into a paragraph
     let words = vec!["word"; 300].join(" ");
     doc.blocks[0].text_mut().push_str(&words);
     assert_eq!(doc.total_word_count(), 303);
-    // 300 words body => ceil(300 / 250) = 2 pages
-    assert_eq!(doc.estimated_page_count(), 2);
+    // 300 words body => ceil(300 / 250) = 2 pages body + 1 page Works Cited = 3 pages
+    assert_eq!(doc.estimated_page_count(), 3);
 
-    // Adding Works Cited entry adds 1 page for the separate Works Cited page
+    // Adding Works Cited entry (still fits on the separate Works Cited page)
     let mut entry = scholia::model::WorksCitedEntry::new_empty();
     entry.author = "Smith, John".to_string();
     entry.title_of_source = "A Book".to_string();

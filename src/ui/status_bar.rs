@@ -1,9 +1,19 @@
 use crate::fonts::icons;
+use crate::mla_rules::MlaLinter;
 use crate::model::MlaDocument;
 use crate::theme::ThemeConfig;
-use egui::{Color32, Ui};
+use egui::{Color32, RichText, Ui};
 
-pub fn render_status_bar(ui: &mut Ui, doc: &MlaDocument, theme: &ThemeConfig) {
+pub enum StatusBarEvent {
+    OpenCompliance,
+}
+
+pub fn render_status_bar(
+    ui: &mut Ui,
+    doc: &MlaDocument,
+    theme: &ThemeConfig,
+) -> Option<StatusBarEvent> {
+    let mut event = None;
     let word_count = doc.total_word_count();
     let char_count = doc.total_char_count();
     let est_pages = doc.estimated_page_count();
@@ -13,7 +23,7 @@ pub fn render_status_bar(ui: &mut Ui, doc: &MlaDocument, theme: &ThemeConfig) {
     let accent_col = theme.accent_color();
 
     ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 16.0;
+        ui.spacing_mut().item_spacing.x = 12.0;
 
         // Save state indicator
         if doc.is_dirty {
@@ -34,14 +44,35 @@ pub fn render_status_bar(ui: &mut Ui, doc: &MlaDocument, theme: &ThemeConfig) {
                 .and_then(|f| f.to_str())
                 .unwrap_or("Document");
             ui.label(
-                egui::RichText::new(format!("{} {}", icons::FOLDER_OPEN, filename)).color(text_col),
+                RichText::new(format!("{} {}", icons::FOLDER_OPEN, filename)).color(text_col),
             );
         }
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            // MLA Compliance score pill on the footer
+            let report = MlaLinter::inspect(doc);
+            let (score_col, score_icon) = if report.score_percentage >= 95 {
+                (Color32::from_rgb(50, 200, 100), icons::CHECK)
+            } else if report.score_percentage >= 75 {
+                (Color32::from_rgb(240, 170, 40), icons::WARNING)
+            } else {
+                (Color32::from_rgb(240, 70, 70), icons::TIMES)
+            };
+
+            let comp_label = format!("{} MLA: {}%", score_icon, report.score_percentage);
+            if ui
+                .button(RichText::new(comp_label).strong().size(11.5).color(score_col))
+                .on_hover_text("Open MLA 9 Compliance Inspector (Ctrl+Shift+C)")
+                .clicked()
+            {
+                event = Some(StatusBarEvent::OpenCompliance);
+            }
+
+            ui.separator();
+
             // Stats
             ui.label(
-                egui::RichText::new(format!("⏳ ~{} min read", reading_time.max(1)))
+                RichText::new(format!("⏳ ~{} min read", reading_time.max(1)))
                     .color(text_col)
                     .size(11.5),
             );
@@ -49,7 +80,7 @@ pub fn render_status_bar(ui: &mut Ui, doc: &MlaDocument, theme: &ThemeConfig) {
             ui.separator();
 
             ui.label(
-                egui::RichText::new(format!(
+                RichText::new(format!(
                     "{} ~{} Page{} (PDF)",
                     icons::FILE_NEW,
                     est_pages,
@@ -63,7 +94,7 @@ pub fn render_status_bar(ui: &mut Ui, doc: &MlaDocument, theme: &ThemeConfig) {
             ui.separator();
 
             ui.label(
-                egui::RichText::new(format!("{} {} chars", icons::TEXT, char_count))
+                RichText::new(format!("{} {} chars", icons::TEXT, char_count))
                     .color(text_col)
                     .size(11.5),
             );
@@ -71,11 +102,13 @@ pub fn render_status_bar(ui: &mut Ui, doc: &MlaDocument, theme: &ThemeConfig) {
             ui.separator();
 
             ui.label(
-                egui::RichText::new(format!("{} {} words", icons::EDIT, word_count))
+                RichText::new(format!("{} {} words", icons::EDIT, word_count))
                     .color(theme.text_color())
                     .strong()
                     .size(12.0),
             );
         });
     });
+
+    event
 }

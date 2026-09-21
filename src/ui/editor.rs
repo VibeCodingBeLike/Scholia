@@ -540,7 +540,7 @@ pub fn render_editor_page(
                         if doc.works_cited.is_empty() {
                             ui.vertical_centered(|ui| {
                                 ui.label(
-                                    RichText::new("No entries in Works Cited yet. Use toolbar or Ctrl+W to add sources.")
+                                    RichText::new("No entries yet")
                                         .font(doc_font(14.0))
                                         .italics()
                                         .color(muted_col),
@@ -596,7 +596,7 @@ pub fn render_editor_page(
 
 fn render_keybind_preview_panel(
     ui: &mut Ui,
-    doc: &MlaDocument,
+    _doc: &MlaDocument,
     theme: &ThemeConfig,
     keybinds: &KeybindConfig,
     sidebar_width: f32,
@@ -616,69 +616,6 @@ fn render_keybind_preview_panel(
             ui.set_max_width(sidebar_width);
             ui.spacing_mut().item_spacing.y = 5.0;
 
-            // --- Document Stats Section ---
-            ui.label(
-                RichText::new(format!("{} DOCUMENT STATS", icons::TEXT))
-                    .strong()
-                    .size(10.5)
-                    .color(accent_col),
-            );
-
-            let word_count = doc.total_word_count();
-            let est_pages = doc.estimated_page_count();
-            let char_count = doc.total_char_count();
-            let read_min = ((word_count as f32) / 200.0).ceil() as usize;
-
-            ui.horizontal(|ui| {
-                ui.label(RichText::new("Word Count:").size(11.0).color(muted_col));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(
-                        RichText::new(format!("{}", word_count))
-                            .strong()
-                            .size(11.5)
-                            .color(theme.text_color()),
-                    );
-                });
-            });
-
-            ui.horizontal(|ui| {
-                ui.label(RichText::new("PDF Pages:").size(11.0).color(muted_col));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(
-                        RichText::new(format!("~{}", est_pages))
-                            .strong()
-                            .size(11.5)
-                            .color(accent_col),
-                    );
-                });
-            });
-
-            ui.horizontal(|ui| {
-                ui.label(RichText::new("Characters:").size(11.0).color(muted_col));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(
-                        RichText::new(format!("{}", char_count))
-                            .size(11.0)
-                            .color(muted_col),
-                    );
-                });
-            });
-
-            ui.horizontal(|ui| {
-                ui.label(RichText::new("Read Time:").size(11.0).color(muted_col));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(
-                        RichText::new(format!("~{} min", read_min.max(1)))
-                            .size(11.0)
-                            .color(muted_col),
-                    );
-                });
-            });
-
-            ui.add_space(4.0);
-            ui.separator();
-            ui.add_space(2.0);
-
             // Header
             ui.horizontal(|ui| {
                 ui.label(
@@ -688,12 +625,6 @@ fn render_keybind_preview_panel(
                         .color(accent_col),
                 );
             });
-            ui.label(
-                RichText::new("Live custom keybinds")
-                    .size(10.0)
-                    .color(muted_col),
-            );
-
             ui.add_space(2.0);
             ui.separator();
 

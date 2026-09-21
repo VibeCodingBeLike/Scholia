@@ -273,16 +273,13 @@ impl MlaDocument {
     }
 
     /// Estimated page count based on ~250 words per standard double-spaced MLA page,
-    /// plus Works Cited on its own page if non-empty.
+    /// plus the Works Cited on its own separate page.
     pub fn estimated_page_count(&self) -> usize {
         let body_words: usize = self.blocks.iter().map(|b| count_words(b.text())).sum();
         let body_pages = ((body_words as f32) / 250.0).ceil() as usize;
         let body_pages = if body_pages == 0 { 1 } else { body_pages };
-        if !self.works_cited.is_empty() {
-            body_pages + 1
-        } else {
-            body_pages
-        }
+        // The Works Cited list is always formatted on its own separate page at the conclusion of the manuscript
+        body_pages + 1
     }
 
     pub fn add_paragraph(&mut self, after_index: Option<usize>) -> usize {
@@ -399,9 +396,9 @@ pub fn to_mla_title_case(input: &str) -> String {
     }
 
     let lowercase_words = [
-        "a", "an", "the", "and", "but", "or", "nor", "for", "so", "yet", "as", "at", "by", "for",
+        "a", "an", "the", "and", "but", "or", "nor", "for", "so", "yet", "as", "at", "by",
         "from", "in", "into", "of", "off", "on", "onto", "out", "over", "to", "up", "with", "vs",
-        "via", "than",
+        "via", "than", "is", "if", "it", "its", "are", "be", "am", "was", "were", "per", "en",
     ];
 
     let total = words.len();
@@ -417,12 +414,25 @@ pub fn to_mla_title_case(input: &str) -> String {
                 false
             };
 
+            let clean = lower.trim_matches(|c: char| !c.is_alphanumeric());
+
             // Check if hyphenated
             if lower.contains('-') {
-                let parts: Vec<String> = lower.split('-').map(capitalize_first).collect();
+                let parts: Vec<String> = lower
+                    .split('-')
+                    .enumerate()
+                    .map(|(pi, p)| {
+                        let p_clean = p.trim_matches(|c: char| !c.is_alphanumeric());
+                        if pi > 0 && lowercase_words.contains(&p_clean) {
+                            p.to_string()
+                        } else {
+                            capitalize_first(p)
+                        }
+                    })
+                    .collect();
                 parts.join("-")
             } else if (i == 0 || i == total - 1 || is_after_colon)
-                || !lowercase_words.contains(&lower.as_str())
+                || !lowercase_words.contains(&clean)
             {
                 capitalize_first(&lower)
             } else {
@@ -436,10 +446,18 @@ pub fn to_mla_title_case(input: &str) -> String {
 
 fn capitalize_first(s: &str) -> String {
     let mut chars = s.chars();
-    match chars.next() {
-        None => String::new(),
-        Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
+    let mut leading = String::new();
+    for c in chars.by_ref() {
+        if c.is_alphanumeric() {
+            let mut res = leading;
+            res.extend(c.to_uppercase());
+            res.push_str(chars.as_str());
+            return res;
+        } else {
+            leading.push(c);
+        }
     }
+    leading
 }
 
 pub fn generate_block_id(seed: usize) -> String {

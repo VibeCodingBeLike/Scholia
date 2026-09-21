@@ -19,14 +19,14 @@ use ui::{
     render_calendar_popup, render_citation_modal, render_compliance_modal, render_editor_page,
     render_settings_modal, render_status_bar, render_toolbar, render_works_cited_modal,
     CalendarModalState, CitationModalState, ComplianceModalState, EditorAction, SettingsModalState,
-    ToolbarEvent, WorksCitedModalState,
+    StatusBarEvent, ToolbarEvent, WorksCitedModalState,
 };
 
 fn main() -> eframe::Result<()> {
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_transparent(true)
-            .with_decorations(true)
+            .with_decorations(false)
             .with_inner_size([1120.0, 860.0])
             .with_min_inner_size([720.0, 500.0])
             .with_title("Scholia — MLA 9th Edition Document Editor"),
@@ -269,7 +269,8 @@ impl MlaApp {
                 self.compliance_state.is_open = true;
             }
             Action::ToggleFocusMode => {
-                self.focus_mode = !self.focus_mode;
+                self.focus_mode = true;
+                self.set_notification("Entered Zen Mode (Press Esc to exit).");
             }
         }
     }
@@ -299,47 +300,13 @@ impl eframe::App for MlaApp {
             }
         }
 
-        // If in Zen / Focus Mode, Escape key or F11 unconditionally exits!
+        // If in Zen / Focus Mode, only Escape key exits!
         if self.focus_mode {
             let input = ui.input(|i| i.clone());
-            if input.key_pressed(egui::Key::Escape) || input.key_pressed(egui::Key::F11) {
+            if input.key_pressed(egui::Key::Escape) {
                 self.focus_mode = false;
                 self.set_notification("Exited Zen Mode.");
             }
-        }
-
-        // Floating Exit Zen Mode button when in Zen Mode
-        if self.focus_mode {
-            egui::Area::new(egui::Id::new("zen_mode_floating_exit_pill"))
-                .anchor(egui::Align2::RIGHT_TOP, [-24.0, 16.0])
-                .order(egui::Order::Foreground)
-                .show(ui.ctx(), |ui| {
-                    egui::Frame::new()
-                        .fill(self.theme.card_fill_color())
-                        .stroke(self.theme.page_stroke())
-                        .corner_radius(20.0)
-                        .inner_margin(egui::Margin::symmetric(14, 8))
-                        .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                if ui
-                                    .button(
-                                        egui::RichText::new(format!(
-                                            "{} Exit Zen Mode (Esc)",
-                                            fonts::icons::FOCUS_MODE
-                                        ))
-                                        .strong()
-                                        .size(12.5)
-                                        .color(self.theme.accent_color()),
-                                    )
-                                    .on_hover_text("Click or press Escape / F11 to exit Zen Mode")
-                                    .clicked()
-                                {
-                                    self.focus_mode = false;
-                                    self.set_notification("Exited Zen Mode.");
-                                }
-                            });
-                        });
-                });
         }
 
         // Outer App Container with customizable window opacity & tint
@@ -368,7 +335,6 @@ impl eframe::App for MlaApp {
                                     self.set_notification("Exported plain text.");
                                 }
                             }
-                            ToolbarEvent::AddParagraph => self.handle_action(Action::AddParagraph),
                             ToolbarEvent::AddBlockquote => {
                                 self.handle_action(Action::InsertBlockQuote)
                             }
@@ -381,48 +347,12 @@ impl eframe::App for MlaApp {
                                     self.handle_action(Action::InsertHeading3);
                                 }
                             }
-                            ToolbarEvent::InsertCitation => {
-                                self.handle_action(Action::InsertCitation);
-                            }
-                            ToolbarEvent::DeleteBlock => {
-                                self.handle_action(Action::DeleteBlock);
-                            }
-                            ToolbarEvent::MoveBlockUp => {
-                                self.handle_action(Action::MoveBlockUp);
-                            }
-                            ToolbarEvent::MoveBlockDown => {
-                                self.handle_action(Action::MoveBlockDown);
-                            }
-                            ToolbarEvent::FormatTitleCase => {
-                                self.handle_action(Action::ConvertToMlaTitleCase)
-                            }
                             ToolbarEvent::OpenWorksCited => {
                                 self.handle_action(Action::ManageWorksCited)
-                            }
-                            ToolbarEvent::OpenCompliance => {
-                                self.handle_action(Action::ToggleComplianceCheck)
-                            }
-                            ToolbarEvent::OpenSettings => {
-                                self.handle_action(Action::OpenPreferences)
-                            }
-                            ToolbarEvent::ToggleFocusMode => {
-                                self.handle_action(Action::ToggleFocusMode)
                             }
                         }
                     }
                     ui.add_space(4.0);
-                }
-
-                // Temporary notification toast banner
-                if let Some((msg, created)) = &self.notification {
-                    if created.elapsed().as_secs() < 4 {
-                        ui.horizontal(|ui| {
-                            ui.colored_label(
-                                egui::Color32::from_rgb(100, 200, 255),
-                                format!("ℹ {}", msg),
-                            );
-                        });
-                    }
                 }
 
                 // Core Editor Canvas
@@ -459,9 +389,44 @@ impl eframe::App for MlaApp {
                 // Bottom Status Bar
                 if !self.focus_mode {
                     ui.separator();
-                    render_status_bar(ui, &self.doc, &self.theme);
+                    if let Some(StatusBarEvent::OpenCompliance) =
+                        render_status_bar(ui, &self.doc, &self.theme)
+                    {
+                        self.compliance_state.is_open = true;
+                    }
                 }
             });
+
+        // Floating toast notification overlay in bottom right just above the footer
+        if let Some((msg, created)) = &self.notification {
+            if created.elapsed().as_secs() < 4 {
+                egui::Area::new(egui::Id::new("toast_notification_overlay"))
+                    .anchor(egui::Align2::RIGHT_BOTTOM, [-20.0, -42.0])
+                    .order(egui::Order::Foreground)
+                    .show(ui.ctx(), |ui| {
+                        egui::Frame::new()
+                            .fill(self.theme.card_fill_color())
+                            .stroke(egui::Stroke::new(1.0, self.theme.accent_color()))
+                            .corner_radius(8.0)
+                            .shadow(egui::Shadow {
+                                offset: [0, 3],
+                                blur: 8,
+                                spread: 0,
+                                color: egui::Color32::from_black_alpha(80),
+                            })
+                            .inner_margin(egui::Margin::symmetric(14, 8))
+                            .show(ui, |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label(
+                                        egui::RichText::new(format!("ℹ  {}", msg))
+                                            .size(12.5)
+                                            .color(self.theme.text_color()),
+                                    );
+                                });
+                            });
+                    });
+            }
+        }
 
         // --- Render Modals ---
         let mut citation_insert = None;

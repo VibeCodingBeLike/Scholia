@@ -95,12 +95,9 @@ pub fn render_compliance_modal(
 
             ui.horizontal(|ui| {
                 if report.issues.iter().any(|i| i.can_auto_fix)
-                    && ui.button(RichText::new("⚡ Auto-Fix All Compatible Issues").strong()).clicked()
+                    && ui.button(RichText::new("⚡ Auto-Fix Title Case").color(Color32::from_rgb(50, 180, 100)).strong()).clicked()
                 {
-                    let fixable_ids: Vec<String> = report.issues.iter().filter(|i| i.can_auto_fix).map(|i| i.rule_id.to_string()).collect();
-                    for id in fixable_ids {
-                        MlaLinter::auto_fix(doc, &id);
-                    }
+                    MlaLinter::auto_fix(doc, "TITLE_CASE");
                 }
 
                 if ui.button("Close").clicked() {

@@ -1,9 +1,8 @@
 use crate::fonts::icons;
 use crate::keybinds::{Action, KeybindConfig};
-use crate::mla_rules::MlaLinter;
 use crate::model::MlaDocument;
 use crate::theme::ThemeConfig;
-use egui::{Color32, RichText, Ui};
+use egui::{RichText, Ui};
 
 pub enum ToolbarEvent {
     NewDoc,
@@ -12,18 +11,9 @@ pub enum ToolbarEvent {
     ExportDocx,
     ExportHtml,
     ExportText,
-    AddParagraph,
     AddBlockquote,
     AddHeading(u8),
-    InsertCitation,
-    DeleteBlock,
-    MoveBlockUp,
-    MoveBlockDown,
-    FormatTitleCase,
     OpenWorksCited,
-    OpenCompliance,
-    OpenSettings,
-    ToggleFocusMode,
 }
 
 pub fn render_toolbar(
@@ -37,7 +27,7 @@ pub fn render_toolbar(
     let text_col = theme.text_color();
     let accent_col = theme.accent_color();
 
-    ui.horizontal_wrapped(|ui| {
+    ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
 
         // Brand / Title
@@ -126,19 +116,7 @@ pub fn render_toolbar(
 
         ui.separator();
 
-        // --- MLA Block Inserters ---
-        let p_sc = keybinds.get_shortcut(Action::AddParagraph).display_string();
-        if ui
-            .button(RichText::new(format!("{} Paragraph", icons::PARAGRAPH)).color(text_col))
-            .on_hover_text(format!(
-                "Add double-spaced 0.5\" indented body paragraph (Enter or {})",
-                p_sc
-            ))
-            .clicked()
-        {
-            event = Some(ToolbarEvent::AddParagraph);
-        }
-
+        // --- MLA Structure Inserters ---
         let bq_sc = keybinds
             .get_shortcut(Action::InsertBlockQuote)
             .display_string();
@@ -186,66 +164,7 @@ pub fn render_toolbar(
             event = Some(ToolbarEvent::AddHeading(3));
         }
 
-        let cite_sc = keybinds
-            .get_shortcut(Action::InsertCitation)
-            .display_string();
-        if ui
-            .button(RichText::new(format!("{} Citation", icons::QUOTE)).color(accent_col))
-            .on_hover_text(format!(
-                "Insert in-text parenthetical citation e.g. (Author 42) ({})",
-                cite_sc
-            ))
-            .clicked()
-        {
-            event = Some(ToolbarEvent::InsertCitation);
-        }
-
         ui.separator();
-
-        // --- Block Arrange & Delete ---
-        let del_sc = keybinds.get_shortcut(Action::DeleteBlock).display_string();
-        if ui
-            .button(RichText::new(format!("{} Delete", icons::TRASH)).color(Color32::from_rgb(230, 90, 90)))
-            .on_hover_text(format!("Delete active block ({})", del_sc))
-            .clicked()
-        {
-            event = Some(ToolbarEvent::DeleteBlock);
-        }
-
-        let up_sc = keybinds.get_shortcut(Action::MoveBlockUp).display_string();
-        if ui
-            .button(RichText::new(format!("{} Up", icons::ARROW_UP)).color(text_col))
-            .on_hover_text(format!("Move active block up ({})", up_sc))
-            .clicked()
-        {
-            event = Some(ToolbarEvent::MoveBlockUp);
-        }
-
-        let dn_sc = keybinds.get_shortcut(Action::MoveBlockDown).display_string();
-        if ui
-            .button(RichText::new(format!("{} Down", icons::ARROW_DOWN)).color(text_col))
-            .on_hover_text(format!("Move active block down ({})", dn_sc))
-            .clicked()
-        {
-            event = Some(ToolbarEvent::MoveBlockDown);
-        }
-
-        ui.separator();
-
-        // Title case helper
-        let tc_sc = keybinds
-            .get_shortcut(Action::ConvertToMlaTitleCase)
-            .display_string();
-        if ui
-            .button(RichText::new(format!("{} Title Case", icons::TITLE_CASE)).color(text_col))
-            .on_hover_text(format!(
-                "Format document title to MLA Capitalization rules ({})",
-                tc_sc
-            ))
-            .clicked()
-        {
-            event = Some(ToolbarEvent::FormatTitleCase);
-        }
 
         // Works Cited Manager button with count
         let wc_sc = keybinds
@@ -264,69 +183,71 @@ pub fn render_toolbar(
             event = Some(ToolbarEvent::OpenWorksCited);
         }
 
-        ui.separator();
-
-        // MLA Compliance score pill
-        let report = MlaLinter::inspect(doc);
-        let (score_col, score_icon) = if report.score_percentage >= 95 {
-            (Color32::from_rgb(50, 200, 100), icons::CHECK)
-        } else if report.score_percentage >= 75 {
-            (Color32::from_rgb(240, 170, 40), icons::WARNING)
-        } else {
-            (Color32::from_rgb(240, 70, 70), icons::TIMES)
-        };
-
-        let chk_sc = keybinds
-            .get_shortcut(Action::ToggleComplianceCheck)
-            .display_string();
-        let comp_label = format!("{} MLA: {}%", score_icon, report.score_percentage);
-        if ui
-            .button(RichText::new(comp_label).strong().color(score_col))
-            .on_hover_text(format!("Run MLA 9 Compliance Inspector ({})", chk_sc))
-            .clicked()
-        {
-            event = Some(ToolbarEvent::OpenCompliance);
+        // Draggable empty space between tools and window controls
+        let avail_rect = ui.available_rect_before_wrap();
+        let mut drag_rect = avail_rect;
+        if drag_rect.width() > 100.0 {
+            drag_rect.max.x -= 95.0;
+            let drag_resp = ui.interact(
+                drag_rect,
+                ui.id().with("toolbar_drag_space"),
+                egui::Sense::click_and_drag(),
+            );
+            if drag_resp.drag_started() {
+                ui.ctx().send_viewport_cmd(egui::ViewportCommand::StartDrag);
+            }
+            if drag_resp.double_clicked() {
+                let is_max = ui.input(|i| i.viewport().maximized.unwrap_or(false));
+                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!is_max));
+            }
         }
 
-        ui.separator();
+        // Window Controls (Minimize, Maximize/Restore, Close) on the top right
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
 
-        // Settings & Zen Mode buttons
-        let set_sc = keybinds.get_shortcut(Action::OpenPreferences).display_string();
-        if ui
-            .button(RichText::new(format!("{} Settings", icons::SETTINGS)).color(text_col))
-            .on_hover_text(format!("Open Preferences ({})", set_sc))
-            .clicked()
-        {
-            event = Some(ToolbarEvent::OpenSettings);
-        }
+            // Close button
+            let close_btn = ui.add(
+                egui::Button::new(
+                    RichText::new("✕")
+                        .size(12.0)
+                        .color(text_col)
+                        .strong(),
+                )
+                .min_size(egui::vec2(26.0, 22.0))
+            ).on_hover_text("Close");
+            if close_btn.clicked() {
+                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+            }
 
-        let zen_sc = keybinds.get_shortcut(Action::ToggleFocusMode).display_string();
-        if ui
-            .button(RichText::new(format!("{} Zen", icons::FOCUS_MODE)).color(accent_col))
-            .on_hover_text(format!("Toggle Zen Mode ({})", zen_sc))
-            .clicked()
-        {
-            event = Some(ToolbarEvent::ToggleFocusMode);
-        }
+            // Maximize / Restore button
+            let is_max = ui.input(|i| i.viewport().maximized.unwrap_or(false));
+            let max_char = if is_max { "🗗" } else { "🗖" };
+            let max_btn = ui.add(
+                egui::Button::new(
+                    RichText::new(max_char)
+                        .size(11.0)
+                        .color(text_col),
+                )
+                .min_size(egui::vec2(26.0, 22.0))
+            ).on_hover_text(if is_max { "Restore" } else { "Maximize" });
+            if max_btn.clicked() {
+                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!is_max));
+            }
 
-        ui.separator();
-
-        // Live Document Stats (Words & PDF Pages)
-        let word_count = doc.total_word_count();
-        let est_pages = doc.estimated_page_count();
-        ui.label(
-            RichText::new(format!(
-                "{} ~{} Page{} (PDF)   {} {} Words",
-                icons::FILE_NEW,
-                est_pages,
-                if est_pages == 1 { "" } else { "s" },
-                icons::EDIT,
-                word_count
-            ))
-            .size(11.5)
-            .strong()
-            .color(accent_col),
-        );
+            // Minimize button
+            let min_btn = ui.add(
+                egui::Button::new(
+                    RichText::new("🗕")
+                        .size(11.0)
+                        .color(text_col),
+                )
+                .min_size(egui::vec2(26.0, 22.0))
+            ).on_hover_text("Minimize");
+            if min_btn.clicked() {
+                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+            }
+        });
     });
 
     event

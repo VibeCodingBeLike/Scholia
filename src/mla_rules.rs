@@ -108,7 +108,7 @@ impl MlaLinter {
                 description: "MLA requires the date of submission in Day Month Year order."
                     .to_string(),
                 severity: RuleSeverity::Error,
-                can_auto_fix: true,
+                can_auto_fix: false,
             });
         } else if !is_valid_mla_date(date_str) {
             issues.push(RuleIssue {
@@ -119,7 +119,7 @@ impl MlaLinter {
                     date_str
                 ),
                 severity: RuleSeverity::Warning,
-                can_auto_fix: true,
+                can_auto_fix: false,
             });
         } else {
             passed += 1;
@@ -133,7 +133,7 @@ impl MlaLinter {
                 title: "Missing Running Header Last Name",
                 description: "MLA 9 requires author's last name followed by page number at top right of every page.".to_string(),
                 severity: RuleSeverity::Warning,
-                can_auto_fix: true,
+                can_auto_fix: false,
             });
         } else {
             passed += 1;
@@ -157,21 +157,18 @@ impl MlaLinter {
                     title: "Period at End of Title",
                     description: "MLA paper titles should not end with a period.".to_string(),
                     severity: RuleSeverity::Warning,
-                    can_auto_fix: true,
+                    can_auto_fix: false,
                 });
             }
-            if title_trim
-                .chars()
-                .filter(|c| c.is_alphabetic())
-                .all(|c| c.is_uppercase())
-                && title_trim.len() > 4
-            {
+            let expected_title_case = crate::model::to_mla_title_case(title_trim);
+            if title_trim != expected_title_case {
                 issues.push(RuleIssue {
-                    rule_id: "TITLE_ALL_CAPS",
-                    title: "Title is in ALL CAPS",
-                    description:
-                        "MLA style prohibits all-capitalized paper titles. Use MLA Title Case."
-                            .to_string(),
+                    rule_id: "TITLE_CASE",
+                    title: "Title Capitalization",
+                    description: format!(
+                        "MLA requires Title Case (e.g. '{}'). Short words like 'is', 'the', and prepositions are not capitalized.",
+                        expected_title_case
+                    ),
                     severity: RuleSeverity::Warning,
                     can_auto_fix: true,
                 });
@@ -244,7 +241,7 @@ impl MlaLinter {
                     title: "Works Cited Not Alphabetized",
                     description: "MLA 9 requires Works Cited entries to be alphabetized by author's last name or primary title.".to_string(),
                     severity: RuleSeverity::Warning,
-                    can_auto_fix: true,
+                    can_auto_fix: false,
                 });
             } else {
                 passed += 1;
@@ -280,24 +277,9 @@ impl MlaLinter {
 
     pub fn auto_fix(doc: &mut MlaDocument, rule_id: &str) {
         match rule_id {
-            "HDR_DATE_MISSING" | "HDR_DATE_FORMAT" => {
-                doc.header.date = crate::model::format_current_mla_date();
-                doc.is_dirty = true;
-            }
-            "HDR_RUNNING_HEAD" => {
-                doc.header.running_header_last_name = doc.header.derived_last_name();
-                doc.is_dirty = true;
-            }
-            "TITLE_PERIOD" => {
-                doc.title = doc.title.trim_end_matches('.').to_string();
-                doc.is_dirty = true;
-            }
-            "TITLE_ALL_CAPS" => {
+            "TITLE_CASE" | "TITLE_ALL_CAPS" => {
                 doc.title = crate::model::to_mla_title_case(&doc.title);
                 doc.is_dirty = true;
-            }
-            "WORKS_CITED_UNSORTED" => {
-                doc.sort_works_cited();
             }
             _ => {}
         }
