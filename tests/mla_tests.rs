@@ -1,4 +1,4 @@
-use scholia::export::{export_to_docx, export_to_html, export_to_text};
+use scholia::export::{export_to_docx, export_to_html, export_to_pdf, export_to_text};
 use scholia::mla_rules::MlaLinter;
 use scholia::model::{
     format_current_mla_date, to_mla_title_case, MlaDocument, SourceType, WorksCitedEntry,
@@ -118,6 +118,15 @@ fn test_document_exporters() {
     assert!(res_txt.is_ok(), "Text export should succeed: {:?}", res_txt);
     assert!(txt_path.exists());
     let _ = std::fs::remove_file(&txt_path);
+
+    // PDF export
+    let pdf_path = temp_dir.join("test_mla_output.pdf");
+    let res_pdf = export_to_pdf(&doc, &pdf_path);
+    assert!(res_pdf.is_ok(), "PDF export should succeed: {:?}", res_pdf);
+    assert!(pdf_path.exists());
+    let pdf_bytes = std::fs::read(&pdf_path).unwrap();
+    assert!(pdf_bytes.starts_with(b"%PDF"));
+    let _ = std::fs::remove_file(&pdf_path);
 }
 
 #[test]

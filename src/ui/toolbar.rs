@@ -91,7 +91,7 @@ pub fn render_toolbar(
                     event = Some(ToolbarEvent::ExportDocx);
                 }
                 if ui
-                    .button(format!("{} Printable HTML / PDF", icons::HTML_PDF))
+                    .button(format!("{} Export PDF (.pdf)", icons::HTML_PDF))
                     .clicked()
                 {
                     event = Some(ToolbarEvent::ExportHtml);

@@ -11,7 +11,7 @@ mod model;
 mod theme;
 mod ui;
 
-use export::{export_to_docx, export_to_html, export_to_text};
+use export::{export_to_docx, export_to_pdf, export_to_text};
 use keybinds::{Action, KeybindConfig};
 use model::{to_mla_title_case, MlaDocument};
 use theme::ThemeConfig;
@@ -150,16 +150,16 @@ impl MlaApp {
             }
             Action::ExportHtmlPdf => {
                 if let Some(path) = rfd::FileDialog::new()
-                    .set_file_name("MLA_Paper_Printable.html")
-                    .add_filter("Printable HTML (*.html)", &["html"])
+                    .set_file_name("MLA_Paper.pdf")
+                    .add_filter("PDF Document (*.pdf)", &["pdf"])
                     .save_file()
                 {
-                    match export_to_html(&self.doc, &path) {
+                    match export_to_pdf(&self.doc, &path) {
                         Ok(_) => self.set_notification(format!(
-                            "Exported Printable HTML: {}",
+                            "Exported PDF: {}",
                             path.display()
                         )),
-                        Err(e) => self.set_notification(format!("HTML export error: {}", e)),
+                        Err(e) => self.set_notification(format!("PDF export error: {}", e)),
                     }
                 }
             }

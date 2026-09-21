@@ -18,6 +18,7 @@ chrono = { version = "0.4.45", features = ["serde"] }
 docx-rs = "0.4.22"
 eframe = { version = "0.36.2", default-features = false, features = ["default_fonts", "wgpu", "wayland", "x11"] }
 egui = "0.36.2"
+printpdf = "0.12.8"
 rfd = "0.17.2"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
