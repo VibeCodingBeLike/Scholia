@@ -45,9 +45,11 @@ pub fn render_editor_page(
 
             // Center container
             ui.horizontal_top(|ui| {
+                ui.spacing_mut().item_spacing.x = 0.0;
+
                 if show_sidebar {
                     // Position sidebar within the left margin so page stays exactly centered
-                    let space_before_sidebar = page_margin_left - sidebar_width - gap;
+                    let space_before_sidebar = (page_margin_left - sidebar_width - gap).max(0.0);
                     if space_before_sidebar > 0.0 {
                         ui.add_space(space_before_sidebar);
                     }
@@ -62,7 +64,11 @@ pub fn render_editor_page(
                         }
                     });
 
-                    ui.add_space(gap);
+                    // Space between sidebar and page to hit exactly page_margin_left
+                    let space_after_sidebar = page_margin_left - (space_before_sidebar + sidebar_width);
+                    if space_after_sidebar > 0.0 {
+                        ui.add_space(space_after_sidebar);
+                    }
                 } else if page_margin_left > 0.0 {
                     // Page is strictly centered
                     ui.add_space(page_margin_left);
@@ -347,10 +353,6 @@ pub fn render_editor_page(
 
                     ui.add_space(40.0);
                 });
-
-                if page_margin_left > 0.0 {
-                    ui.add_space(page_margin_left);
-                }
             });
         });
 
