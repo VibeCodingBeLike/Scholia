@@ -204,7 +204,7 @@ pub fn render_editor_page(
                                 .desired_width(printable_width)
                                 .desired_rows(24)
                                 .lock_focus(true)
-                                .hint_text(RichText::new("Begin typing your MLA paper here...\n\nPress Enter twice to start a new paragraph (0.5\" indent is applied automatically in MLA format).\nUse Ctrl+Shift+C to insert parenthetical citations, e.g. (Smith 42).\nFor long quotations (> 4 lines), prefix with '> ' for an indented blockquote.").italics().color(muted_col)),
+                                .hint_text(RichText::new("Begin typing your MLA paper here...").italics().color(muted_col)),
                         );
 
                         if body_edit.changed() {

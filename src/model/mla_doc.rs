@@ -181,8 +181,7 @@ impl MlaDocument {
 
     pub fn sync_blocks_from_body(&mut self) {
         let mut new_blocks = Vec::new();
-        let paragraphs = self.body.split("\n\n");
-        for (i, p) in paragraphs.enumerate() {
+        for (i, p) in self.body.lines().enumerate() {
             let trimmed = p.trim();
             if trimmed.is_empty() {
                 continue;

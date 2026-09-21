@@ -164,33 +164,33 @@ impl MlaApp {
                 }
             }
             Action::AddParagraph => {
-                if !self.doc.body.ends_with("\n\n") && !self.doc.body.is_empty() {
-                    self.doc.body.push_str("\n\n");
+                if !self.doc.body.ends_with('\n') && !self.doc.body.is_empty() {
+                    self.doc.body.push('\n');
                 }
                 self.doc.sync_blocks_from_body();
                 self.doc.is_dirty = true;
             }
             Action::InsertBlockQuote => {
-                if !self.doc.body.ends_with("\n\n") && !self.doc.body.is_empty() {
-                    self.doc.body.push_str("\n\n");
+                if !self.doc.body.ends_with('\n') && !self.doc.body.is_empty() {
+                    self.doc.body.push('\n');
                 }
-                self.doc.body.push_str("> Blockquote quotation here...\n\n");
+                self.doc.body.push_str("> Blockquote quotation here...\n");
                 self.doc.sync_blocks_from_body();
                 self.doc.is_dirty = true;
             }
             Action::InsertHeading1 => {
-                if !self.doc.body.ends_with("\n\n") && !self.doc.body.is_empty() {
-                    self.doc.body.push_str("\n\n");
+                if !self.doc.body.ends_with('\n') && !self.doc.body.is_empty() {
+                    self.doc.body.push('\n');
                 }
-                self.doc.body.push_str("# Section Heading\n\n");
+                self.doc.body.push_str("# Section Heading\n");
                 self.doc.sync_blocks_from_body();
                 self.doc.is_dirty = true;
             }
             Action::InsertHeading2 => {
-                if !self.doc.body.ends_with("\n\n") && !self.doc.body.is_empty() {
-                    self.doc.body.push_str("\n\n");
+                if !self.doc.body.ends_with('\n') && !self.doc.body.is_empty() {
+                    self.doc.body.push('\n');
                 }
-                self.doc.body.push_str("## Subheading\n\n");
+                self.doc.body.push_str("## Subheading\n");
                 self.doc.sync_blocks_from_body();
                 self.doc.is_dirty = true;
             }

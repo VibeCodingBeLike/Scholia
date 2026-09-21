@@ -25,6 +25,11 @@ if (-not (Test-Path $ExeSource)) {
 # 2. Assemble portable distribution directory
 $DistDir = "dist\Scholia-Portable"
 Write-Host "`n[2/3] Assembling portable directory at $DistDir..." -ForegroundColor Yellow
+
+# Ensure no running instance locks the binary
+Get-Process -Name "scholia" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 500
+
 if (Test-Path $DistDir) {
     Remove-Item -Recurse -Force $DistDir
 }
