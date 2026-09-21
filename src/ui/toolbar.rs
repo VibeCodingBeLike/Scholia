@@ -4,6 +4,7 @@ use crate::model::MlaDocument;
 use crate::theme::ThemeConfig;
 use egui::{RichText, Ui};
 
+#[allow(dead_code)]
 pub enum ToolbarEvent {
     NewDoc,
     OpenDoc,
@@ -80,24 +81,6 @@ pub fn render_toolbar(
             event = Some(ToolbarEvent::SaveDoc);
         }
 
-        let undo_sc = keybinds.get_shortcut(Action::Undo).display_string();
-        if ui
-            .button(RichText::new(format!("{} Undo", icons::UNDO)).color(text_col))
-            .on_hover_text(format!("Undo last action ({})", undo_sc))
-            .clicked()
-        {
-            event = Some(ToolbarEvent::Undo);
-        }
-
-        let redo_sc = keybinds.get_shortcut(Action::Redo).display_string();
-        if ui
-            .button(RichText::new(format!("{} Redo", icons::REDO)).color(text_col))
-            .on_hover_text(format!("Redo action ({})", redo_sc))
-            .clicked()
-        {
-            event = Some(ToolbarEvent::Redo);
-        }
-
         // Export dropdown / buttons (shortcuts removed as requested)
         egui::ComboBox::from_id_salt("export_cb")
             .selected_text(
@@ -125,56 +108,6 @@ pub fn render_toolbar(
                     event = Some(ToolbarEvent::ExportText);
                 }
             });
-
-        ui.separator();
-
-        // --- MLA Structure Inserters ---
-        let bq_sc = keybinds
-            .get_shortcut(Action::InsertBlockQuote)
-            .display_string();
-        if ui
-            .button(RichText::new(format!("{} Block Quote", icons::QUOTE)).color(text_col))
-            .on_hover_text(format!(
-                "Insert 0.5\" indented block quotation for >4 lines of prose ({})",
-                bq_sc
-            ))
-            .clicked()
-        {
-            event = Some(ToolbarEvent::AddBlockquote);
-        }
-
-        let h1_sc = keybinds
-            .get_shortcut(Action::InsertHeading1)
-            .display_string();
-        if ui
-            .button(RichText::new(format!("{} H1", icons::HEADING)).color(text_col))
-            .on_hover_text(format!("Insert MLA Level 1 Section Heading (Bold Flush Left) ({})", h1_sc))
-            .clicked()
-        {
-            event = Some(ToolbarEvent::AddHeading(1));
-        }
-
-        let h2_sc = keybinds
-            .get_shortcut(Action::InsertHeading2)
-            .display_string();
-        if ui
-            .button(RichText::new(format!("{} H2", icons::HEADING)).color(text_col))
-            .on_hover_text(format!("Insert MLA Level 2 Section Heading (Italic Flush Left) ({})", h2_sc))
-            .clicked()
-        {
-            event = Some(ToolbarEvent::AddHeading(2));
-        }
-
-        let h3_sc = keybinds
-            .get_shortcut(Action::InsertHeading3)
-            .display_string();
-        if ui
-            .button(RichText::new(format!("{} H3", icons::HEADING)).color(text_col))
-            .on_hover_text(format!("Insert MLA Level 3 Section Heading (Bold Centered) ({})", h3_sc))
-            .clicked()
-        {
-            event = Some(ToolbarEvent::AddHeading(3));
-        }
 
         ui.separator();
 

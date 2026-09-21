@@ -309,22 +309,6 @@ pub fn render_editor_page(
                                         }
                                     }
 
-                                    // Automatic Block Quote Detection (>4 lines of prose or >250 chars)
-                                    let line_count = text.lines().count();
-                                    let char_count = text.len();
-                                    if line_count >= 4 || char_count >= 250 {
-                                        ui.horizontal(|ui| {
-                                            ui.label(
-                                                RichText::new("💡 MLA Rule: Quotation exceeds 4 lines of prose.")
-                                                    .size(11.0)
-                                                    .color(egui::Color32::from_rgb(220, 150, 30)),
-                                            );
-                                            if ui.small_button("Convert to Block Quote").clicked() {
-                                                block_to_toggle = Some(b_idx);
-                                            }
-                                        });
-                                    }
-
                                     if resp.has_focus() {
                                         doc.active_block_idx = b_idx;
                                         // If empty paragraph and backspace pressed, remove block (if > 1)

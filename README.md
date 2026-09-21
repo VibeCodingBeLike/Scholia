@@ -89,7 +89,6 @@ It provides a rich, fluent text editing canvas, but **it is fundamentally imposs
   - `Ctrl+Alt+Up` and `Ctrl+Alt+Down` reorder active blocks/paragraphs.
   - Single `Enter` key automatically splits the current paragraph into a new block at cursor position.
   - `Up` and `Down` arrow keys navigate seamlessly across adjacent blocks when cursor reaches top/bottom boundaries.
-  - Block quote detection: automatically prompts to convert prose passages exceeding 4 lines or 250 characters into MLA block quotes.
 - **Typographical Cleaning Engine**:
   - Automatically transforms straight quotes to smart curly quotes (`“ ”`, `‘ ’`) and double dashes `--` to em dashes (`—`).
 - **Customizable Interface**:
