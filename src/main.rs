@@ -26,11 +26,17 @@ use ui::{
 };
 
 fn main() -> eframe::Result<()> {
+    // Windows/Linux: frameless + in-app window controls.
+    // macOS: native traffic lights over the toolbar (no extra title-bar strip).
     let is_macos = cfg!(target_os = "macos");
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_transparent(cfg!(target_os = "windows"))
-            .with_decorations(!is_macos)
+            .with_transparent(cfg!(any(target_os = "windows", target_os = "macos")))
+            .with_decorations(is_macos)
+            .with_fullsize_content_view(is_macos)
+            .with_titlebar_shown(false)
+            .with_title_shown(false)
+            .with_titlebar_buttons_shown(is_macos)
             .with_inner_size([1120.0, 860.0])
             .with_min_inner_size([720.0, 500.0])
             .with_title("Scholia"),
@@ -478,15 +484,14 @@ impl MlaApp {
 
 impl eframe::App for MlaApp {
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
-        #[cfg(target_os = "windows")]
+        #[cfg(any(target_os = "windows", target_os = "macos"))]
         {
-            // Transparent clear color allows OS acrylic / mica / blur to shine through on Windows
+            // Transparent clear color lets OS acrylic / mica / vibrancy show through
             [0.0, 0.0, 0.0, 0.0]
         }
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
         {
-            // On macOS and Linux, clear to the theme window tint with alpha 1.0
-            // so Metal / Wayland / X11 surfaces render cleanly without compositing drops
+            // Linux: opaque clear so Wayland / X11 surfaces render without compositor drops
             let [r, g, b] = self.theme.window_tint_rgb;
             [r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, 1.0]
         }

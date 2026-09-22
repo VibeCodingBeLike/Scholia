@@ -478,11 +478,23 @@ impl ThemeConfig {
 
         #[cfg(target_os = "macos")]
         {
-            // On macOS (and particularly macOS 26+ Tahoe / Sequoia), injecting an NSVisualEffectView
-            // into winit's NSView underneath wgpu's CAMetalLayer breaks CoreAnimation layer compositing,
-            // preventing the Metal swapchain from presenting and resulting in a blank/empty window.
-            // macOS uses native window decorations and direct Metal GPU rendering instead.
-            let _ = window;
+            // Place the NSVisualEffectView behind the Metal layer (BehindWindow blending).
+            // Combined with a transparent wgpu clear color, this restores frosted glass.
+            use window_vibrancy::{NSVisualEffectMaterial, NSVisualEffectState};
+            let _ = window_vibrancy::clear_vibrancy(window);
+            if self.blur_mode != BlurMode::TransparentOnly {
+                let material = if self.blur_mode == BlurMode::Mica {
+                    NSVisualEffectMaterial::HudWindow
+                } else {
+                    NSVisualEffectMaterial::UnderWindowBackground
+                };
+                let _ = window_vibrancy::apply_vibrancy(
+                    window,
+                    material,
+                    Some(NSVisualEffectState::FollowsWindowActiveState),
+                    None,
+                );
+            }
         }
     }
 

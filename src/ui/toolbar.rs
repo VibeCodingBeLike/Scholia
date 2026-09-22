@@ -35,6 +35,11 @@ pub fn render_toolbar(
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
 
+        // Leave room for macOS traffic lights overlaid on the full-size content view
+        if cfg!(target_os = "macos") {
+            ui.add_space(78.0);
+        }
+
         // Brand / Title
         let brand_resp = ui.label(
             RichText::new("Scholia")
