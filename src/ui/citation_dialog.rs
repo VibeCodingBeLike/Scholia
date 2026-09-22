@@ -35,11 +35,18 @@ pub fn render_citation_modal(
     let text_col = theme.text_color();
     let accent_col = theme.accent_color();
 
+    let screen_w = ctx.input(|i| i.viewport().inner_rect.map(|r| r.width()).unwrap_or(1000.0));
+    let screen_h = ctx.input(|i| i.viewport().inner_rect.map(|r| r.height()).unwrap_or(750.0));
+    let max_w = (screen_w * 0.85).clamp(400.0, 560.0);
+    let max_h = (screen_h * 0.85).round();
+
     Window::new("Insert MLA In-Text Citation")
         .open(&mut open)
         .resizable(false)
         .frame(theme.modal_frame())
         .default_width(450.0)
+        .max_width(max_w)
+        .max_height(max_h)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .show(ctx, |ui| {
             ui.spacing_mut().item_spacing.y = 10.0;
@@ -139,11 +146,14 @@ pub fn render_citation_modal(
                         .size(11.5)
                         .color(theme.muted_text_color()),
                 );
-                ui.label(
-                    RichText::new(&formatted_citation)
-                        .strong()
-                        .size(14.0)
-                        .color(accent_col),
+                ui.add(
+                    egui::Label::new(
+                        RichText::new(&formatted_citation)
+                            .strong()
+                            .size(14.0)
+                            .color(accent_col),
+                    )
+                    .wrap(),
                 );
             });
 
