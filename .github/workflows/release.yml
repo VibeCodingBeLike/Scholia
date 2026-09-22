@@ -68,7 +68,14 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run Test Suite
-        run: cargo test --release --target ${{ matrix.target }}
+        shell: bash
+        run: |
+          if [ "${{ matrix.target }}" = "x86_64-apple-darwin" ] && [ "$(uname -m)" = "arm64" ]; then
+            # Verify tests compile for x86_64 target on ARM64 runner without executing incompatible host binaries
+            cargo test --release --target ${{ matrix.target }} --no-run
+          else
+            cargo test --release --target ${{ matrix.target }}
+          fi
 
       - name: Build Optimized Release Binary
         run: cargo build --release --target ${{ matrix.target }}
@@ -93,6 +100,13 @@ jobs:
           Write-Host "Installing Inno Setup..."
           choco install innosetup -y --no-progress
           $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            $iscc = "C:\Program Files\Inno Setup 6\ISCC.exe"
+          }
+          if (-not (Test-Path $iscc)) {
+            $isccCmd = Get-Command iscc.exe -ErrorAction SilentlyContinue
+            if ($isccCmd) { $iscc = $isccCmd.Source }
+          }
           $exeSource = "$PWD\target\${{ matrix.target }}\release\scholia.exe"
           $outDir = "$PWD\dist"
           $setupBase = "Scholia-$ver-windows-x64-Setup"
@@ -109,6 +123,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           TAG="${{ steps.semver.outputs.VERSION }}"
+          VER="${TAG#v}"
           ARCH="${{ matrix.target == 'aarch64-apple-darwin' && 'arm64' || 'x64' }}"
 
           # 1. Portable ZIP
@@ -130,6 +145,7 @@ jobs:
           cp "target/${{ matrix.target }}/release/scholia" "${MACOS_DIR}/scholia"
           chmod +x "${MACOS_DIR}/scholia"
           cp "installers/macos/Info.plist" "${CONTENTS_DIR}/Info.plist"
+          sed -i.bak "s/0.1.0/${VER}/g" "${CONTENTS_DIR}/Info.plist" && rm -f "${CONTENTS_DIR}/Info.plist.bak"
 
           # 3. Native DMG installer with Applications drag-and-drop link
           DMG_STAGING="dist/dmg_staging_${ARCH}"

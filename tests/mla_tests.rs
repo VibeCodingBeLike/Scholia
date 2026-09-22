@@ -635,14 +635,22 @@ fn test_block_toggle_conversion() {
 #[test]
 fn test_semantic_versioning() {
     let version = env!("CARGO_PKG_VERSION");
-    assert_eq!(version, "0.1.0");
+    assert!(!version.is_empty(), "Package version must not be empty");
 
     // Verify version components follow semver: major.minor.patch
     let parts: Vec<&str> = version.split('.').collect();
-    assert_eq!(parts.len(), 3);
-    assert_eq!(parts[0], "0");
-    assert_eq!(parts[1], "1");
-    assert_eq!(parts[2], "0");
+    assert_eq!(
+        parts.len(),
+        3,
+        "Version must have 3 components: major.minor.patch"
+    );
+    for part in &parts {
+        assert!(
+            part.parse::<u32>().is_ok(),
+            "Component '{}' must be a valid integer in semver",
+            part
+        );
+    }
 }
 
 #[test]
