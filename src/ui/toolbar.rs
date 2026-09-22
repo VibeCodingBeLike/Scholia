@@ -166,7 +166,8 @@ pub fn render_toolbar(
         }
 
         // Window Controls (Minimize, Maximize/Restore, Close) on the top right
-        if theme.show_window_controls {
+        // Only shown on Windows and Linux (macOS already has native traffic lights on the left)
+        if theme.show_window_controls && !cfg!(target_os = "macos") {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 4.0;
 

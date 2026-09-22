@@ -140,22 +140,30 @@ jobs:
           PKG_DIR="dist/Scholia-${TAG}-macos-${ARCH}"
           mkdir -p "$PKG_DIR"
           cp "target/${{ matrix.target }}/release/scholia" "$PKG_DIR/"
+          chmod +x "$PKG_DIR/scholia"
+          codesign --force --sign - "$PKG_DIR/scholia"
           cp LICENSE "$PKG_DIR/"
           cp README.md "$PKG_DIR/"
           cd dist && zip -r "Scholia-${TAG}-macos-${ARCH}.zip" "Scholia-${TAG}-macos-${ARCH}"
           cd ..
           echo "Created dist/Scholia-${TAG}-macos-${ARCH}.zip"
 
-          # 2. App Bundle (.app) with Info.plist file association
+          # 2. App Bundle (.app) with Info.plist file association & Ad-Hoc Signature
           BUNDLE_DIR="dist/bundle_${ARCH}/Scholia.app"
           CONTENTS_DIR="${BUNDLE_DIR}/Contents"
           MACOS_DIR="${CONTENTS_DIR}/MacOS"
+          RESOURCES_DIR="${CONTENTS_DIR}/Resources"
           mkdir -p "${MACOS_DIR}"
-          mkdir -p "${CONTENTS_DIR}/Resources"
+          mkdir -p "${RESOURCES_DIR}"
           cp "target/${{ matrix.target }}/release/scholia" "${MACOS_DIR}/scholia"
           chmod +x "${MACOS_DIR}/scholia"
+          codesign --force --sign - "${MACOS_DIR}/scholia"
           cp "installers/macos/Info.plist" "${CONTENTS_DIR}/Info.plist"
           sed -i.bak "s/0.1.0/${VER}/g" "${CONTENTS_DIR}/Info.plist" && rm -f "${CONTENTS_DIR}/Info.plist.bak"
+          echo -n "APPL????" > "${CONTENTS_DIR}/PkgInfo"
+          codesign --force --deep --sign - "${BUNDLE_DIR}"
+          codesign --verify --deep --strict "${BUNDLE_DIR}"
+          echo "Verified code signature for ${BUNDLE_DIR}"
 
           # 3. Native DMG installer with Applications drag-and-drop link
           DMG_STAGING="dist/dmg_staging_${ARCH}"

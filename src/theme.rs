@@ -472,19 +472,11 @@ impl ThemeConfig {
 
         #[cfg(target_os = "macos")]
         {
-            match self.blur_mode {
-                BlurMode::TransparentOnly => {
-                    let _ = window_vibrancy::clear_vibrancy(window);
-                }
-                _ => {
-                    let _ = window_vibrancy::apply_vibrancy(
-                        window,
-                        window_vibrancy::NSVisualEffectMaterial::UnderWindowBackground,
-                        None,
-                        None,
-                    );
-                }
-            }
+            // On macOS (and particularly macOS 26+ Tahoe / Sequoia), injecting an NSVisualEffectView
+            // into winit's NSView underneath wgpu's CAMetalLayer breaks CoreAnimation layer compositing,
+            // preventing the Metal swapchain from presenting and resulting in a blank/empty window.
+            // macOS uses native window decorations and direct Metal GPU rendering instead.
+            let _ = window;
         }
     }
 

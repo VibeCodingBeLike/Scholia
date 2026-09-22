@@ -4,7 +4,7 @@
 
 ### *The distraction-free, strictly formatted MLA 9 document editor with frosted glass transparency.*
 
-[![Version: v0.1.0](https://img.shields.io/badge/Version-v0.1.0-blue.svg)](Cargo.toml)
+[![Version: v0.1.1](https://img.shields.io/badge/Version-v0.1.1-blue.svg)](Cargo.toml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Rust: 1.80+](https://img.shields.io/badge/Rust-1.80%2B-orange.svg?logo=rust)](https://www.rust-lang.org/)
 [![MLA: 9th Edition](https://img.shields.io/badge/MLA%20Standard-9th%20Edition-success.svg)](#-mla-9th-edition-rules-enforced)
@@ -277,16 +277,21 @@ Creates:
 The repository includes an automated GitHub Actions release workflow (`.github/workflows/release.yml`) that builds and publishes both **native installers (with `.mla` file association)** and **portable standalone archives**:
 
 ### Installers (File Association & Desktop Integration)
-- **Windows (x64)**: `Scholia-v0.1.0-windows-x64-Setup.exe` (Inno Setup installer registering `.mla` and `.mladoc` shell associations, icons, and Start Menu/Desktop shortcuts).
-- **macOS Apple Silicon (arm64)**: `Scholia-v0.1.0-macos-arm64.dmg` (Drag-and-drop disk image with `.app` bundle declaring `CFBundleDocumentTypes` for `.mla`).
-- **macOS Intel (x64)**: `Scholia-v0.1.0-macos-x64.dmg` (Universal Intel DMG with `.mla` file association).
-- **Linux (x64)**: `Scholia-v0.1.0-linux-x64.deb` (Debian package with `scholia.desktop` and shared-mime-info XML for `.mla`).
+- **Windows (x64)**: `Scholia-v0.1.1-windows-x64-Setup.exe` (Inno Setup installer registering `.mla` and `.mladoc` shell associations, icons, and Start Menu/Desktop shortcuts).
+- **macOS Apple Silicon (arm64)**: `Scholia-v0.1.1-macos-arm64.dmg` (Drag-and-drop disk image with `.app` bundle declaring `CFBundleDocumentTypes` for `.mla`).
+- **macOS Intel (x64)**: `Scholia-v0.1.1-macos-x64.dmg` (Universal Intel DMG with `.mla` file association).
+- **Linux (x64)**: `Scholia-v0.1.1-linux-x64.deb` (Debian package with `scholia.desktop` and shared-mime-info XML for `.mla`).
 
 ### Portable Releases (Zero Installation)
-- **Windows (x64)**: `Scholia-v0.1.0-windows-x64.zip`
-- **macOS Apple Silicon (arm64)**: `Scholia-v0.1.0-macos-arm64.zip`
-- **macOS Intel (x64)**: `Scholia-v0.1.0-macos-x64.zip`
-- **Linux (x64)**: `Scholia-v0.1.0-linux-x64.tar.gz`
+- **Windows (x64)**: `Scholia-v0.1.1-windows-x64.zip`
+- **macOS Apple Silicon (arm64)**: `Scholia-v0.1.1-macos-arm64.zip`
+- **macOS Intel (x64)**: `Scholia-v0.1.1-macos-x64.zip`
+- **Linux (x64)**: `Scholia-v0.1.1-linux-x64.tar.gz`
+
+> [!TIP]
+> **macOS Gatekeeper Note**: Because open-source GitHub release binaries are not signed with a paid Apple Developer enterprise certificate, macOS Gatekeeper may flag newly downloaded apps from web browsers:
+> - **Finder**: Right-click (or Control-click) `Scholia.app` > click **Open** > confirm **Open**.
+> - **Terminal**: Or run `xattr -cr /Applications/Scholia.app` to clear the quarantine attribute.
 
 ### Verification
 - **Checksums**: SHA256 hashes automatically computed for all installers and portable archives in `SHA256SUMS.txt`.
