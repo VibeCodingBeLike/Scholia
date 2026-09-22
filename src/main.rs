@@ -75,7 +75,19 @@ impl MlaApp {
 
         // Load saved theme & keybinds & undo history limit if present
         let (theme, keybinds, undo_limit) = load_config();
-        let doc = MlaDocument::default();
+        let mut doc = MlaDocument::default();
+        if let Some(arg_path) = std::env::args().nth(1) {
+            let path = PathBuf::from(&arg_path);
+            if path.exists() && path.is_file() {
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    if let Ok(mut loaded_doc) = serde_json::from_str::<MlaDocument>(&content) {
+                        loaded_doc.file_path = Some(path.to_string_lossy().to_string());
+                        loaded_doc.is_dirty = false;
+                        doc = loaded_doc;
+                    }
+                }
+            }
+        }
         let mut history = HistoryManager::new(&doc);
         history.set_max_depth(undo_limit);
 
@@ -509,6 +521,23 @@ impl eframe::App for MlaApp {
             if self.keybinds.check_action(action, &input) {
                 self.handle_action(action, ui.ctx());
                 break;
+            }
+        }
+
+        // Handle dropped files (drag & drop opening)
+        let dropped = ui.ctx().input(|i| i.raw.dropped_files.clone());
+        for file in dropped {
+            let path = file.path();
+            if path.exists() && path.is_file() {
+                if let Ok(content) = std::fs::read_to_string(path) {
+                    if let Ok(mut loaded_doc) = serde_json::from_str::<MlaDocument>(&content) {
+                        loaded_doc.file_path = Some(path.to_string_lossy().to_string());
+                        loaded_doc.is_dirty = false;
+                        self.doc = loaded_doc;
+                        self.history.reset(&self.doc);
+                        self.set_notification("Document opened from file.");
+                    }
+                }
             }
         }
 

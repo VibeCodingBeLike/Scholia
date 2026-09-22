@@ -74,43 +74,121 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
 
       # Packaging on Windows
-      - name: Package Windows Artifact
+      - name: Package Windows Artifacts (Portable & Installer)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $ver = "${{ steps.semver.outputs.VERSION }}"
+          $verNum = $ver.TrimStart('v')
           $pkgDir = "dist\Scholia-$ver-windows-x64"
           New-Item -ItemType Directory -Path $pkgDir -Force
           Copy-Item "target\${{ matrix.target }}\release\scholia.exe" -Destination "$pkgDir\"
           Copy-Item "LICENSE" -Destination "$pkgDir\"
+          Copy-Item "README.md" -Destination "$pkgDir\"
           $zipName = "Scholia-$ver-windows-x64.zip"
           Compress-Archive -Path "$pkgDir\*" -DestinationPath "dist\$zipName" -Force
           Write-Host "Created dist\$zipName"
 
+          # Build Inno Setup Installer for File Associations (.mla, .mladoc)
+          Write-Host "Installing Inno Setup..."
+          choco install innosetup -y --no-progress
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          $exeSource = "$PWD\target\${{ matrix.target }}\release\scholia.exe"
+          $outDir = "$PWD\dist"
+          $setupBase = "Scholia-$ver-windows-x64-Setup"
+          & $iscc "/DMyAppVersion=$verNum" "/DMyAppExeSource=$exeSource" "/DOutputDir=$outDir" "/DOutputBaseFilename=$setupBase" "installers\windows\installer.iss"
+          if (Test-Path "dist\$setupBase.exe") {
+            Write-Host "Created dist\$setupBase.exe"
+          } else {
+            Write-Error "Failed to produce installer dist\$setupBase.exe"
+            exit 1
+          }
+
       # Packaging on macOS
-      - name: Package macOS Artifact
+      - name: Package macOS Artifacts (Portable & DMG Installer)
         if: runner.os == 'macOS'
         run: |
           TAG="${{ steps.semver.outputs.VERSION }}"
           ARCH="${{ matrix.target == 'aarch64-apple-darwin' && 'arm64' || 'x64' }}"
+
+          # 1. Portable ZIP
           PKG_DIR="dist/Scholia-${TAG}-macos-${ARCH}"
           mkdir -p "$PKG_DIR"
           cp "target/${{ matrix.target }}/release/scholia" "$PKG_DIR/"
           cp LICENSE "$PKG_DIR/"
+          cp README.md "$PKG_DIR/"
           cd dist && zip -r "Scholia-${TAG}-macos-${ARCH}.zip" "Scholia-${TAG}-macos-${ARCH}"
+          cd ..
           echo "Created dist/Scholia-${TAG}-macos-${ARCH}.zip"
 
+          # 2. App Bundle (.app) with Info.plist file association
+          BUNDLE_DIR="dist/bundle_${ARCH}/Scholia.app"
+          CONTENTS_DIR="${BUNDLE_DIR}/Contents"
+          MACOS_DIR="${CONTENTS_DIR}/MacOS"
+          mkdir -p "${MACOS_DIR}"
+          mkdir -p "${CONTENTS_DIR}/Resources"
+          cp "target/${{ matrix.target }}/release/scholia" "${MACOS_DIR}/scholia"
+          chmod +x "${MACOS_DIR}/scholia"
+          cp "installers/macos/Info.plist" "${CONTENTS_DIR}/Info.plist"
+
+          # 3. Native DMG installer with Applications drag-and-drop link
+          DMG_STAGING="dist/dmg_staging_${ARCH}"
+          mkdir -p "$DMG_STAGING"
+          cp -R "${BUNDLE_DIR}" "$DMG_STAGING/"
+          ln -s /Applications "$DMG_STAGING/Applications"
+          hdiutil create -volname "Scholia" -srcfolder "$DMG_STAGING" -ov -format UDZO "dist/Scholia-${TAG}-macos-${ARCH}.dmg"
+          rm -rf "$DMG_STAGING"
+          echo "Created dist/Scholia-${TAG}-macos-${ARCH}.dmg"
+
       # Packaging on Linux
-      - name: Package Linux Artifact
+      - name: Package Linux Artifacts (Portable & Debian Package)
         if: runner.os == 'Linux'
         run: |
           TAG="${{ steps.semver.outputs.VERSION }}"
+          VER="${TAG#v}"
+
+          # 1. Portable tar.gz
           PKG_DIR="dist/Scholia-${TAG}-linux-x64"
           mkdir -p "$PKG_DIR"
           cp "target/${{ matrix.target }}/release/scholia" "$PKG_DIR/"
           cp LICENSE "$PKG_DIR/"
+          cp README.md "$PKG_DIR/"
           cd dist && tar -czvf "Scholia-${TAG}-linux-x64.tar.gz" "Scholia-${TAG}-linux-x64"
+          cd ..
           echo "Created dist/Scholia-${TAG}-linux-x64.tar.gz"
+
+          # 2. Debian Package (.deb) with MIME and desktop file associations
+          DEB_DIR="target/debian/scholia_${VER}_amd64"
+          rm -rf "${DEB_DIR}"
+          mkdir -p "${DEB_DIR}/DEBIAN"
+          mkdir -p "${DEB_DIR}/usr/bin"
+          mkdir -p "${DEB_DIR}/usr/share/applications"
+          mkdir -p "${DEB_DIR}/usr/share/mime/packages"
+          mkdir -p "${DEB_DIR}/usr/share/doc/scholia"
+
+          cp "target/${{ matrix.target }}/release/scholia" "${DEB_DIR}/usr/bin/scholia"
+          chmod 755 "${DEB_DIR}/usr/bin/scholia"
+
+          cp "installers/linux/scholia.desktop" "${DEB_DIR}/usr/share/applications/scholia.desktop"
+          cp "installers/linux/scholia.xml" "${DEB_DIR}/usr/share/mime/packages/scholia.xml"
+          cp "README.md" "${DEB_DIR}/usr/share/doc/scholia/"
+          cp "LICENSE" "${DEB_DIR}/usr/share/doc/scholia/copyright"
+
+          cat <<EOF > "${DEB_DIR}/DEBIAN/control"
+          Package: scholia
+          Version: ${VER}
+          Section: editors
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Scholia Authors <info@scholia.editor>
+          Description: Modern, distraction-free MLA 9th edition document editor
+           Scholia enforces strict adherence to MLA 9 guidelines while providing
+           a customizable frosted glass interface, custom keybindings, and high-fidelity
+           export to DOCX, HTML/PDF, and Markdown.
+          EOF
+
+          dpkg-deb --build "${DEB_DIR}" "dist/Scholia-${TAG}-linux-x64.deb"
+          echo "Created dist/Scholia-${TAG}-linux-x64.deb"
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -119,6 +197,9 @@ jobs:
           path: |
             dist/*.zip
             dist/*.tar.gz
+            dist/*.exe
+            dist/*.dmg
+            dist/*.deb
           retention-days: 1
 
   publish-release:
@@ -154,7 +235,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p final-assets
-          cp release-downloads/*.zip release-downloads/*.tar.gz final-assets/ 2>/dev/null || true
+          cp release-downloads/*.zip release-downloads/*.tar.gz release-downloads/*.exe release-downloads/*.dmg release-downloads/*.deb final-assets/ 2>/dev/null || true
           cd final-assets
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
@@ -170,6 +251,9 @@ jobs:
           files: |
             final-assets/*.zip
             final-assets/*.tar.gz
+            final-assets/*.exe
+            final-assets/*.dmg
+            final-assets/*.deb
             final-assets/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

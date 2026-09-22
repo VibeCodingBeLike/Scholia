@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-scholia-mla">
+    <comment>MLA 9th Edition Document</comment>
+    <glob pattern="*.mla"/>
+    <glob pattern="*.mladoc"/>
+  </mime-type>
+</mime-info>

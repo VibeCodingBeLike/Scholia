@@ -274,14 +274,22 @@ Creates:
 
 ## 📦 GitHub Actions & Multi-Platform Releases
 
-The repository includes a GitHub Actions workflow (`.github/workflows/release.yml`) that builds and publishes releases across all platforms under **one unified GitHub Release**:
-- **Windows x64**: `Scholia-v0.1.0-windows-x64.zip`
+The repository includes an automated GitHub Actions release workflow (`.github/workflows/release.yml`) that builds and publishes both **native installers (with `.mla` file association)** and **portable standalone archives**:
+
+### Installers (File Association & Desktop Integration)
+- **Windows (x64)**: `Scholia-v0.1.0-windows-x64-Setup.exe` (Inno Setup installer registering `.mla` and `.mladoc` shell associations, icons, and Start Menu/Desktop shortcuts).
+- **macOS Apple Silicon (arm64)**: `Scholia-v0.1.0-macos-arm64.dmg` (Drag-and-drop disk image with `.app` bundle declaring `CFBundleDocumentTypes` for `.mla`).
+- **macOS Intel (x64)**: `Scholia-v0.1.0-macos-x64.dmg` (Universal Intel DMG with `.mla` file association).
+- **Linux (x64)**: `Scholia-v0.1.0-linux-x64.deb` (Debian package with `scholia.desktop` and shared-mime-info XML for `.mla`).
+
+### Portable Releases (Zero Installation)
+- **Windows (x64)**: `Scholia-v0.1.0-windows-x64.zip`
 - **macOS Apple Silicon (arm64)**: `Scholia-v0.1.0-macos-arm64.zip`
 - **macOS Intel (x64)**: `Scholia-v0.1.0-macos-x64.zip`
-- **Linux x64**: `Scholia-v0.1.0-linux-x64.tar.gz`
-- **Checksums**: Automatically computed and attached as `SHA256SUMS.txt`.
+- **Linux (x64)**: `Scholia-v0.1.0-linux-x64.tar.gz`
 
-Release packages strictly contain the executable binary and `LICENSE` without extraneous sample files or documentation.
+### Verification
+- **Checksums**: SHA256 hashes automatically computed for all installers and portable archives in `SHA256SUMS.txt`.
 
 ---
 
