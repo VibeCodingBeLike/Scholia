@@ -104,7 +104,11 @@ pub fn generate_mla_html(doc: &MlaDocument) -> String {
     <hr class="mla-footnotes-divider">"#,
         );
         for note in &doc.notes {
-            let note_str = format!("{}. {}", note.index, crate::model::typographical_clean(&note.text));
+            let note_str = format!(
+                "{}. {}",
+                note.index,
+                crate::model::typographical_clean(&note.text)
+            );
             body_html.push_str(&format!(
                 r#"    <p class="mla-footnote-entry">{}</p>"#,
                 escape_html(&note_str)

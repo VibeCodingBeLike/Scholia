@@ -442,7 +442,9 @@ impl MlaDocument {
             .get_mut(self.active_block_idx)
             .ok_or("No active block selected.")?;
         let text = block.text_mut();
-        if let Some((new_text, new_cursor)) = reorder_sentences(text, cursor_char_idx, direction_left) {
+        if let Some((new_text, new_cursor)) =
+            reorder_sentences(text, cursor_char_idx, direction_left)
+        {
             *text = new_text;
             self.is_dirty = true;
             self.sync_body_from_blocks();
@@ -466,7 +468,9 @@ impl MlaDocument {
 
     pub fn add_explanatory_note(&mut self, text: String) -> usize {
         self.ensure_blocks_initialized();
-        let b_idx = self.active_block_idx.min(self.blocks.len().saturating_sub(1));
+        let b_idx = self
+            .active_block_idx
+            .min(self.blocks.len().saturating_sub(1));
         let block_id = self.blocks[b_idx].id().to_string();
         self.add_note_to_block(&block_id, text)
     }
@@ -528,7 +532,12 @@ impl MlaDocument {
         indices
     }
 
-    pub fn link_note_from_shortcut(&mut self, block_id: &str, note_index: usize, word: &str) -> bool {
+    pub fn link_note_from_shortcut(
+        &mut self,
+        block_id: &str,
+        note_index: usize,
+        word: &str,
+    ) -> bool {
         if let Some(note) = self.notes.iter_mut().find(|n| n.index == note_index) {
             if !note.word.is_empty() && note.word != word {
                 // In MLA 9, reusing a note for multiple words is prohibited
@@ -553,7 +562,10 @@ impl MlaDocument {
     }
 
     pub fn notes_for_block(&self, block_id: &str) -> Vec<&ExplanatoryNote> {
-        self.notes.iter().filter(|n| n.block_id == block_id).collect()
+        self.notes
+            .iter()
+            .filter(|n| n.block_id == block_id)
+            .collect()
     }
 
     /// Re-indexes all notes sequentially based on document block order, keeping note_tags in lockstep.
@@ -567,7 +579,10 @@ impl MlaDocument {
 
         self.notes.sort_by_key(|n| {
             (
-                block_order.get(n.block_id.as_str()).copied().unwrap_or(usize::MAX),
+                block_order
+                    .get(n.block_id.as_str())
+                    .copied()
+                    .unwrap_or(usize::MAX),
                 n.index,
             )
         });
@@ -603,7 +618,11 @@ impl MlaDocument {
     pub fn toggle_block_type(&mut self, idx: usize) {
         if idx < self.blocks.len() {
             match &self.blocks[idx] {
-                MlaBlock::Paragraph { id, text, note_tags } => {
+                MlaBlock::Paragraph {
+                    id,
+                    text,
+                    note_tags,
+                } => {
                     self.blocks[idx] = MlaBlock::BlockQuote {
                         id: id.clone(),
                         text: text.clone(),
@@ -611,7 +630,12 @@ impl MlaDocument {
                         note_tags: note_tags.clone(),
                     };
                 }
-                MlaBlock::BlockQuote { id, text, citation, note_tags } => {
+                MlaBlock::BlockQuote {
+                    id,
+                    text,
+                    citation,
+                    note_tags,
+                } => {
                     let mut combined = text.clone();
                     if !citation.trim().is_empty() {
                         combined.push(' ');
@@ -700,7 +724,10 @@ pub fn try_parse_and_apply_note_shortcut(
             }
         } else {
             // Case 2: ^digits (e.g. ^1, ^10, ^13)
-            let digit_len = after_caret.chars().take_while(|c| c.is_ascii_digit()).count();
+            let digit_len = after_caret
+                .chars()
+                .take_while(|c| c.is_ascii_digit())
+                .count();
             if digit_len > 0 {
                 let digits_str = &after_caret[..digit_len];
                 if let Ok(num) = digits_str.parse::<usize>() {
@@ -735,7 +762,16 @@ pub fn try_parse_and_apply_note_shortcut(
             .last()
             .unwrap_or("")
             .trim_matches(|c: char| {
-                c == '"' || c == '\'' || c == '(' || c == '[' || c == '“' || c == '”' || c == ',' || c == '.' || c == ';' || c == ':'
+                c == '"'
+                    || c == '\''
+                    || c == '('
+                    || c == '['
+                    || c == '“'
+                    || c == '”'
+                    || c == ','
+                    || c == '.'
+                    || c == ';'
+                    || c == ':'
             })
             .to_string();
 
@@ -796,7 +832,7 @@ pub fn render_text_with_note_tags(
 
     let mut sorted_tags = tags.to_vec();
     // Sort descending by offset so that insertions do not shift earlier character offsets
-    sorted_tags.sort_by(|a, b| b.offset.cmp(&a.offset));
+    sorted_tags.sort_by_key(|a| std::cmp::Reverse(a.offset));
 
     let mut result = base_text;
     for tag in sorted_tags {
@@ -851,9 +887,9 @@ pub fn to_mla_title_case(input: &str) -> String {
     }
 
     let lowercase_words = [
-        "a", "an", "the", "and", "but", "or", "nor", "for", "so", "yet", "as", "at", "by",
-        "from", "in", "into", "of", "off", "on", "onto", "out", "over", "to", "up", "with", "vs",
-        "via", "than", "is", "if", "it", "its", "are", "be", "am", "was", "were", "per", "en",
+        "a", "an", "the", "and", "but", "or", "nor", "for", "so", "yet", "as", "at", "by", "from",
+        "in", "into", "of", "off", "on", "onto", "out", "over", "to", "up", "with", "vs", "via",
+        "than", "is", "if", "it", "its", "are", "be", "am", "was", "were", "per", "en",
     ];
 
     let total = words.len();
@@ -999,7 +1035,9 @@ pub fn typographical_clean(s: &str) -> String {
             let prev = if i > 0 { Some(chars[i - 1]) } else { None };
             let is_open = match prev {
                 None => true,
-                Some(c) if c.is_whitespace() || c == '(' || c == '[' || c == '{' || c == '—' => true,
+                Some(c) if c.is_whitespace() || c == '(' || c == '[' || c == '{' || c == '—' => {
+                    true
+                }
                 _ => false,
             };
             if is_open {
@@ -1014,7 +1052,11 @@ pub fn typographical_clean(s: &str) -> String {
         // Single quotes: ' -> ‘ or ’
         if chars[i] == '\'' {
             let prev = if i > 0 { Some(chars[i - 1]) } else { None };
-            let next = if i + 1 < len { Some(chars[i + 1]) } else { None };
+            let next = if i + 1 < len {
+                Some(chars[i + 1])
+            } else {
+                None
+            };
 
             // Apostrophe inside word: don't, Smith's
             if let (Some(p), Some(n)) = (prev, next) {
@@ -1027,7 +1069,9 @@ pub fn typographical_clean(s: &str) -> String {
 
             let is_open = match prev {
                 None => true,
-                Some(c) if c.is_whitespace() || c == '(' || c == '[' || c == '{' || c == '—' => true,
+                Some(c) if c.is_whitespace() || c == '(' || c == '[' || c == '{' || c == '—' => {
+                    true
+                }
                 _ => false,
             };
             if is_open {
@@ -1058,11 +1102,43 @@ fn is_abbreviation(word: &str) -> bool {
     let lower = word.to_lowercase();
     matches!(
         lower.as_str(),
-        "dr" | "mr" | "mrs" | "ms" | "prof" | "sr" | "jr" | "vs" | "etc"
-            | "eg" | "ie" | "al" | "vol" | "no" | "ed" | "dept" | "fig"
-            | "co" | "inc" | "corp" | "st" | "gen" | "gov" | "rev"
-            | "approx" | "avg" | "est" | "min" | "max" | "misc" | "stat"
-            | "univ" | "p" | "pp" | "cf" | "ibid" | "op" | "cit"
+        "dr" | "mr"
+            | "mrs"
+            | "ms"
+            | "prof"
+            | "sr"
+            | "jr"
+            | "vs"
+            | "etc"
+            | "eg"
+            | "ie"
+            | "al"
+            | "vol"
+            | "no"
+            | "ed"
+            | "dept"
+            | "fig"
+            | "co"
+            | "inc"
+            | "corp"
+            | "st"
+            | "gen"
+            | "gov"
+            | "rev"
+            | "approx"
+            | "avg"
+            | "est"
+            | "min"
+            | "max"
+            | "misc"
+            | "stat"
+            | "univ"
+            | "p"
+            | "pp"
+            | "cf"
+            | "ibid"
+            | "op"
+            | "cit"
     )
 }
 
@@ -1073,8 +1149,26 @@ fn is_terminal_punct(c: char) -> bool {
 fn is_closing_delimiter(c: char) -> bool {
     matches!(
         c,
-        '"' | '\'' | '”' | '“' | '’' | '‘' | '»' | '«' | ')' | ']' | '}' | '⁰'
-            | '¹' | '²' | '³' | '⁴' | '⁵' | '⁶' | '⁷' | '⁸' | '⁹'
+        '"' | '\''
+            | '”'
+            | '“'
+            | '’'
+            | '‘'
+            | '»'
+            | '«'
+            | ')'
+            | ']'
+            | '}'
+            | '⁰'
+            | '¹'
+            | '²'
+            | '³'
+            | '⁴'
+            | '⁵'
+            | '⁶'
+            | '⁷'
+            | '⁸'
+            | '⁹'
     )
 }
 
@@ -1104,16 +1198,12 @@ pub fn split_sentences(text: &str) -> (String, Vec<SentenceSpan>) {
 
             // Dot specific exceptions
             if c == '.' {
-                // Check decimals: e.g. 3.14
-                if i > 0
+                // Check decimals (e.g. 3.14) or ellipsis (e.g. ... or ..)
+                if (i > 0
                     && chars[i - 1].is_ascii_digit()
                     && i + 1 < total_len
-                    && chars[i + 1].is_ascii_digit()
-                {
-                    is_boundary = false;
-                }
-                // Check ellipsis: e.g. ... or ..
-                else if (i > 0 && chars[i - 1] == '.')
+                    && chars[i + 1].is_ascii_digit())
+                    || (i > 0 && chars[i - 1] == '.')
                     || (i + 1 < total_len && chars[i + 1] == '.')
                 {
                     is_boundary = false;
@@ -1205,7 +1295,9 @@ pub fn reorder_sentences(
         if cursor_char_idx >= span.char_start && (cursor_char_idx < span_end || is_last) {
             active_idx = Some(idx);
             let s_text_len = span.text.chars().count();
-            active_offset = cursor_char_idx.saturating_sub(span.char_start).min(s_text_len);
+            active_offset = cursor_char_idx
+                .saturating_sub(span.char_start)
+                .min(s_text_len);
             break;
         }
     }
@@ -1247,4 +1339,3 @@ pub fn reorder_sentences(
 
     Some((new_text, new_cursor))
 }
-

@@ -84,13 +84,31 @@ impl ThemePreset {
 
     pub fn preview_palette(&self) -> ([u8; 3], [u8; 3], [u8; 3], [u8; 3]) {
         match self {
-            ThemePreset::FrostedDark => ([18, 20, 26], [28, 32, 42], [240, 243, 248], [70, 145, 235]),
-            ThemePreset::FrostedLight => ([235, 240, 245], [255, 255, 255], [20, 25, 30], [30, 110, 210]),
-            ThemePreset::NordicFrost => ([15, 23, 34], [24, 34, 48], [236, 242, 248], [136, 192, 208]),
-            ThemePreset::AmberTerminal => ([22, 18, 14], [35, 28, 22], [255, 205, 120], [240, 150, 40]),
+            ThemePreset::FrostedDark => {
+                ([18, 20, 26], [28, 32, 42], [240, 243, 248], [70, 145, 235])
+            }
+            ThemePreset::FrostedLight => (
+                [235, 240, 245],
+                [255, 255, 255],
+                [20, 25, 30],
+                [30, 110, 210],
+            ),
+            ThemePreset::NordicFrost => {
+                ([15, 23, 34], [24, 34, 48], [236, 242, 248], [136, 192, 208])
+            }
+            ThemePreset::AmberTerminal => {
+                ([22, 18, 14], [35, 28, 22], [255, 205, 120], [240, 150, 40])
+            }
             ThemePreset::RosePine => ([25, 23, 36], [31, 29, 46], [224, 222, 244], [235, 188, 186]),
-            ThemePreset::RosePineMoon => ([35, 33, 54], [42, 39, 63], [224, 222, 244], [234, 154, 151]),
-            ThemePreset::RosePineDawn => ([250, 244, 237], [255, 250, 243], [87, 82, 121], [215, 130, 126]),
+            ThemePreset::RosePineMoon => {
+                ([35, 33, 54], [42, 39, 63], [224, 222, 244], [234, 154, 151])
+            }
+            ThemePreset::RosePineDawn => (
+                [250, 244, 237],
+                [255, 250, 243],
+                [87, 82, 121],
+                [215, 130, 126],
+            ),
             ThemePreset::Custom => ([20, 20, 25], [30, 30, 40], [240, 240, 245], [150, 150, 200]),
         }
     }
@@ -260,12 +278,12 @@ impl ThemeConfig {
             blur_mode: BlurMode::Acrylic,
             window_opacity: 0.65,
             page_opacity: 0.40,
-            window_tint_rgb: [25, 23, 36],     // Base
-            page_tint_rgb: [31, 29, 46],       // Surface
-            text_rgb: [224, 222, 244],         // Text
-            muted_text_rgb: [144, 140, 170],   // Muted
-            accent_rgb: [235, 188, 186],       // Rose
-            page_border_rgb: [64, 61, 82],     // Highlight Med
+            window_tint_rgb: [25, 23, 36],   // Base
+            page_tint_rgb: [31, 29, 46],     // Surface
+            text_rgb: [224, 222, 244],       // Text
+            muted_text_rgb: [144, 140, 170], // Muted
+            accent_rgb: [235, 188, 186],     // Rose
+            page_border_rgb: [64, 61, 82],   // Highlight Med
             page_border_alpha: 0.40,
             font_choice: MlaFontChoice::TimesNewRoman,
             show_window_controls: true,
@@ -280,12 +298,12 @@ impl ThemeConfig {
             blur_mode: BlurMode::Acrylic,
             window_opacity: 0.65,
             page_opacity: 0.40,
-            window_tint_rgb: [35, 33, 54],     // Base
-            page_tint_rgb: [42, 39, 63],       // Surface
-            text_rgb: [224, 222, 244],         // Text
-            muted_text_rgb: [144, 140, 170],   // Muted
-            accent_rgb: [234, 154, 151],       // Rose
-            page_border_rgb: [68, 65, 90],     // Highlight Med
+            window_tint_rgb: [35, 33, 54],   // Base
+            page_tint_rgb: [42, 39, 63],     // Surface
+            text_rgb: [224, 222, 244],       // Text
+            muted_text_rgb: [144, 140, 170], // Muted
+            accent_rgb: [234, 154, 151],     // Rose
+            page_border_rgb: [68, 65, 90],   // Highlight Med
             page_border_alpha: 0.40,
             font_choice: MlaFontChoice::TimesNewRoman,
             show_window_controls: true,
@@ -300,12 +318,12 @@ impl ThemeConfig {
             blur_mode: BlurMode::Acrylic,
             window_opacity: 0.75,
             page_opacity: 0.55,
-            window_tint_rgb: [250, 244, 237],  // Base
-            page_tint_rgb: [255, 250, 243],    // Surface
-            text_rgb: [87, 82, 121],           // Text
-            muted_text_rgb: [152, 147, 165],   // Muted
-            accent_rgb: [215, 130, 126],       // Rose
-            page_border_rgb: [223, 218, 217],  // Highlight Med
+            window_tint_rgb: [250, 244, 237], // Base
+            page_tint_rgb: [255, 250, 243],   // Surface
+            text_rgb: [87, 82, 121],          // Text
+            muted_text_rgb: [152, 147, 165],  // Muted
+            accent_rgb: [215, 130, 126],      // Rose
+            page_border_rgb: [223, 218, 217], // Highlight Med
             page_border_alpha: 0.50,
             font_choice: MlaFontChoice::TimesNewRoman,
             show_window_controls: true,
@@ -527,7 +545,8 @@ impl ThemeConfig {
         // Noninteractive widgets (e.g. disabled buttons, label backgrounds): transparent
         visuals.widgets.noninteractive.bg_fill = egui::Color32::TRANSPARENT;
         visuals.widgets.noninteractive.weak_bg_fill = egui::Color32::TRANSPARENT;
-        visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, text_col.gamma_multiply(0.10));
+        visuals.widgets.noninteractive.bg_stroke =
+            egui::Stroke::new(1.0, text_col.gamma_multiply(0.10));
         visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, self.muted_text_color());
         visuals.widgets.noninteractive.corner_radius = egui::CornerRadius::same(5);
 
@@ -606,16 +625,15 @@ pub fn save_custom_theme(theme: &ThemeConfig, name: &str) -> Result<std::path::P
     let json = serde_json::to_string_pretty(&saved_theme)
         .map_err(|e| format!("Failed to serialize theme: {e}"))?;
     let file_path = dir.join(format!("{}.json", trimmed));
-    std::fs::write(&file_path, json)
-        .map_err(|e| format!("Failed to write theme file: {e}"))?;
+    std::fs::write(&file_path, json).map_err(|e| format!("Failed to write theme file: {e}"))?;
     Ok(file_path)
 }
 
 pub fn load_theme_file(path: &std::path::Path) -> Result<ThemeConfig, String> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read theme file: {e}"))?;
-    let mut theme: ThemeConfig = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse theme JSON: {e}"))?;
+    let content =
+        std::fs::read_to_string(path).map_err(|e| format!("Failed to read theme file: {e}"))?;
+    let mut theme: ThemeConfig =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse theme JSON: {e}"))?;
     if theme.custom_name.is_none() {
         if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
             theme.custom_name = Some(stem.to_string());
@@ -642,4 +660,3 @@ pub fn open_themes_folder() {
         let _ = std::process::Command::new("xdg-open").arg(&dir).spawn();
     }
 }
-

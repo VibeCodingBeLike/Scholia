@@ -16,14 +16,26 @@ const LINE_H_PT: f32 = FONT_PT * 2.0; // MLA double-spacing
 const INDENT_MM: f32 = 12.7; // 0.5-inch paragraph first-line indent
 const BLOCKQUOTE_INDENT_MM: f32 = 12.7; // 0.5-inch block quote left indent
 
-fn pt_per_mm() -> f32 { 2.834645669 }
-fn text_w_mm() -> f32 { PAGE_W_MM - 2.0 * MARGIN_MM }
-fn top_y_mm() -> f32 { PAGE_H_MM - MARGIN_MM }
-fn running_head_y_mm() -> f32 { PAGE_H_MM - MARGIN_MM / 2.0 }
-fn line_h_mm() -> f32 { LINE_H_PT / pt_per_mm() }
+fn pt_per_mm() -> f32 {
+    2.834_645_7
+}
+fn text_w_mm() -> f32 {
+    PAGE_W_MM - 2.0 * MARGIN_MM
+}
+fn top_y_mm() -> f32 {
+    PAGE_H_MM - MARGIN_MM
+}
+fn running_head_y_mm() -> f32 {
+    PAGE_H_MM - MARGIN_MM / 2.0
+}
+fn line_h_mm() -> f32 {
+    LINE_H_PT / pt_per_mm()
+}
 
 /// Rough average character width in mm for Times New Roman 12pt
-fn char_w_mm() -> f32 { FONT_PT * 0.45 / pt_per_mm() }
+fn char_w_mm() -> f32 {
+    FONT_PT * 0.45 / pt_per_mm()
+}
 
 pub fn export_to_pdf(doc: &MlaDocument, path: &Path) -> Result<(), String> {
     let bytes = build_pdf(doc)?;
@@ -55,22 +67,58 @@ struct DocLine {
 
 impl DocLine {
     fn normal(text: impl Into<String>) -> Self {
-        Self { kind: LineKind::Normal, text: text.into(), left_extra_mm: 0.0, first_indent_mm: 0.0, referenced_notes: Vec::new() }
+        Self {
+            kind: LineKind::Normal,
+            text: text.into(),
+            left_extra_mm: 0.0,
+            first_indent_mm: 0.0,
+            referenced_notes: Vec::new(),
+        }
     }
     fn bold(text: impl Into<String>) -> Self {
-        Self { kind: LineKind::Bold, text: text.into(), left_extra_mm: 0.0, first_indent_mm: 0.0, referenced_notes: Vec::new() }
+        Self {
+            kind: LineKind::Bold,
+            text: text.into(),
+            left_extra_mm: 0.0,
+            first_indent_mm: 0.0,
+            referenced_notes: Vec::new(),
+        }
     }
     fn centered(text: impl Into<String>) -> Self {
-        Self { kind: LineKind::Centered, text: text.into(), left_extra_mm: 0.0, first_indent_mm: 0.0, referenced_notes: Vec::new() }
+        Self {
+            kind: LineKind::Centered,
+            text: text.into(),
+            left_extra_mm: 0.0,
+            first_indent_mm: 0.0,
+            referenced_notes: Vec::new(),
+        }
     }
     fn paragraph(text: impl Into<String>) -> Self {
-        Self { kind: LineKind::Normal, text: text.into(), left_extra_mm: 0.0, first_indent_mm: INDENT_MM, referenced_notes: Vec::new() }
+        Self {
+            kind: LineKind::Normal,
+            text: text.into(),
+            left_extra_mm: 0.0,
+            first_indent_mm: INDENT_MM,
+            referenced_notes: Vec::new(),
+        }
     }
     fn blockquote(text: impl Into<String>) -> Self {
-        Self { kind: LineKind::Normal, text: text.into(), left_extra_mm: BLOCKQUOTE_INDENT_MM, first_indent_mm: 0.0, referenced_notes: Vec::new() }
+        Self {
+            kind: LineKind::Normal,
+            text: text.into(),
+            left_extra_mm: BLOCKQUOTE_INDENT_MM,
+            first_indent_mm: 0.0,
+            referenced_notes: Vec::new(),
+        }
     }
     fn page_break() -> Self {
-        Self { kind: LineKind::PageBreak, text: String::new(), left_extra_mm: 0.0, first_indent_mm: 0.0, referenced_notes: Vec::new() }
+        Self {
+            kind: LineKind::PageBreak,
+            text: String::new(),
+            left_extra_mm: 0.0,
+            first_indent_mm: 0.0,
+            referenced_notes: Vec::new(),
+        }
     }
 }
 
@@ -98,7 +146,8 @@ fn build_pdf(mla: &MlaDocument) -> Result<Vec<u8>, String> {
     let mut y_mm = top_y_mm();
     let mut page_num: u32 = 1;
     let mut current_page_notes: Vec<usize> = Vec::new();
-    let mut rendered_note_indices: std::collections::HashSet<usize> = std::collections::HashSet::new();
+    let mut rendered_note_indices: std::collections::HashSet<usize> =
+        std::collections::HashSet::new();
 
     // Draw running head (right-aligned "LastName N") at top of each page
     add_running_head(&mut page_ops, &font, &last_name, page_num);
@@ -168,7 +217,9 @@ fn build_pdf(mla: &MlaDocument) -> Result<Vec<u8>, String> {
 
         // Write the text line
         page_ops.push(Op::StartTextSection);
-        page_ops.push(Op::SetTextCursor { pos: Point::new(Mm(x_mm), Mm(y_mm)) });
+        page_ops.push(Op::SetTextCursor {
+            pos: Point::new(Mm(x_mm), Mm(y_mm)),
+        });
         page_ops.push(Op::SetFont {
             font: PdfFontHandle::External(font.clone()),
             size: Pt(FONT_PT),
@@ -215,7 +266,9 @@ fn build_pdf(mla: &MlaDocument) -> Result<Vec<u8>, String> {
         pages.push(PdfPage::new(Mm(PAGE_W_MM), Mm(PAGE_H_MM), vec![]));
     }
 
-    Ok(pdf.with_pages(pages).save(&PdfSaveOptions::default(), &mut warn))
+    Ok(pdf
+        .with_pages(pages)
+        .save(&PdfSaveOptions::default(), &mut warn))
 }
 
 // ── Proper line builder ──────────────────────────────────────────────────────
@@ -245,7 +298,9 @@ fn rebuild_lines(mla: &MlaDocument, sorted_wc: &[crate::model::WorksCitedEntry])
         match block {
             MlaBlock::Paragraph { text, .. } => {
                 let t = text.trim();
-                if t.is_empty() { continue; }
+                if t.is_empty() {
+                    continue;
+                }
                 let base = typographical_clean(t);
                 let cleaned = crate::model::render_text_with_note_tags(
                     &base,
@@ -271,7 +326,9 @@ fn rebuild_lines(mla: &MlaDocument, sorted_wc: &[crate::model::WorksCitedEntry])
             }
             MlaBlock::BlockQuote { text, citation, .. } => {
                 let t = text.trim();
-                if t.is_empty() { continue; }
+                if t.is_empty() {
+                    continue;
+                }
                 let base = if citation.trim().is_empty() {
                     t.to_string()
                 } else {
@@ -297,7 +354,9 @@ fn rebuild_lines(mla: &MlaDocument, sorted_wc: &[crate::model::WorksCitedEntry])
             }
             MlaBlock::SectionHeading { level, text, .. } => {
                 let t = text.trim();
-                if t.is_empty() { continue; }
+                if t.is_empty() {
+                    continue;
+                }
                 let cleaned = typographical_clean(t);
                 match level {
                     1 => lines.push(DocLine::bold(cleaned)),
@@ -309,7 +368,11 @@ fn rebuild_lines(mla: &MlaDocument, sorted_wc: &[crate::model::WorksCitedEntry])
 
     // Works Cited page
     lines.push(DocLine::page_break());
-    let wc_title = if sorted_wc.len() == 1 { "Work Cited" } else { "Works Cited" };
+    let wc_title = if sorted_wc.len() == 1 {
+        "Work Cited"
+    } else {
+        "Works Cited"
+    };
     lines.push(DocLine::centered(wc_title));
     if sorted_wc.is_empty() {
         lines.push(DocLine::normal("No entries yet."));
@@ -339,10 +402,17 @@ fn add_running_head(ops: &mut Vec<Op>, font: &FontId, last_name: &str, page_num:
     let approx_w_mm = text.len() as f32 * char_w_mm();
     let x_mm = (PAGE_W_MM - MARGIN_MM - approx_w_mm).max(MARGIN_MM);
     ops.push(Op::StartTextSection);
-    ops.push(Op::SetTextCursor { pos: Point::new(Mm(x_mm), Mm(running_head_y_mm())) });
-    ops.push(Op::SetFont { font: PdfFontHandle::External(font.clone()), size: Pt(FONT_PT) });
+    ops.push(Op::SetTextCursor {
+        pos: Point::new(Mm(x_mm), Mm(running_head_y_mm())),
+    });
+    ops.push(Op::SetFont {
+        font: PdfFontHandle::External(font.clone()),
+        size: Pt(FONT_PT),
+    });
     ops.push(Op::SetLineHeight { lh: Pt(FONT_PT) });
-    ops.push(Op::ShowText { items: vec![PdfTextItem::Text(text)] });
+    ops.push(Op::ShowText {
+        items: vec![PdfTextItem::Text(text)],
+    });
     ops.push(Op::EndTextSection);
 }
 
@@ -361,19 +431,33 @@ fn add_footnotes_footer(ops: &mut Vec<Op>, font: &FontId, notes: &[crate::model:
 
     // Standard MLA 1.5-inch rule divider (38.1 mm) rendered with standard underscore characters
     ops.push(Op::StartTextSection);
-    ops.push(Op::SetTextCursor { pos: Point::new(Mm(MARGIN_MM), Mm(divider_y)) });
-    ops.push(Op::SetFont { font: PdfFontHandle::External(font.clone()), size: Pt(10.0) });
-    ops.push(Op::ShowText { items: vec![PdfTextItem::Text("______________________".to_string())] });
+    ops.push(Op::SetTextCursor {
+        pos: Point::new(Mm(MARGIN_MM), Mm(divider_y)),
+    });
+    ops.push(Op::SetFont {
+        font: PdfFontHandle::External(font.clone()),
+        size: Pt(10.0),
+    });
+    ops.push(Op::ShowText {
+        items: vec![PdfTextItem::Text("______________________".to_string())],
+    });
     ops.push(Op::EndTextSection);
 
     let mut cur_y = divider_y - 4.0;
     for note in notes {
         let text = format!("{}. {}", note.index, typographical_clean(&note.text));
         ops.push(Op::StartTextSection);
-        ops.push(Op::SetTextCursor { pos: Point::new(Mm(MARGIN_MM + INDENT_MM), Mm(cur_y)) });
-        ops.push(Op::SetFont { font: PdfFontHandle::External(font.clone()), size: Pt(10.0) });
+        ops.push(Op::SetTextCursor {
+            pos: Point::new(Mm(MARGIN_MM + INDENT_MM), Mm(cur_y)),
+        });
+        ops.push(Op::SetFont {
+            font: PdfFontHandle::External(font.clone()),
+            size: Pt(10.0),
+        });
         ops.push(Op::SetLineHeight { lh: Pt(12.0) });
-        ops.push(Op::ShowText { items: vec![PdfTextItem::Text(text)] });
+        ops.push(Op::ShowText {
+            items: vec![PdfTextItem::Text(text)],
+        });
         ops.push(Op::EndTextSection);
         cur_y -= foot_line_h_mm;
     }

@@ -849,7 +849,11 @@ fn compute_shortcuts_panel_width(ui: &egui::Ui, keybinds: &KeybindConfig) -> f32
 
     let all_actions: &[(Action, &str, &str)] = &[
         // Writing
-        (Action::ManageWorksCited, icons::BOOK_CITATIONS, "Works Cited"),
+        (
+            Action::ManageWorksCited,
+            icons::BOOK_CITATIONS,
+            "Works Cited",
+        ),
         (Action::InsertCitation, icons::QUOTE, "Citation"),
         (Action::AddFootnote, icons::INFO, "Notes"),
         (Action::InsertBlockQuote, icons::QUOTE, "Block Quote"),
@@ -860,7 +864,11 @@ fn compute_shortcuts_panel_width(ui: &egui::Ui, keybinds: &KeybindConfig) -> f32
         (Action::MoveBlockUp, icons::ARROW_UP, "Move Up"),
         (Action::MoveBlockDown, icons::ARROW_DOWN, "Move Down"),
         (Action::MoveSentenceLeft, icons::ARROW_LEFT, "Sentence Left"),
-        (Action::MoveSentenceRight, icons::ARROW_RIGHT, "Sentence Right"),
+        (
+            Action::MoveSentenceRight,
+            icons::ARROW_RIGHT,
+            "Sentence Right",
+        ),
         (Action::DeleteBlock, icons::TRASH, "Delete Paragraph"),
         (Action::Undo, icons::UNDO, "Undo"),
         (Action::Redo, icons::REDO, "Redo"),
@@ -872,19 +880,31 @@ fn compute_shortcuts_panel_width(ui: &egui::Ui, keybinds: &KeybindConfig) -> f32
         (Action::ToggleFocusMode, icons::FOCUS_MODE, "Zen Mode"),
         (Action::OpenPreferences, icons::SETTINGS, "Preferences"),
         (Action::ToggleComplianceCheck, icons::CHECK, "MLA Linter"),
-        (Action::ConvertToMlaTitleCase, icons::TITLE_CASE, "Title Case Title"),
+        (
+            Action::ConvertToMlaTitleCase,
+            icons::TITLE_CASE,
+            "Title Case Title",
+        ),
     ];
 
     for &(act, icon, label) in all_actions {
         let label_text = format!("{} {}", icon, label);
-        let label_w = ui.painter().layout_no_wrap(label_text, label_font.clone(), egui::Color32::WHITE).size().x;
+        let label_w = ui
+            .painter()
+            .layout_no_wrap(label_text, label_font.clone(), egui::Color32::WHITE)
+            .size()
+            .x;
 
         let sc_text = if let Some(hint) = act.in_text_hint() {
             hint.to_string()
         } else {
             keybinds.get_shortcut(act).display_string()
         };
-        let sc_w = ui.painter().layout_no_wrap(sc_text, sc_font.clone(), egui::Color32::WHITE).size().x;
+        let sc_w = ui
+            .painter()
+            .layout_no_wrap(sc_text, sc_font.clone(), egui::Color32::WHITE)
+            .size()
+            .x;
 
         // label text + separation space (16.0) + badge text + badge horizontal padding (8.0) + badge stroke (2.0)
         let row_w = label_w + 16.0 + sc_w + 10.0;
@@ -933,15 +953,14 @@ fn render_keybind_preview_panel(
             ui.separator();
 
             // Group 1: Writing
-            ui.label(
-                RichText::new("WRITING")
-                    .size(9.5)
-                    .strong()
-                    .color(muted_col),
-            );
+            ui.label(RichText::new("WRITING").size(9.5).strong().color(muted_col));
 
             let actions_writing = [
-                (Action::ManageWorksCited, icons::BOOK_CITATIONS, "Works Cited"),
+                (
+                    Action::ManageWorksCited,
+                    icons::BOOK_CITATIONS,
+                    "Works Cited",
+                ),
                 (Action::InsertCitation, icons::QUOTE, "Citation"),
                 (Action::AddFootnote, icons::INFO, "Notes"),
                 (Action::InsertBlockQuote, icons::QUOTE, "Block Quote"),
@@ -965,18 +984,17 @@ fn render_keybind_preview_panel(
             ui.separator();
 
             // Group 2: Modify
-            ui.label(
-                RichText::new("MODIFY")
-                    .size(9.5)
-                    .strong()
-                    .color(muted_col),
-            );
+            ui.label(RichText::new("MODIFY").size(9.5).strong().color(muted_col));
 
             let actions_modify = [
                 (Action::MoveBlockUp, icons::ARROW_UP, "Move Up"),
                 (Action::MoveBlockDown, icons::ARROW_DOWN, "Move Down"),
                 (Action::MoveSentenceLeft, icons::ARROW_LEFT, "Sentence Left"),
-                (Action::MoveSentenceRight, icons::ARROW_RIGHT, "Sentence Right"),
+                (
+                    Action::MoveSentenceRight,
+                    icons::ARROW_RIGHT,
+                    "Sentence Right",
+                ),
                 (Action::DeleteBlock, icons::TRASH, "Delete Paragraph"),
                 (Action::Undo, icons::UNDO, "Undo"),
                 (Action::Redo, icons::REDO, "Redo"),
@@ -997,12 +1015,7 @@ fn render_keybind_preview_panel(
             ui.separator();
 
             // Group 3: File
-            ui.label(
-                RichText::new("FILE")
-                    .size(9.5)
-                    .strong()
-                    .color(muted_col),
-            );
+            ui.label(RichText::new("FILE").size(9.5).strong().color(muted_col));
 
             let actions_file = [
                 (Action::SaveDocument, icons::SAVE, "Save"),
@@ -1025,18 +1038,17 @@ fn render_keybind_preview_panel(
             ui.separator();
 
             // Group 4: Tools
-            ui.label(
-                RichText::new("TOOLS")
-                    .size(9.5)
-                    .strong()
-                    .color(muted_col),
-            );
+            ui.label(RichText::new("TOOLS").size(9.5).strong().color(muted_col));
 
             let actions_tools = [
                 (Action::ToggleFocusMode, icons::FOCUS_MODE, "Zen Mode"),
                 (Action::OpenPreferences, icons::SETTINGS, "Preferences"),
                 (Action::ToggleComplianceCheck, icons::CHECK, "MLA Linter"),
-                (Action::ConvertToMlaTitleCase, icons::TITLE_CASE, "Title Case Title"),
+                (
+                    Action::ConvertToMlaTitleCase,
+                    icons::TITLE_CASE,
+                    "Title Case Title",
+                ),
             ];
 
             for (act, icon, label) in actions_tools {

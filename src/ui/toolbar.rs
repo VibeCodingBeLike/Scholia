@@ -42,13 +42,18 @@ pub fn render_toolbar(
                 .size(15.0)
                 .color(accent_col),
         );
-        let brand_drag = ui.interact(brand_resp.rect, ui.id().with("brand_drag"), egui::Sense::click_and_drag());
+        let brand_drag = ui.interact(
+            brand_resp.rect,
+            ui.id().with("brand_drag"),
+            egui::Sense::click_and_drag(),
+        );
         if brand_drag.drag_started() {
             ui.ctx().send_viewport_cmd(egui::ViewportCommand::StartDrag);
         }
         if brand_drag.double_clicked() {
             let is_max = ui.input(|i| i.viewport().maximized.unwrap_or(false));
-            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!is_max));
+            ui.ctx()
+                .send_viewport_cmd(egui::ViewportCommand::Maximized(!is_max));
         }
 
         ui.separator();
@@ -155,7 +160,8 @@ pub fn render_toolbar(
             }
             if drag_resp.double_clicked() {
                 let is_max = ui.input(|i| i.viewport().maximized.unwrap_or(false));
-                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!is_max));
+                ui.ctx()
+                    .send_viewport_cmd(egui::ViewportCommand::Maximized(!is_max));
             }
         }
 
@@ -165,15 +171,12 @@ pub fn render_toolbar(
                 ui.spacing_mut().item_spacing.x = 4.0;
 
                 // Close button
-                let close_btn = ui.add(
-                    egui::Button::new(
-                        RichText::new("✕")
-                            .size(12.0)
-                            .color(text_col)
-                            .strong(),
+                let close_btn = ui
+                    .add(
+                        egui::Button::new(RichText::new("✕").size(12.0).color(text_col).strong())
+                            .min_size(egui::vec2(26.0, 22.0)),
                     )
-                    .min_size(egui::vec2(26.0, 22.0))
-                ).on_hover_text("Close");
+                    .on_hover_text("Close");
                 if close_btn.clicked() {
                     event = Some(ToolbarEvent::CloseApp);
                 }
@@ -181,29 +184,27 @@ pub fn render_toolbar(
                 // Maximize / Restore button
                 let is_max = ui.input(|i| i.viewport().maximized.unwrap_or(false));
                 let max_char = if is_max { "🗗" } else { "🗖" };
-                let max_btn = ui.add(
-                    egui::Button::new(
-                        RichText::new(max_char)
-                            .size(11.0)
-                            .color(text_col),
+                let max_btn = ui
+                    .add(
+                        egui::Button::new(RichText::new(max_char).size(11.0).color(text_col))
+                            .min_size(egui::vec2(26.0, 22.0)),
                     )
-                    .min_size(egui::vec2(26.0, 22.0))
-                ).on_hover_text(if is_max { "Restore" } else { "Maximize" });
+                    .on_hover_text(if is_max { "Restore" } else { "Maximize" });
                 if max_btn.clicked() {
-                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!is_max));
+                    ui.ctx()
+                        .send_viewport_cmd(egui::ViewportCommand::Maximized(!is_max));
                 }
 
                 // Minimize button
-                let min_btn = ui.add(
-                    egui::Button::new(
-                        RichText::new("🗕")
-                            .size(11.0)
-                            .color(text_col),
+                let min_btn = ui
+                    .add(
+                        egui::Button::new(RichText::new("🗕").size(11.0).color(text_col))
+                            .min_size(egui::vec2(26.0, 22.0)),
                     )
-                    .min_size(egui::vec2(26.0, 22.0))
-                ).on_hover_text("Minimize");
+                    .on_hover_text("Minimize");
                 if min_btn.clicked() {
-                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+                    ui.ctx()
+                        .send_viewport_cmd(egui::ViewportCommand::Minimized(true));
                 }
             });
         }

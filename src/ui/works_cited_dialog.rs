@@ -248,7 +248,10 @@ pub fn render_works_cited_modal(
 
         // Bottom action buttons
         ui.horizontal(|ui| {
-            if ui.button(RichText::new("💾 Save Entry").strong().color(accent_col)).clicked() {
+            if ui
+                .button(RichText::new("💾 Save Entry").strong().color(accent_col))
+                .clicked()
+            {
                 if let Some(idx) = state.editing_index {
                     if idx < works_cited.len() {
                         works_cited[idx] = state.editing_entry.clone();
@@ -263,7 +266,9 @@ pub fn render_works_cited_modal(
 
             if let Some(idx) = state.editing_index {
                 if ui
-                    .button(RichText::new("🗑 Delete Entry").color(egui::Color32::from_rgb(220, 80, 80)))
+                    .button(
+                        RichText::new("🗑 Delete Entry").color(egui::Color32::from_rgb(220, 80, 80)),
+                    )
                     .clicked()
                 {
                     if idx < works_cited.len() {

@@ -43,9 +43,7 @@ pub fn render_status_bar(
                 .file_name()
                 .and_then(|f| f.to_str())
                 .unwrap_or("Document");
-            ui.label(
-                RichText::new(format!("{} {}", icons::FOLDER_OPEN, filename)).color(text_col),
-            );
+            ui.label(RichText::new(format!("{} {}", icons::FOLDER_OPEN, filename)).color(text_col));
         }
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

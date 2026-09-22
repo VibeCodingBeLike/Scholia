@@ -1,7 +1,7 @@
 use crate::model::{MlaBlock, MlaDocument};
 use docx_rs::{
-    AlignmentType, Docx, Footer, Header, LineSpacing, LineSpacingType, PageMargin, PageNum, Paragraph, Run,
-    RunFonts, SpecialIndentType,
+    AlignmentType, Docx, Footer, Header, LineSpacing, LineSpacingType, PageMargin, PageNum,
+    Paragraph, Run, RunFonts, SpecialIndentType,
 };
 use std::fs::File;
 use std::path::Path;
@@ -199,18 +199,20 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
         let mut footer = Footer::new();
         // 1.5-inch rule divider
         footer = footer.add_paragraph(
-            Paragraph::new()
-                .align(AlignmentType::Left)
-                .add_run(
-                    Run::new()
-                        .fonts(RunFonts::new().ascii(font_name))
-                        .size(20) // 10pt
-                        .add_text("______________________"),
-                ),
+            Paragraph::new().align(AlignmentType::Left).add_run(
+                Run::new()
+                    .fonts(RunFonts::new().ascii(font_name))
+                    .size(20) // 10pt
+                    .add_text("______________________"),
+            ),
         );
 
         for note in &doc.notes {
-            let note_text = format!("{}. {}", note.index, crate::model::typographical_clean(&note.text));
+            let note_text = format!(
+                "{}. {}",
+                note.index,
+                crate::model::typographical_clean(&note.text)
+            );
             footer = footer.add_paragraph(
                 Paragraph::new()
                     .align(AlignmentType::Left)

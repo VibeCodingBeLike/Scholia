@@ -544,4 +544,3 @@ fn render_keybindings_tab(ui: &mut egui::Ui, keybinds: &mut KeybindConfig, theme
             });
     });
 }
-

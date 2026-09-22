@@ -187,10 +187,7 @@ impl MlaApp {
                     .save_file()
                 {
                     match export_to_pdf(&self.doc, &path) {
-                        Ok(_) => self.set_notification(format!(
-                            "Exported PDF: {}",
-                            path.display()
-                        )),
+                        Ok(_) => self.set_notification(format!("Exported PDF: {}", path.display())),
                         Err(e) => self.set_notification(format!("PDF export error: {}", e)),
                     }
                 }
@@ -359,13 +356,18 @@ impl MlaApp {
         let cursor_idx = self.get_active_block_cursor(ctx);
         self.history.record_discrete_action(&self.doc, cursor_idx);
 
-        match self.doc.move_sentence_in_active_block(cursor_idx, direction_left) {
+        match self
+            .doc
+            .move_sentence_in_active_block(cursor_idx, direction_left)
+        {
             Ok(new_cursor) => {
                 let mut state =
                     egui::text_edit::TextEditState::load(ctx, target_id).unwrap_or_default();
-                state.cursor.set_char_range(Some(egui::text::CCursorRange::one(
-                    egui::text::CCursor::new(new_cursor),
-                )));
+                state
+                    .cursor
+                    .set_char_range(Some(egui::text::CCursorRange::one(
+                        egui::text::CCursor::new(new_cursor),
+                    )));
                 state.store(ctx, target_id);
                 ctx.memory_mut(|m| m.request_focus(target_id));
                 let dir_str = if direction_left { "left" } else { "right" };
@@ -378,17 +380,24 @@ impl MlaApp {
     }
 
     fn get_active_block_cursor(&self, ctx: &egui::Context) -> usize {
-        let b_idx = self.doc.active_block_idx.min(self.doc.blocks.len().saturating_sub(1));
-        self.doc.blocks.get(b_idx).and_then(|block| {
-            let target_id = match block {
-                MlaBlock::Paragraph { id, .. } => egui::Id::new("p_block").with(id),
-                MlaBlock::BlockQuote { id, .. } => egui::Id::new("bq_block").with(id),
-                MlaBlock::SectionHeading { id, .. } => egui::Id::new("h_block").with(id),
-            };
-            egui::text_edit::TextEditState::load(ctx, target_id)
-                .and_then(|s| s.cursor.char_range())
-                .map(|r| r.primary.index.0)
-        }).unwrap_or(0)
+        let b_idx = self
+            .doc
+            .active_block_idx
+            .min(self.doc.blocks.len().saturating_sub(1));
+        self.doc
+            .blocks
+            .get(b_idx)
+            .and_then(|block| {
+                let target_id = match block {
+                    MlaBlock::Paragraph { id, .. } => egui::Id::new("p_block").with(id),
+                    MlaBlock::BlockQuote { id, .. } => egui::Id::new("bq_block").with(id),
+                    MlaBlock::SectionHeading { id, .. } => egui::Id::new("h_block").with(id),
+                };
+                egui::text_edit::TextEditState::load(ctx, target_id)
+                    .and_then(|s| s.cursor.char_range())
+                    .map(|r| r.primary.index.0)
+            })
+            .unwrap_or(0)
     }
 
     fn consume_undo_redo_keys(ctx: &egui::Context) {
@@ -408,18 +417,24 @@ impl MlaApp {
         self.doc.is_dirty = true;
         self.doc.sync_body_from_blocks();
 
-        let b_idx = self.doc.active_block_idx.min(self.doc.blocks.len().saturating_sub(1));
+        let b_idx = self
+            .doc
+            .active_block_idx
+            .min(self.doc.blocks.len().saturating_sub(1));
         if let Some(block) = self.doc.blocks.get(b_idx) {
             let target_id = match block {
                 MlaBlock::Paragraph { id, .. } => egui::Id::new("p_block").with(id),
                 MlaBlock::BlockQuote { id, .. } => egui::Id::new("bq_block").with(id),
                 MlaBlock::SectionHeading { id, .. } => egui::Id::new("h_block").with(id),
             };
-            let mut state = egui::text_edit::TextEditState::load(ctx, target_id).unwrap_or_default();
+            let mut state =
+                egui::text_edit::TextEditState::load(ctx, target_id).unwrap_or_default();
             let safe_cursor = snapshot.cursor_pos.min(block.text().chars().count());
-            state.cursor.set_char_range(Some(egui::text::CCursorRange::one(
-                egui::text::CCursor::new(safe_cursor),
-            )));
+            state
+                .cursor
+                .set_char_range(Some(egui::text::CCursorRange::one(
+                    egui::text::CCursor::new(safe_cursor),
+                )));
             state.store(ctx, target_id);
             ctx.memory_mut(|m| m.request_focus(target_id));
         }
@@ -465,7 +480,8 @@ impl eframe::App for MlaApp {
 
         // Fill the entire window bounds seamlessly with the theme's window fill color
         let screen_rect = ui.max_rect();
-        ui.painter().rect_filled(screen_rect, 0.0, self.theme.window_fill_color());
+        ui.painter()
+            .rect_filled(screen_rect, 0.0, self.theme.window_fill_color());
 
         // Handle vibrancy application
         if self.vibrancy_dirty {
@@ -521,13 +537,23 @@ impl eframe::App for MlaApp {
                         render_toolbar(ui, &self.doc, &self.theme, &self.keybinds, self.focus_mode)
                     {
                         match tb_event {
-                            ToolbarEvent::NewDoc => self.handle_action(Action::NewDocument, ui.ctx()),
-                            ToolbarEvent::OpenDoc => self.handle_action(Action::OpenDocument, ui.ctx()),
-                            ToolbarEvent::SaveDoc => self.handle_action(Action::SaveDocument, ui.ctx()),
+                            ToolbarEvent::NewDoc => {
+                                self.handle_action(Action::NewDocument, ui.ctx())
+                            }
+                            ToolbarEvent::OpenDoc => {
+                                self.handle_action(Action::OpenDocument, ui.ctx())
+                            }
+                            ToolbarEvent::SaveDoc => {
+                                self.handle_action(Action::SaveDocument, ui.ctx())
+                            }
                             ToolbarEvent::Undo => self.handle_action(Action::Undo, ui.ctx()),
                             ToolbarEvent::Redo => self.handle_action(Action::Redo, ui.ctx()),
-                            ToolbarEvent::ExportDocx => self.handle_action(Action::ExportDocx, ui.ctx()),
-                            ToolbarEvent::ExportHtml => self.handle_action(Action::ExportHtmlPdf, ui.ctx()),
+                            ToolbarEvent::ExportDocx => {
+                                self.handle_action(Action::ExportDocx, ui.ctx())
+                            }
+                            ToolbarEvent::ExportHtml => {
+                                self.handle_action(Action::ExportHtmlPdf, ui.ctx())
+                            }
                             ToolbarEvent::ExportText => {
                                 if let Some(path) = rfd::FileDialog::new()
                                     .set_file_name("MLA_Paper.txt")
@@ -566,7 +592,8 @@ impl eframe::App for MlaApp {
                 // Handle close request confirmation popup
                 if close_requested {
                     if self.doc.is_dirty && !self.confirmed_exit {
-                        ui.ctx().send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                        ui.ctx()
+                            .send_viewport_cmd(egui::ViewportCommand::CancelClose);
                         self.unsaved_changes_state.is_open = true;
                     } else {
                         save_config(&self.theme, &self.keybinds, self.history.max_depth);

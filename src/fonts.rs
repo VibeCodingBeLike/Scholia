@@ -77,10 +77,7 @@ pub fn configure_fonts(ctx: &egui::Context) {
     }
 
     // 4. Register MLA Document Family: bundled Times New Roman + NerdFont for icon fallback
-    let doc_family_list = vec![
-        MLA_DOC_FONT.to_string(),
-        "NerdFont".to_string(),
-    ];
+    let doc_family_list = vec![MLA_DOC_FONT.to_string(), "NerdFont".to_string()];
     fonts.families.insert(doc_font_family(), doc_family_list);
 
     ctx.set_fonts(fonts);

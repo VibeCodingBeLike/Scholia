@@ -203,7 +203,10 @@ fn test_editor_page_centering() {
 
     let mut out = ctx.run_ui(
         egui::RawInput {
-            screen_rect: Some(egui::Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(1920.0, 1080.0))),
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::pos2(0.0, 0.0),
+                egui::vec2(1920.0, 1080.0),
+            )),
             ..Default::default()
         },
         |ui| {
@@ -235,7 +238,9 @@ fn test_document_block_operations_and_sync() {
 
     // Verify sync_body_from_blocks
     doc.blocks[0].text_mut().push_str("Paragraph one.");
-    doc.blocks[1].text_mut().push_str("A quoted passage from literature.");
+    doc.blocks[1]
+        .text_mut()
+        .push_str("A quoted passage from literature.");
     doc.sync_body_from_blocks();
     assert!(doc.body.contains("Paragraph one."));
     assert!(doc.body.contains("> A quoted passage from literature."));
@@ -286,10 +291,27 @@ fn test_block_deletion_focus_and_keybinds() {
 
     // Verify keybinds are registered
     let cfg = KeybindConfig::default();
-    assert_eq!(cfg.get_shortcut(Action::DeleteBlock).display_string(), "Ctrl+Backspace");
-    assert_eq!(cfg.get_shortcut(Action::MoveBlockUp).display_string(), "Ctrl+Alt+Up");
-    assert_eq!(cfg.get_shortcut(Action::MoveBlockDown).display_string(), "Ctrl+Alt+Down");
-    assert_eq!(cfg.get_shortcut(Action::InsertHeading3).display_string(), "Ctrl+Alt+3");
+    let (ctrl_name, alt_name) = if cfg!(target_os = "macos") {
+        ("Cmd", "Option")
+    } else {
+        ("Ctrl", "Alt")
+    };
+    assert_eq!(
+        cfg.get_shortcut(Action::DeleteBlock).display_string(),
+        format!("{ctrl_name}+Backspace")
+    );
+    assert_eq!(
+        cfg.get_shortcut(Action::MoveBlockUp).display_string(),
+        format!("{ctrl_name}+{alt_name}+Up")
+    );
+    assert_eq!(
+        cfg.get_shortcut(Action::MoveBlockDown).display_string(),
+        format!("{ctrl_name}+{alt_name}+Down")
+    );
+    assert_eq!(
+        cfg.get_shortcut(Action::InsertHeading3).display_string(),
+        format!("{ctrl_name}+{alt_name}+3")
+    );
 }
 
 #[test]
@@ -311,15 +333,29 @@ fn test_interface_options_and_removed_shortcuts() {
     // Anything that has an in-text action (^N, /cite) shouldn't have a keybind
     assert!(!cfg.check_action(Action::InsertCitation, &input));
     assert!(!cfg.check_action(Action::AddFootnote, &input));
-    assert_eq!(cfg.get_shortcut(Action::InsertCitation).display_string(), "None");
-    assert_eq!(cfg.get_shortcut(Action::AddFootnote).display_string(), "None");
+    assert_eq!(
+        cfg.get_shortcut(Action::InsertCitation).display_string(),
+        "None"
+    );
+    assert_eq!(
+        cfg.get_shortcut(Action::AddFootnote).display_string(),
+        "None"
+    );
     assert!(Action::InsertCitation.is_in_text_action());
     assert!(Action::AddFootnote.is_in_text_action());
     assert_eq!(Action::InsertCitation.in_text_hint(), Some("/cite"));
     assert_eq!(Action::AddFootnote.in_text_hint(), Some("^N"));
 
-    // Verify Works Cited shortcut is Ctrl+W
-    assert_eq!(cfg.get_shortcut(Action::ManageWorksCited).display_string(), "Ctrl+W");
+    // Verify Works Cited shortcut is Ctrl+W (or Cmd+W on macOS)
+    let ctrl_name = if cfg!(target_os = "macos") {
+        "Cmd"
+    } else {
+        "Ctrl"
+    };
+    assert_eq!(
+        cfg.get_shortcut(Action::ManageWorksCited).display_string(),
+        format!("{ctrl_name}+W")
+    );
 
     // Verify categories and renamed actions
     assert_eq!(Action::DeleteBlock.display_name(), "Delete Paragraph");
@@ -357,7 +393,10 @@ fn test_explanatory_notes_and_superscript_engine() {
     assert_eq!(num_to_superscript(12), "¹²");
 
     // Body text is clean prose, no raw superscript characters
-    assert_eq!(clean_superscripts("Here is text¹ and more²."), "Here is text and more.");
+    assert_eq!(
+        clean_superscripts("Here is text¹ and more²."),
+        "Here is text and more."
+    );
 
     let block_0_id = doc.blocks[0].id().to_string();
     if let MlaBlock::Paragraph { text, .. } = &mut doc.blocks[0] {
@@ -380,7 +419,10 @@ fn test_explanatory_notes_and_superscript_engine() {
     assert_eq!(block_notes[1].index, 2);
 
     // Verify block text remains clean prose
-    assert_eq!(doc.blocks[0].text(), "Here is clean prose text without raw superscripts.");
+    assert_eq!(
+        doc.blocks[0].text(),
+        "Here is clean prose text without raw superscripts."
+    );
 
     // Deleting note 1 removes it and re-indexes note 2 to index 1
     let note_1_id = doc.notes[0].id.clone();
@@ -426,13 +468,17 @@ fn test_word_superscript_note_shortcut_and_json_tag() {
     let mut no_space_single = "The example^1".to_string();
     let mut tags_temp: Vec<NoteTag> = Vec::new();
     assert!(
-        try_parse_and_apply_note_shortcut(&mut no_space_single, &mut tags_temp, &[]).unwrap().is_none(),
+        try_parse_and_apply_note_shortcut(&mut no_space_single, &mut tags_temp, &[])
+            .unwrap()
+            .is_none(),
         "Must wait for spacebar: example^1 without space must not trigger"
     );
 
     let mut no_space_multi = "The example^10".to_string();
     assert!(
-        try_parse_and_apply_note_shortcut(&mut no_space_multi, &mut tags_temp, &[]).unwrap().is_none(),
+        try_parse_and_apply_note_shortcut(&mut no_space_multi, &mut tags_temp, &[])
+            .unwrap()
+            .is_none(),
         "Must wait for spacebar: example^10 without space must not trigger"
     );
 
@@ -442,7 +488,10 @@ fn test_word_superscript_note_shortcut_and_json_tag() {
 
     // First shortcut: example^1 confirmed with spacebar
     let result1 = try_parse_and_apply_note_shortcut(&mut input_text, &mut tags, &[]).unwrap();
-    assert!(result1.is_some(), "Shortcut example^1 should be recognized upon typing space");
+    assert!(
+        result1.is_some(),
+        "Shortcut example^1 should be recognized upon typing space"
+    );
     let res1 = result1.unwrap();
     assert_eq!(res1.note_index, 1);
     assert_eq!(res1.word, "example");
@@ -451,7 +500,10 @@ fn test_word_superscript_note_shortcut_and_json_tag() {
 
     // Second shortcut: another^13 confirmed with spacebar (note 1 is already in-use so we pass [1])
     let result2 = try_parse_and_apply_note_shortcut(&mut input_text, &mut tags, &[1]).unwrap();
-    assert!(result2.is_some(), "Shortcut another^13 should be recognized upon typing space");
+    assert!(
+        result2.is_some(),
+        "Shortcut another^13 should be recognized upon typing space"
+    );
     let res2 = result2.unwrap();
     assert_eq!(res2.note_index, 13);
     assert_eq!(res2.word, "another");
@@ -462,9 +514,15 @@ fn test_word_superscript_note_shortcut_and_json_tag() {
     let mut reuse_text = "test^1 ".to_string();
     let mut reuse_tags: Vec<NoteTag> = Vec::new();
     let reuse_result = try_parse_and_apply_note_shortcut(&mut reuse_text, &mut reuse_tags, &[1]);
-    assert!(reuse_result.is_err(), "MLA 9: reusing note 1 that is already in use must return Err");
+    assert!(
+        reuse_result.is_err(),
+        "MLA 9: reusing note 1 that is already in use must return Err"
+    );
     // The caret notation should be stripped/cancelled from text
-    assert!(!reuse_text.contains("^"), "Cancelled note shorthand must be removed from text");
+    assert!(
+        !reuse_text.contains("^"),
+        "Cancelled note shorthand must be removed from text"
+    );
 
     // 2. Adding notes does NOT delete the associated words
     assert!(input_text.contains("example"));
@@ -478,12 +536,21 @@ fn test_word_superscript_note_shortcut_and_json_tag() {
     assert_eq!(tags[1].word, "another");
 
     // 4. Update block in document
-    if let MlaBlock::Paragraph { text, note_tags, .. } = &mut doc.blocks[0] {
+    if let MlaBlock::Paragraph {
+        text, note_tags, ..
+    } = &mut doc.blocks[0]
+    {
         *text = input_text.clone();
         *note_tags = tags.clone();
     }
-    assert!(doc.link_note_from_shortcut(&block_id, res1.note_index, &res1.word), "Linking new note must succeed");
-    assert!(doc.link_note_from_shortcut(&block_id, res2.note_index, &res2.word), "Linking new note must succeed");
+    assert!(
+        doc.link_note_from_shortcut(&block_id, res1.note_index, &res1.word),
+        "Linking new note must succeed"
+    );
+    assert!(
+        doc.link_note_from_shortcut(&block_id, res2.note_index, &res2.word),
+        "Linking new note must succeed"
+    );
 
     // Verify linked in document
     assert_eq!(doc.notes.len(), 2);
@@ -500,28 +567,51 @@ fn test_word_superscript_note_shortcut_and_json_tag() {
 
     // 5. Test JSON serialization and deserialization retains note_tags
     let json = serde_json::to_string(&doc).expect("Serialization to JSON must succeed");
-    assert!(json.contains("note_tags"), "JSON must contain note_tags tag in block");
+    assert!(
+        json.contains("note_tags"),
+        "JSON must contain note_tags tag in block"
+    );
     assert!(json.contains("example"));
     assert!(json.contains("another"));
-    let deserialized: MlaDocument = serde_json::from_str(&json).expect("Deserialization must succeed");
+    let deserialized: MlaDocument =
+        serde_json::from_str(&json).expect("Deserialization must succeed");
     assert_eq!(deserialized.blocks[0].note_tags().len(), 2);
     assert_eq!(deserialized.blocks[0].note_tags()[0].word, "example");
 
     // 6. Test Exporter text rendering: superscripts placed right after the words without duplication!
     let block_notes = doc.notes_for_block(&block_id);
-    let rendered_text = render_text_with_note_tags(&doc.blocks[0].text(), doc.blocks[0].note_tags(), &block_notes, num_to_superscript);
+    let rendered_text = render_text_with_note_tags(
+        doc.blocks[0].text(),
+        doc.blocks[0].note_tags(),
+        &block_notes,
+        num_to_superscript,
+    );
     assert_eq!(rendered_text, "The example¹ and another² quest continued.");
 
-    let rendered_html = render_text_with_note_tags(&doc.blocks[0].text(), doc.blocks[0].note_tags(), &block_notes, |idx| format!("<sup>{}</sup>", idx));
-    assert_eq!(rendered_html, "The example<sup>1</sup> and another<sup>2</sup> quest continued.");
+    let rendered_html = render_text_with_note_tags(
+        doc.blocks[0].text(),
+        doc.blocks[0].note_tags(),
+        &block_notes,
+        |idx| format!("<sup>{}</sup>", idx),
+    );
+    assert_eq!(
+        rendered_html,
+        "The example<sup>1</sup> and another<sup>2</sup> quest continued."
+    );
 
     // 7. Deleting note removes note tag AND removes superscript from paragraph text
     doc.delete_explanatory_note(1);
     assert_eq!(doc.notes.len(), 1);
     assert_eq!(doc.blocks[0].note_tags().len(), 1);
     assert_eq!(doc.blocks[0].note_tags()[0].word, "another");
-    assert!(!doc.blocks[0].text().contains("example¹"), "Deleted note superscript must be removed from text");
-    assert!(doc.blocks[0].text().contains("another¹"), "Remaining note should reindex to ¹ in text");
+    assert!(
+        !doc.blocks[0].text().contains("example¹"),
+        "Deleted note superscript must be removed from text"
+    );
+    assert!(
+        doc.blocks[0].text().contains("another¹"),
+        "Remaining note should reindex to ¹ in text"
+    );
 }
 
 #[test]
@@ -570,23 +660,46 @@ fn test_notes_exported_in_footer_not_separate_page() {
 
     // HTML Verification
     let html = generate_mla_html(&doc);
-    assert!(html.contains(r#"<footer class="mla-footnotes">"#), "Notes must be inside footer element in HTML");
-    assert!(html.contains(r#"<hr class="mla-footnotes-divider">"#), "Footer must contain standard 1.5-inch divider");
-    assert!(html.contains("1. Explanatory footnote content."), "Footnote text must be present");
-    assert!(!html.contains("mla-notes-section"), "Must not have separate notes page section");
-    assert!(!html.contains(r#"<h2 class="mla-notes-title""#), "Must not have separate Notes h2 page header");
+    assert!(
+        html.contains(r#"<footer class="mla-footnotes">"#),
+        "Notes must be inside footer element in HTML"
+    );
+    assert!(
+        html.contains(r#"<hr class="mla-footnotes-divider">"#),
+        "Footer must contain standard 1.5-inch divider"
+    );
+    assert!(
+        html.contains("1. Explanatory footnote content."),
+        "Footnote text must be present"
+    );
+    assert!(
+        !html.contains("mla-notes-section"),
+        "Must not have separate notes page section"
+    );
+    assert!(
+        !html.contains(r#"<h2 class="mla-notes-title""#),
+        "Must not have separate Notes h2 page header"
+    );
 
     // DOCX Export Verification
     let temp_dir = std::env::temp_dir();
     let docx_path = temp_dir.join("test_export_notes.docx");
     let docx_res = export_to_docx(&doc, &docx_path);
-    assert!(docx_res.is_ok(), "DOCX export with notes in footer should succeed: {:?}", docx_res.err());
+    assert!(
+        docx_res.is_ok(),
+        "DOCX export with notes in footer should succeed: {:?}",
+        docx_res.err()
+    );
     let _ = std::fs::remove_file(&docx_path);
 
     // PDF Export Verification
     let pdf_path = temp_dir.join("test_export_notes.pdf");
     let pdf_res = export_to_pdf(&doc, &pdf_path);
-    assert!(pdf_res.is_ok(), "PDF export with notes in footer should succeed: {:?}", pdf_res.err());
+    assert!(
+        pdf_res.is_ok(),
+        "PDF export with notes in footer should succeed: {:?}",
+        pdf_res.err()
+    );
     let _ = std::fs::remove_file(&pdf_path);
 }
 
@@ -596,22 +709,40 @@ fn test_transparent_button_visuals() {
     let dark_visuals = dark_theme.create_egui_visuals();
 
     // Inactive buttons must have completely transparent background
-    assert_eq!(dark_visuals.widgets.inactive.bg_fill, egui::Color32::TRANSPARENT);
-    assert_eq!(dark_visuals.widgets.inactive.weak_bg_fill, egui::Color32::TRANSPARENT);
+    assert_eq!(
+        dark_visuals.widgets.inactive.bg_fill,
+        egui::Color32::TRANSPARENT
+    );
+    assert_eq!(
+        dark_visuals.widgets.inactive.weak_bg_fill,
+        egui::Color32::TRANSPARENT
+    );
 
     // Hovered buttons should be softly tinted, not solid opaque gray (egui default is from_gray(70) with alpha 255)
-    assert_ne!(dark_visuals.widgets.hovered.bg_fill, egui::Color32::from_gray(70));
+    assert_ne!(
+        dark_visuals.widgets.hovered.bg_fill,
+        egui::Color32::from_gray(70)
+    );
     assert_ne!(dark_visuals.widgets.hovered.bg_fill.a(), 255);
 
     // Active buttons should also be translucent
-    assert_ne!(dark_visuals.widgets.active.bg_fill, egui::Color32::from_gray(55));
+    assert_ne!(
+        dark_visuals.widgets.active.bg_fill,
+        egui::Color32::from_gray(55)
+    );
     assert_ne!(dark_visuals.widgets.active.bg_fill.a(), 255);
 
     // Test light theme as well
     let light_theme = scholia::theme::ThemeConfig::preset_frosted_light();
     let light_visuals = light_theme.create_egui_visuals();
-    assert_eq!(light_visuals.widgets.inactive.bg_fill, egui::Color32::TRANSPARENT);
-    assert_eq!(light_visuals.widgets.inactive.weak_bg_fill, egui::Color32::TRANSPARENT);
+    assert_eq!(
+        light_visuals.widgets.inactive.bg_fill,
+        egui::Color32::TRANSPARENT
+    );
+    assert_eq!(
+        light_visuals.widgets.inactive.weak_bg_fill,
+        egui::Color32::TRANSPARENT
+    );
 }
 
 #[test]
@@ -634,7 +765,10 @@ fn test_sentence_splitting_and_reordering() {
     let text2 = "Dr. Smith cited p. 42 and 3.14 ratio in vol. 2. Next statement.";
     let (_, spans2) = split_sentences(text2);
     assert_eq!(spans2.len(), 2);
-    assert_eq!(spans2[0].text, "Dr. Smith cited p. 42 and 3.14 ratio in vol. 2.");
+    assert_eq!(
+        spans2[0].text,
+        "Dr. Smith cited p. 42 and 3.14 ratio in vol. 2."
+    );
     assert_eq!(spans2[1].text, "Next statement.");
 
     // 3. Quotes, ellipses, and superscripts
@@ -653,7 +787,8 @@ fn test_sentence_splitting_and_reordering() {
     assert_eq!(cursor_left, 0, "Cursor should follow 'B' to index 0");
 
     // Reorder sentences Alt+Right from index 0 ("B." swaps with "A.")
-    let (swapped_right, cursor_right) = reorder_sentences(&swapped_left, 0, false).expect("Should swap right");
+    let (swapped_right, cursor_right) =
+        reorder_sentences(&swapped_left, 0, false).expect("Should swap right");
     assert_eq!(swapped_right, "A. B. C.");
     assert_eq!(cursor_right, 3, "Cursor should follow 'B' back to index 3");
 
@@ -676,12 +811,20 @@ fn test_document_sentence_reordering_and_keybinds() {
     let left_sc = config.get_shortcut(Action::MoveSentenceLeft);
     assert!(left_sc.alt, "MoveSentenceLeft must use Alt");
     assert!(left_sc.ctrl, "MoveSentenceLeft must use Ctrl");
-    assert_eq!(left_sc.key, KeyName::Left, "MoveSentenceLeft key must be Left");
+    assert_eq!(
+        left_sc.key,
+        KeyName::Left,
+        "MoveSentenceLeft key must be Left"
+    );
 
     let right_sc = config.get_shortcut(Action::MoveSentenceRight);
     assert!(right_sc.alt, "MoveSentenceRight must use Alt");
     assert!(right_sc.ctrl, "MoveSentenceRight must use Ctrl");
-    assert_eq!(right_sc.key, KeyName::Right, "MoveSentenceRight key must be Right");
+    assert_eq!(
+        right_sc.key,
+        KeyName::Right,
+        "MoveSentenceRight key must be Right"
+    );
 
     let mut doc = MlaDocument::new_blank();
     doc.blocks[0] = scholia::model::MlaBlock::Paragraph {
@@ -695,13 +838,19 @@ fn test_document_sentence_reordering_and_keybinds() {
     // Cursor is in "Sentence two." at index 14
     let res = doc.move_sentence_in_active_block(14, true);
     assert!(res.is_ok());
-    assert_eq!(doc.blocks[0].text(), "Sentence two. Sentence one. Sentence three.");
+    assert_eq!(
+        doc.blocks[0].text(),
+        "Sentence two. Sentence one. Sentence three."
+    );
 
     // Move it right again
     let new_cursor = res.unwrap();
     let res_right = doc.move_sentence_in_active_block(new_cursor, false);
     assert!(res_right.is_ok());
-    assert_eq!(doc.blocks[0].text(), "Sentence one. Sentence two. Sentence three.");
+    assert_eq!(
+        doc.blocks[0].text(),
+        "Sentence one. Sentence two. Sentence three."
+    );
 }
 
 #[test]
@@ -843,11 +992,22 @@ fn test_discrete_actions_undo_and_redo() {
 
 #[test]
 fn test_undo_redo_shortcuts_and_keybinds() {
-    use scholia::keybinds::{Action, KeybindConfig, KeyName};
+    use scholia::keybinds::{Action, KeyName, KeybindConfig};
 
     let cfg = KeybindConfig::default();
-    assert_eq!(cfg.get_shortcut(Action::Undo).display_string(), "Ctrl+Z");
-    assert_eq!(cfg.get_shortcut(Action::Redo).display_string(), "Ctrl+Y");
+    let ctrl_name = if cfg!(target_os = "macos") {
+        "Cmd"
+    } else {
+        "Ctrl"
+    };
+    assert_eq!(
+        cfg.get_shortcut(Action::Undo).display_string(),
+        format!("{ctrl_name}+Z")
+    );
+    assert_eq!(
+        cfg.get_shortcut(Action::Redo).display_string(),
+        format!("{ctrl_name}+Y")
+    );
 
     // Action categories and labels
     assert_eq!(Action::Undo.category(), "Modify");
@@ -983,11 +1143,19 @@ fn test_modal_fill_color_ninety_percent_opacity() {
     let theme = ThemeConfig::default();
     let modal_color = theme.modal_fill_color();
     // 90% opaque corresponds to alpha = 230 (or ~0.90 * 255)
-    assert_eq!(modal_color.a(), 230, "Modal dialog background must have alpha = 230 (90% opaque, 10% transparent)");
+    assert_eq!(
+        modal_color.a(),
+        230,
+        "Modal dialog background must have alpha = 230 (90% opaque, 10% transparent)"
+    );
 
     // Window fill in visuals should also match modal fill color
     let visuals = theme.create_egui_visuals();
-    assert_eq!(visuals.window_fill.a(), 230, "Visuals window_fill must match 90% opaque modal fill");
+    assert_eq!(
+        visuals.window_fill.a(),
+        230,
+        "Visuals window_fill must match 90% opaque modal fill"
+    );
 }
 
 #[test]
@@ -1033,13 +1201,21 @@ fn test_theme_folder_save_and_load_roundtrip() {
 
     let test_theme_name = "Automated Test Theme";
     let save_res = save_custom_theme(&theme, test_theme_name);
-    assert!(save_res.is_ok(), "Saving custom theme must succeed: {:?}", save_res);
+    assert!(
+        save_res.is_ok(),
+        "Saving custom theme must succeed: {:?}",
+        save_res
+    );
 
     let saved_path = save_res.unwrap();
     assert!(saved_path.exists());
 
     let load_res = load_theme_file(&saved_path);
-    assert!(load_res.is_ok(), "Loading saved theme file must succeed: {:?}", load_res);
+    assert!(
+        load_res.is_ok(),
+        "Loading saved theme file must succeed: {:?}",
+        load_res
+    );
 
     let loaded = load_res.unwrap();
     assert_eq!(loaded.preset, ThemePreset::Custom);
@@ -1084,5 +1260,3 @@ fn test_shortcuts_panel_dynamic_width_no_overlap() {
     );
     out.textures_delta.clear();
 }
-
-

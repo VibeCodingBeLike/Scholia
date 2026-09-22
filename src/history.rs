@@ -225,7 +225,9 @@ impl HistoryManager {
         }
 
         // Active block text changes
-        let b_idx = new_doc.active_block_idx.min(new_doc.blocks.len().saturating_sub(1));
+        let b_idx = new_doc
+            .active_block_idx
+            .min(new_doc.blocks.len().saturating_sub(1));
         if let (Some(old_b), Some(new_b)) = (old_doc.blocks.get(b_idx), new_doc.blocks.get(b_idx)) {
             let old_text = old_b.text();
             let new_text = new_b.text();
@@ -236,7 +238,12 @@ impl HistoryManager {
                     if diff_len > 4 {
                         return true; // Large change (paste/replace)
                     }
-                    if new_text.chars().rev().take(diff_len).any(is_word_boundary_char) {
+                    if new_text
+                        .chars()
+                        .rev()
+                        .take(diff_len)
+                        .any(is_word_boundary_char)
+                    {
                         return true;
                     }
                 } else if new_text.len() < old_text.len() {
@@ -244,7 +251,12 @@ impl HistoryManager {
                     if diff_len > 4 {
                         return true; // Large deletion
                     }
-                    if old_text.chars().rev().take(diff_len).any(is_word_boundary_char) {
+                    if old_text
+                        .chars()
+                        .rev()
+                        .take(diff_len)
+                        .any(is_word_boundary_char)
+                    {
                         return true;
                     }
                 }
@@ -252,18 +264,36 @@ impl HistoryManager {
         }
 
         // Header or title changes
-        if old_doc.title != new_doc.title {
-            if new_doc.title.chars().last().map_or(false, is_word_boundary_char) {
-                return true;
-            }
+        if old_doc.title != new_doc.title
+            && new_doc
+                .title
+                .chars()
+                .last()
+                .is_some_and(is_word_boundary_char)
+        {
+            return true;
         }
-        if old_doc.header != new_doc.header {
-            if new_doc.header.student_name.chars().last().map_or(false, is_word_boundary_char)
-                || new_doc.header.instructor_name.chars().last().map_or(false, is_word_boundary_char)
-                || new_doc.header.course.chars().last().map_or(false, is_word_boundary_char)
-            {
-                return true;
-            }
+        if old_doc.header != new_doc.header
+            && (new_doc
+                .header
+                .student_name
+                .chars()
+                .last()
+                .is_some_and(is_word_boundary_char)
+                || new_doc
+                    .header
+                    .instructor_name
+                    .chars()
+                    .last()
+                    .is_some_and(is_word_boundary_char)
+                || new_doc
+                    .header
+                    .course
+                    .chars()
+                    .last()
+                    .is_some_and(is_word_boundary_char))
+        {
+            return true;
         }
 
         false
