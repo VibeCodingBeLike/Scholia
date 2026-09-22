@@ -118,15 +118,9 @@ pub fn generate_mla_html(doc: &MlaDocument) -> String {
     }
 
     // Works Cited
-    let title_label = if sorted_wc.len() == 1 {
-        "Work Cited"
-    } else {
-        "Works Cited"
-    };
     body_html.push_str(&format!(
         r#"<div class="mla-works-cited-section">
-    <h2 class="mla-works-cited-title">{}</h2>"#,
-        title_label
+    <h2 class="mla-works-cited-title">Works Cited</h2>"#
     ));
 
     if sorted_wc.is_empty() {

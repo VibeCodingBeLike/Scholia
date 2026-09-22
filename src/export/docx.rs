@@ -229,12 +229,6 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
     }
 
     // --- Works Cited (Starts on a New Page) ---
-    let wc_title = if doc.works_cited.len() == 1 {
-        "Work Cited"
-    } else {
-        "Works Cited"
-    };
-
     docx = docx.add_paragraph(
         Paragraph::new()
             .page_break_before(true)
@@ -244,7 +238,7 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
                 Run::new()
                     .fonts(RunFonts::new().ascii(font_name))
                     .size(font_size)
-                    .add_text(wc_title),
+                    .add_text("Works Cited"),
             ),
     );
 

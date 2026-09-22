@@ -3,6 +3,7 @@ use crate::keybinds::{Action, KeybindConfig};
 use crate::model::format_current_mla_date;
 use crate::model::{num_to_superscript, MlaBlock, MlaDocument};
 use crate::theme::ThemeConfig;
+use egui::text::{LayoutJob, TextFormat};
 use egui::{RichText, Ui};
 
 pub enum EditorAction {
@@ -28,6 +29,18 @@ pub fn render_editor_page(
     // Ensure blocks and body are properly populated
     doc.ensure_blocks_initialized();
     doc.ensure_body_synced();
+
+    // Provide a document-wide copy command even though blocks use separate editors.
+    if ui.input(|i| i.modifiers.command && i.modifiers.shift && i.key_pressed(egui::Key::C)) {
+        let all_text = doc
+            .blocks
+            .iter()
+            .map(MlaBlock::text)
+            .filter(|text| !text.trim().is_empty())
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        ui.ctx().copy_text(all_text);
+    }
 
     let avail_h = ui.available_height();
     let status_bar_h = if focus_mode { 0.0 } else { 24.0 };
@@ -770,13 +783,8 @@ pub fn render_editor_page(
 
                         // Centered "Works Cited" title
                         ui.vertical_centered(|ui| {
-                            let wc_title = if doc.works_cited.len() == 1 {
-                                "Work Cited"
-                            } else {
-                                "Works Cited"
-                            };
                             ui.label(
-                                RichText::new(wc_title)
+                                RichText::new("Works Cited")
                                     .font(doc_font(16.0))
                                     .color(text_col),
                             );
@@ -797,33 +805,42 @@ pub fn render_editor_page(
                         } else {
                             let mut entry_to_edit = None;
 
-                            for (idx, entry) in doc.works_cited.iter().enumerate() {
+                            let mut sorted_entries: Vec<_> = doc.works_cited.iter().enumerate().collect();
+                            sorted_entries.sort_by_key(|(_, entry)| entry.sort_key());
+
+                            for (idx, entry) in sorted_entries {
                                 let formatted = entry.format_markdown();
 
-                                ui.horizontal_top(|ui| {
-                                    // 0.5-inch Hanging Indent: First line flush left, subsequent lines indented
-                                    ui.label(
-                                        RichText::new(format!("{}.", idx + 1))
-                                            .font(doc_font(14.0))
-                                            .color(muted_col),
-                                    );
-
-                                    ui.add_space(4.0);
-
-                                    let entry_lbl = ui.add(
-                                        egui::Label::new(
-                                            RichText::new(formatted)
-                                                .font(doc_font(15.0))
-                                                .color(text_col),
-                                        )
-                                        .wrap()
-                                        .sense(egui::Sense::click()),
-                                    ).on_hover_text("Click to edit or delete entry in Works Cited manager");
-
-                                    if entry_lbl.clicked() {
-                                        entry_to_edit = Some(idx);
+                                let mut job = LayoutJob::default();
+                                job.wrap.max_width = printable_width - 36.0;
+                                for (part_idx, part) in formatted.split('*').enumerate() {
+                                    if part.is_empty() {
+                                        continue;
                                     }
-                                });
+                                    job.append(
+                                        part,
+                                        0.0,
+                                        TextFormat {
+                                            font_id: doc_font(15.0),
+                                            color: text_col,
+                                            italics: part_idx % 2 == 1,
+                                            ..Default::default()
+                                        },
+                                    );
+                                }
+
+                                let entry_lbl = ui.horizontal(|ui| {
+                                    ui.add_space(36.0);
+                                    ui.add(
+                                        egui::Label::new(job)
+                                            .wrap()
+                                            .sense(egui::Sense::click()),
+                                    )
+                                }).inner.on_hover_text("Click to edit or delete entry in Works Cited manager");
+
+                                if entry_lbl.clicked() {
+                                    entry_to_edit = Some(idx);
+                                }
 
                                 ui.add_space(6.0);
                             }

@@ -38,9 +38,51 @@ fn char_w_mm() -> f32 {
 }
 
 pub fn export_to_pdf(doc: &MlaDocument, path: &Path) -> Result<(), String> {
+    if export_pdf_via_docx(doc, path).is_ok() {
+        return Ok(());
+    }
     let bytes = build_pdf(doc)?;
     fs::write(path, bytes).map_err(|e| format!("Failed to write PDF: {e}"))?;
     Ok(())
+}
+
+fn export_pdf_via_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
+    let temp_root = std::env::temp_dir().join(format!(
+        "scholia-pdf-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| e.to_string())?
+            .as_nanos()
+    ));
+    fs::create_dir_all(&temp_root)
+        .map_err(|e| format!("Failed to create temporary export directory: {e}"))?;
+    let docx_path = temp_root.join("document.docx");
+    let result = (|| {
+        crate::export::docx::export_to_docx(doc, &docx_path)?;
+        let output = ["soffice", "libreoffice"]
+            .iter()
+            .find_map(|program| {
+                std::process::Command::new(program)
+                    .args(["--headless", "--convert-to", "pdf", "--outdir"])
+                    .arg(&temp_root)
+                    .arg(&docx_path)
+                    .output()
+                    .ok()
+                    .filter(|output| output.status.success())
+            })
+            .ok_or_else(|| "LibreOffice is not installed".to_string())?;
+        let converted = temp_root.join("document.pdf");
+        if !converted.exists() {
+            return Err(format!(
+                "DOCX-to-PDF conversion failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+        fs::copy(converted, path).map_err(|e| format!("Failed to copy converted PDF: {e}"))?;
+        Ok(())
+    })();
+    let _ = fs::remove_dir_all(&temp_root);
+    result
 }
 
 // ── Logical line model ───────────────────────────────────────────────────────
@@ -368,12 +410,7 @@ fn rebuild_lines(mla: &MlaDocument, sorted_wc: &[crate::model::WorksCitedEntry])
 
     // Works Cited page
     lines.push(DocLine::page_break());
-    let wc_title = if sorted_wc.len() == 1 {
-        "Work Cited"
-    } else {
-        "Works Cited"
-    };
-    lines.push(DocLine::centered(wc_title));
+    lines.push(DocLine::centered("Works Cited"));
     if sorted_wc.is_empty() {
         lines.push(DocLine::normal("No entries yet."));
     } else {

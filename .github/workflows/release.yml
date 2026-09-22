@@ -100,6 +100,7 @@ jobs:
           $pkgDir = "dist\Scholia-$ver-windows-x64"
           New-Item -ItemType Directory -Path $pkgDir -Force
           Copy-Item "target\${{ matrix.target }}\release\scholia.exe" -Destination "$pkgDir\"
+          Copy-Item "assets\scholia-mla.ico" -Destination "$pkgDir\"
           Copy-Item "LICENSE" -Destination "$pkgDir\"
           Copy-Item "README.md" -Destination "$pkgDir\"
           $zipName = "Scholia-$ver-windows-x64.zip"
@@ -197,6 +198,7 @@ jobs:
           mkdir -p "${DEB_DIR}/DEBIAN"
           mkdir -p "${DEB_DIR}/usr/bin"
           mkdir -p "${DEB_DIR}/usr/share/applications"
+          mkdir -p "${DEB_DIR}/usr/share/icons/hicolor/scalable/apps"
           mkdir -p "${DEB_DIR}/usr/share/mime/packages"
           mkdir -p "${DEB_DIR}/usr/share/doc/scholia"
 
@@ -204,6 +206,7 @@ jobs:
           chmod 755 "${DEB_DIR}/usr/bin/scholia"
 
           cp "installers/linux/scholia.desktop" "${DEB_DIR}/usr/share/applications/scholia.desktop"
+          cp "assets/scholia-mla.svg" "${DEB_DIR}/usr/share/icons/hicolor/scalable/apps/scholia.svg"
           cp "installers/linux/scholia.xml" "${DEB_DIR}/usr/share/mime/packages/scholia.xml"
           cp "README.md" "${DEB_DIR}/usr/share/doc/scholia/"
           cp "LICENSE" "${DEB_DIR}/usr/share/doc/scholia/copyright"

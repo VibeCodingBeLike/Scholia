@@ -389,7 +389,7 @@ impl ThemeConfig {
 
     /// Color for modal dialogs and popup windows (10% transparent, 90% opaque)
     pub fn modal_fill_color(&self) -> egui::Color32 {
-        let a = 230u8; // 90% opaque (10% transparent)
+        let a = 230u8;
         egui::Color32::from_rgba_premultiplied(
             ((self.page_tint_rgb[0] as f32) * (a as f32 / 255.0)) as u8,
             ((self.page_tint_rgb[1] as f32) * (a as f32 / 255.0)) as u8,
@@ -405,6 +405,12 @@ impl ThemeConfig {
             .fill(self.modal_fill_color())
             .stroke(egui::Stroke::new(1.0, text_col.gamma_multiply(0.25)))
             .corner_radius(egui::CornerRadius::same(10))
+            .shadow(egui::Shadow {
+                offset: [0, 4],
+                blur: 24,
+                spread: 2,
+                color: egui::Color32::from_black_alpha(120),
+            })
             .inner_margin(egui::Margin::same(16))
     }
 
@@ -557,17 +563,34 @@ impl ThemeConfig {
 // ---------------------------------------------------------------------------
 
 pub fn themes_dir() -> std::path::PathBuf {
-    // Check if themes directory exists next to executable
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(parent) = exe.parent() {
-            let p = parent.join("themes");
-            if p.exists() {
-                return p;
-            }
-        }
-    }
-    // Default to ./themes in current working directory
-    std::path::PathBuf::from("themes")
+    app_data_dir().join("themes")
+}
+
+pub fn app_data_dir() -> std::path::PathBuf {
+    #[cfg(target_os = "windows")]
+    let base = std::env::var_os("APPDATA")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("LOCALAPPDATA").map(std::path::PathBuf::from));
+    #[cfg(target_os = "macos")]
+    let base = std::env::var_os("HOME").map(|home| {
+        std::path::PathBuf::from(home)
+            .join("Library")
+            .join("Application Support")
+    });
+    #[cfg(target_os = "linux")]
+    let base = std::env::var_os("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".config"))
+        });
+
+    base.unwrap_or_else(|| {
+        std::env::current_exe()
+            .ok()
+            .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+    })
+    .join("Scholia")
 }
 
 pub fn ensure_sample_themes() {

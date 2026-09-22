@@ -46,6 +46,7 @@ Name: "associate"; Description: "Associate .mla and .mladoc files with Scholia";
 
 [Files]
 Source: "{#MyAppExeSource}"; DestDir: "{app}"; DestName: "{#MyAppExeName}"; Flags: ignoreversion
+Source: "..\..\assets\scholia-mla.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\sample_mla_paper.mla"; DestDir: "{app}"; Flags: ignoreversion
@@ -55,7 +56,7 @@ Source: "..\..\sample_mla_paper.mla"; DestDir: "{app}"; Flags: ignoreversion
 Root: HKA; Subkey: "Software\Classes\.mla"; ValueType: string; ValueName: ""; ValueData: "Scholia.Document"; Flags: uninsdeletevalue; Tasks: associate
 Root: HKA; Subkey: "Software\Classes\.mladoc"; ValueType: string; ValueName: ""; ValueData: "Scholia.Document"; Flags: uninsdeletevalue; Tasks: associate
 Root: HKA; Subkey: "Software\Classes\Scholia.Document"; ValueType: string; ValueName: ""; ValueData: "MLA 9th Edition Document"; Flags: uninsdeletekey; Tasks: associate
-Root: HKA; Subkey: "Software\Classes\Scholia.Document\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: associate
+Root: HKA; Subkey: "Software\Classes\Scholia.Document\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\scholia-mla.ico"; Tasks: associate
 Root: HKA; Subkey: "Software\Classes\Scholia.Document\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: associate
 
 [Icons]

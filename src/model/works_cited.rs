@@ -153,8 +153,7 @@ impl WorksCitedEntry {
             let s_title = self.title_of_source.trim();
             match self.source_type {
                 SourceType::BookOrStandalone => {
-                    // Italicized, with trailing period inside or outside
-                    parts.push(format!("*{}.*", s_title.trim_end_matches('.')));
+                    parts.push(format!("*{}*.", s_title.trim_end_matches('.')));
                 }
                 _ => {
                     // Quotation marks with period inside

@@ -93,13 +93,8 @@ pub fn generate_mla_text(doc: &MlaDocument) -> String {
         out.push_str(
             "\n\n----------------------------------------------------------------------\n\n",
         );
-        let wc_title = if doc.works_cited.len() == 1 {
-            "Work Cited"
-        } else {
-            "Works Cited"
-        };
-        let pad = (70 - wc_title.len()) / 2;
-        out.push_str(&format!("{}{}\n\n", " ".repeat(pad), wc_title));
+        let pad = (70 - "Works Cited".len()) / 2;
+        out.push_str(&format!("{}Works Cited\n\n", " ".repeat(pad)));
 
         let mut sorted = doc.works_cited.clone();
         sorted.sort_by_key(|a| a.sort_key());

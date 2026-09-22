@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 #![windows_subsystem = "windows"]
 use eframe::egui;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 mod export;
 mod fonts;
@@ -117,7 +117,7 @@ impl MlaApp {
     pub fn save_current_document(&mut self) -> bool {
         let target_path = self.doc.file_path.clone().map(PathBuf::from).or_else(|| {
             rfd::FileDialog::new()
-                .set_file_name("paper.mla")
+                .set_file_name(&default_document_filename(&self.doc, "mla"))
                 .add_filter("MLA Document (*.mla)", &["mla", "mladoc"])
                 .save_file()
         });
@@ -181,7 +181,7 @@ impl MlaApp {
             }
             Action::ExportDocx => {
                 if let Some(path) = rfd::FileDialog::new()
-                    .set_file_name("MLA_Paper.docx")
+                    .set_file_name(&default_document_filename(&self.doc, "docx"))
                     .add_filter("Word Document (*.docx)", &["docx"])
                     .save_file()
                 {
@@ -195,7 +195,7 @@ impl MlaApp {
             }
             Action::ExportHtmlPdf => {
                 if let Some(path) = rfd::FileDialog::new()
-                    .set_file_name("MLA_Paper.pdf")
+                    .set_file_name(&default_document_filename(&self.doc, "pdf"))
                     .add_filter("PDF Document (*.pdf)", &["pdf"])
                     .save_file()
                 {
@@ -841,16 +841,14 @@ struct SavedConfig {
 }
 
 fn config_path() -> PathBuf {
-    // Portable config in current working directory first, fallback to user directory
-    let local = Path::new("mla_config.json");
-    if local.exists() {
-        return local.to_path_buf();
-    }
-    local.to_path_buf()
+    theme::app_data_dir().join("mla_config.json")
 }
 
 fn save_config(theme: &ThemeConfig, keybinds: &KeybindConfig, undo_limit: usize) {
     let path = config_path();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
     let cfg = SavedConfig {
         theme: Some(theme.clone()),
         keybinds: Some(keybinds.clone()),
@@ -859,6 +857,27 @@ fn save_config(theme: &ThemeConfig, keybinds: &KeybindConfig, undo_limit: usize)
     if let Ok(json) = serde_json::to_string_pretty(&cfg) {
         let _ = std::fs::write(&path, json);
     }
+}
+
+fn default_document_filename(doc: &MlaDocument, extension: &str) -> String {
+    let title = doc
+        .title
+        .trim()
+        .chars()
+        .map(|ch| {
+            if matches!(ch, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') {
+                '_'
+            } else {
+                ch
+            }
+        })
+        .collect::<String>();
+    let stem = if title.trim().is_empty() {
+        "Untitled MLA Document".to_string()
+    } else {
+        title.trim().to_string()
+    };
+    format!("{stem}.{extension}")
 }
 
 fn load_config() -> (ThemeConfig, KeybindConfig, usize) {
