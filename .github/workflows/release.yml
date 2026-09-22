@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Semantic Version tag (e.g. v0.1.0)'
+        description: 'Semantic Version tag (e.g. v0.1.1; leave blank to auto-grab from Cargo.toml)'
         required: false
-        default: 'v0.1.0'
+        default: ''
 
 permissions:
   contents: write
@@ -43,15 +43,25 @@ jobs:
         id: semver
         shell: bash
         run: |
+          CARGO_VER=$(sed -E -n 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Cargo.toml | head -n 1)
+          if [ -z "$CARGO_VER" ]; then
+            CARGO_VER="0.1.0"
+          fi
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
             TAG="${{ github.event.inputs.version }}"
-          elif [ -n "${{ github.ref_name }}" ]; then
+          elif [[ "${{ github.ref_name }}" =~ ^v[0-9] ]]; then
             TAG="${{ github.ref_name }}"
           else
-            TAG="v0.1.0"
+            TAG="v${CARGO_VER}"
           fi
+
+          if [[ ! "$TAG" =~ ^v ]]; then
+            TAG="v${TAG}"
+          fi
+
           echo "VERSION=${TAG}" >> $GITHUB_OUTPUT
-          echo "Building Scholia for tag: ${TAG}"
+          echo "Building Scholia for tag: ${TAG} (Cargo.toml version: ${CARGO_VER})"
 
       - name: Install Linux Dependencies
         if: runner.os == 'Linux'
@@ -231,14 +241,25 @@ jobs:
         id: semver
         shell: bash
         run: |
+          CARGO_VER=$(sed -E -n 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Cargo.toml | head -n 1)
+          if [ -z "$CARGO_VER" ]; then
+            CARGO_VER="0.1.0"
+          fi
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
             TAG="${{ github.event.inputs.version }}"
-          elif [ -n "${{ github.ref_name }}" ]; then
+          elif [[ "${{ github.ref_name }}" =~ ^v[0-9] ]]; then
             TAG="${{ github.ref_name }}"
           else
-            TAG="v0.1.0"
+            TAG="v${CARGO_VER}"
           fi
+
+          if [[ ! "$TAG" =~ ^v ]]; then
+            TAG="v${TAG}"
+          fi
+
           echo "VERSION=${TAG}" >> $GITHUB_OUTPUT
+          echo "Releasing Scholia for tag: ${TAG} (Cargo.toml version: ${CARGO_VER})"
 
       - name: Download All Release Artifacts
         uses: actions/download-artifact@v4
