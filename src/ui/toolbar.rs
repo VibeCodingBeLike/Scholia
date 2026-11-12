@@ -13,6 +13,7 @@ pub enum ToolbarEvent {
     Redo,
     ExportDocx,
     ExportHtml,
+    ExportHtmlFile,
     ExportText,
     AddBlockquote,
     AddHeading(u8),
@@ -112,12 +113,39 @@ pub fn render_toolbar(
                     event = Some(ToolbarEvent::ExportHtml);
                 }
                 if ui
+                    .button(format!("{} Printable HTML (.html)", icons::HTML_PDF))
+                    .clicked()
+                {
+                    event = Some(ToolbarEvent::ExportHtmlFile);
+                }
+                if ui
                     .button(format!("{} Plain Text / Markdown (.txt)", icons::TEXT))
                     .clicked()
                 {
                     event = Some(ToolbarEvent::ExportText);
                 }
             });
+
+        ui.separator();
+
+        // Undo / Redo buttons
+        let undo_sc = keybinds.get_shortcut(Action::Undo).display_string();
+        if ui
+            .button(RichText::new(icons::UNDO).color(text_col))
+            .on_hover_text(format!("Undo ({})", undo_sc))
+            .clicked()
+        {
+            event = Some(ToolbarEvent::Undo);
+        }
+
+        let redo_sc = keybinds.get_shortcut(Action::Redo).display_string();
+        if ui
+            .button(RichText::new(icons::REDO).color(text_col))
+            .on_hover_text(format!("Redo ({})", redo_sc))
+            .clicked()
+        {
+            event = Some(ToolbarEvent::Redo);
+        }
 
         ui.separator();
 

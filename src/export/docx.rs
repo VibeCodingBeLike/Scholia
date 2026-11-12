@@ -1,4 +1,5 @@
 use crate::model::{MlaBlock, MlaDocument};
+use crate::theme::MlaFontChoice;
 use docx_rs::{
     AlignmentType, Docx, Footer, Header, LineSpacing, LineSpacingType, PageMargin, PageNum,
     Paragraph, Run, RunFonts, SpecialIndentType,
@@ -12,8 +13,23 @@ fn double_spacing() -> LineSpacing {
         .line_rule(LineSpacingType::Auto)
 }
 
+fn mla_run_fonts(font_name: &str) -> RunFonts {
+    RunFonts::new()
+        .ascii(font_name)
+        .hi_ansi(font_name)
+        .cs(font_name)
+}
+
 pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
-    let font_name = "Times New Roman";
+    export_to_docx_with_font(doc, path, MlaFontChoice::TimesNewRoman)
+}
+
+pub fn export_to_docx_with_font(
+    doc: &MlaDocument,
+    path: &Path,
+    font_choice: MlaFontChoice,
+) -> Result<(), String> {
+    let font_name = font_choice.docx_font_name();
     let font_size = 24; // 24 half-points = 12 pt
 
     let mut docx = Docx::new();
@@ -37,7 +53,7 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
             .line_spacing(double_spacing())
             .add_run(
                 Run::new()
-                    .fonts(RunFonts::new().ascii(font_name))
+                    .fonts(mla_run_fonts(font_name))
                     .size(font_size)
                     .add_text(format!("{} ", last_name)),
             )
@@ -53,7 +69,7 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
             .line_spacing(double_spacing())
             .add_run(
                 Run::new()
-                    .fonts(RunFonts::new().ascii(font_name))
+                    .fonts(mla_run_fonts(font_name))
                     .size(font_size)
                     .add_text(&doc.header.student_name),
             ),
@@ -65,7 +81,7 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
             .line_spacing(double_spacing())
             .add_run(
                 Run::new()
-                    .fonts(RunFonts::new().ascii(font_name))
+                    .fonts(mla_run_fonts(font_name))
                     .size(font_size)
                     .add_text(&doc.header.instructor_name),
             ),
@@ -77,7 +93,7 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
             .line_spacing(double_spacing())
             .add_run(
                 Run::new()
-                    .fonts(RunFonts::new().ascii(font_name))
+                    .fonts(mla_run_fonts(font_name))
                     .size(font_size)
                     .add_text(&doc.header.course),
             ),
@@ -89,7 +105,7 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
             .line_spacing(double_spacing())
             .add_run(
                 Run::new()
-                    .fonts(RunFonts::new().ascii(font_name))
+                    .fonts(mla_run_fonts(font_name))
                     .size(font_size)
                     .add_text(&doc.header.date),
             ),
@@ -102,7 +118,7 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
             .line_spacing(double_spacing())
             .add_run(
                 Run::new()
-                    .fonts(RunFonts::new().ascii(font_name))
+                    .fonts(mla_run_fonts(font_name))
                     .size(font_size)
                     .add_text(&doc.title),
             ),
@@ -151,7 +167,7 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
                     if !citation.trim().is_empty() {
                         p = p.add_run(
                             Run::new()
-                                .fonts(RunFonts::new().ascii(font_name))
+                                .fonts(mla_run_fonts(font_name))
                                 .size(font_size)
                                 .add_text(format!(" {}", citation.trim())),
                         );
@@ -163,7 +179,7 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
                 let trimmed = text.trim();
                 if !trimmed.is_empty() {
                     let mut run = Run::new()
-                        .fonts(RunFonts::new().ascii(font_name))
+                        .fonts(mla_run_fonts(font_name))
                         .size(font_size)
                         .add_text(trimmed);
 
@@ -201,7 +217,7 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
         footer = footer.add_paragraph(
             Paragraph::new().align(AlignmentType::Left).add_run(
                 Run::new()
-                    .fonts(RunFonts::new().ascii(font_name))
+                    .fonts(mla_run_fonts(font_name))
                     .size(20) // 10pt
                     .add_text("______________________"),
             ),
@@ -219,7 +235,7 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
                     .indent(None, Some(SpecialIndentType::FirstLine(720)), None, None)
                     .add_run(
                         Run::new()
-                            .fonts(RunFonts::new().ascii(font_name))
+                            .fonts(mla_run_fonts(font_name))
                             .size(20) // 10pt
                             .add_text(note_text),
                     ),
@@ -236,7 +252,7 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
             .line_spacing(double_spacing())
             .add_run(
                 Run::new()
-                    .fonts(RunFonts::new().ascii(font_name))
+                    .fonts(mla_run_fonts(font_name))
                     .size(font_size)
                     .add_text("Works Cited"),
             ),
@@ -249,7 +265,7 @@ pub fn export_to_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
                 .line_spacing(double_spacing())
                 .add_run(
                     Run::new()
-                        .fonts(RunFonts::new().ascii(font_name))
+                        .fonts(mla_run_fonts(font_name))
                         .size(font_size)
                         .add_text("No entries yet."),
                 ),

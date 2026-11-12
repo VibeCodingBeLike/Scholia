@@ -96,9 +96,9 @@ pub fn render_compliance_modal(
 
             ui.horizontal(|ui| {
                 if report.issues.iter().any(|i| i.can_auto_fix)
-                    && ui.button(RichText::new("⚡ Auto-Fix Title Case").color(Color32::from_rgb(50, 180, 100)).strong()).clicked()
+                    && ui.button(RichText::new("⚡ Auto-Fix All").color(Color32::from_rgb(50, 180, 100)).strong()).clicked()
                 {
-                    MlaLinter::auto_fix(doc, "TITLE_CASE");
+                    MlaLinter::auto_fix(doc, "ALL");
                 }
 
                 if ui.button("Close").clicked() {

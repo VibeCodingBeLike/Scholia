@@ -1,8 +1,9 @@
-use crate::fonts::EMBEDDED_TIMES_NEW_ROMAN;
+use crate::fonts::{load_font_bytes_for, EMBEDDED_TIMES_NEW_ROMAN};
 use crate::model::{MlaBlock, MlaDocument};
+use crate::theme::MlaFontChoice;
 use printpdf::{
     FontId, Mm, Op, ParsedFont, PdfDocument, PdfFontHandle, PdfFontParseWarning, PdfPage,
-    PdfSaveOptions, PdfWarnMsg, Point, Pt, TextItem as PdfTextItem,
+    PdfSaveOptions, PdfWarnMsg, Point, Pt, TextItem as PdfTextItem, TextMatrix,
 };
 use std::fs;
 use std::path::Path;
@@ -38,15 +39,27 @@ fn char_w_mm() -> f32 {
 }
 
 pub fn export_to_pdf(doc: &MlaDocument, path: &Path) -> Result<(), String> {
-    if export_pdf_via_docx(doc, path).is_ok() {
+    export_to_pdf_with_font(doc, path, MlaFontChoice::TimesNewRoman)
+}
+
+pub fn export_to_pdf_with_font(
+    doc: &MlaDocument,
+    path: &Path,
+    font_choice: MlaFontChoice,
+) -> Result<(), String> {
+    if export_pdf_via_docx(doc, path, font_choice).is_ok() {
         return Ok(());
     }
-    let bytes = build_pdf(doc)?;
+    let bytes = build_pdf(doc, font_choice)?;
     fs::write(path, bytes).map_err(|e| format!("Failed to write PDF: {e}"))?;
     Ok(())
 }
 
-fn export_pdf_via_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
+fn export_pdf_via_docx(
+    doc: &MlaDocument,
+    path: &Path,
+    font_choice: MlaFontChoice,
+) -> Result<(), String> {
     let temp_root = std::env::temp_dir().join(format!(
         "scholia-pdf-{}",
         std::time::SystemTime::now()
@@ -58,17 +71,20 @@ fn export_pdf_via_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
         .map_err(|e| format!("Failed to create temporary export directory: {e}"))?;
     let docx_path = temp_root.join("document.docx");
     let result = (|| {
-        crate::export::docx::export_to_docx(doc, &docx_path)?;
+        crate::export::docx::export_to_docx_with_font(doc, &docx_path, font_choice)?;
         let output = ["soffice", "libreoffice"]
             .iter()
             .find_map(|program| {
-                std::process::Command::new(program)
-                    .args(["--headless", "--convert-to", "pdf", "--outdir"])
+                let mut cmd = std::process::Command::new(program);
+                cmd.args(["--headless", "--convert-to", "pdf", "--outdir"])
                     .arg(&temp_root)
-                    .arg(&docx_path)
-                    .output()
-                    .ok()
-                    .filter(|output| output.status.success())
+                    .arg(&docx_path);
+                #[cfg(target_os = "windows")]
+                {
+                    use std::os::windows::process::CommandExt;
+                    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+                }
+                cmd.output().ok().filter(|output| output.status.success())
             })
             .ok_or_else(|| "LibreOffice is not installed".to_string())?;
         let converted = temp_root.join("document.pdf");
@@ -91,7 +107,9 @@ fn export_pdf_via_docx(doc: &MlaDocument, path: &Path) -> Result<(), String> {
 enum LineKind {
     Normal,
     Bold,
+    Italic,
     Centered,
+    BoldCentered,
     PageBreak,
 }
 
@@ -126,9 +144,27 @@ impl DocLine {
             referenced_notes: Vec::new(),
         }
     }
+    fn italic(text: impl Into<String>) -> Self {
+        Self {
+            kind: LineKind::Italic,
+            text: text.into(),
+            left_extra_mm: 0.0,
+            first_indent_mm: 0.0,
+            referenced_notes: Vec::new(),
+        }
+    }
     fn centered(text: impl Into<String>) -> Self {
         Self {
             kind: LineKind::Centered,
+            text: text.into(),
+            left_extra_mm: 0.0,
+            first_indent_mm: 0.0,
+            referenced_notes: Vec::new(),
+        }
+    }
+    fn bold_centered(text: impl Into<String>) -> Self {
+        Self {
+            kind: LineKind::BoldCentered,
             text: text.into(),
             left_extra_mm: 0.0,
             first_indent_mm: 0.0,
@@ -166,12 +202,14 @@ impl DocLine {
 
 // ── Main PDF builder ─────────────────────────────────────────────────────────
 
-fn build_pdf(mla: &MlaDocument) -> Result<Vec<u8>, String> {
+fn build_pdf(mla: &MlaDocument, font_choice: MlaFontChoice) -> Result<Vec<u8>, String> {
     let mut warn: Vec<PdfWarnMsg> = Vec::new();
     let mut pdf = PdfDocument::new(&mla.title);
 
     let mut font_warn: Vec<PdfFontParseWarning> = Vec::new();
-    let parsed = ParsedFont::from_bytes(EMBEDDED_TIMES_NEW_ROMAN, 0, &mut font_warn)
+    let preferred_bytes = load_font_bytes_for(font_choice);
+    let parsed = ParsedFont::from_bytes(&preferred_bytes, 0, &mut font_warn)
+        .or_else(|| ParsedFont::from_bytes(EMBEDDED_TIMES_NEW_ROMAN, 0, &mut font_warn))
         .ok_or("Failed to parse bundled Times New Roman")?;
     let font = pdf.add_font(&parsed);
 
@@ -249,9 +287,9 @@ fn build_pdf(mla: &MlaDocument) -> Result<Vec<u8>, String> {
             add_running_head(&mut page_ops, &font, &last_name, page_num);
         }
 
-        let x_mm = if matches!(line.kind, LineKind::Centered) {
+        let x_mm = if matches!(line.kind, LineKind::Centered | LineKind::BoldCentered) {
             // Center: compute approximate text width and offset
-            let approx_w = line.text.len() as f32 * char_w_mm();
+            let approx_w = line.text.chars().count() as f32 * char_w_mm();
             MARGIN_MM + (text_w_mm() - approx_w) / 2.0
         } else {
             MARGIN_MM + line.left_extra_mm + line.first_indent_mm
@@ -259,16 +297,29 @@ fn build_pdf(mla: &MlaDocument) -> Result<Vec<u8>, String> {
 
         // Write the text line
         page_ops.push(Op::StartTextSection);
-        page_ops.push(Op::SetTextCursor {
-            pos: Point::new(Mm(x_mm), Mm(y_mm)),
-        });
+        if matches!(line.kind, LineKind::Italic) {
+            page_ops.push(Op::SetTextMatrix {
+                matrix: TextMatrix::Raw([
+                    1.0,
+                    0.0,
+                    0.21,
+                    1.0,
+                    Pt::from(Mm(x_mm)).0,
+                    Pt::from(Mm(y_mm)).0,
+                ]),
+            });
+        } else {
+            page_ops.push(Op::SetTextCursor {
+                pos: Point::new(Mm(x_mm), Mm(y_mm)),
+            });
+        }
         page_ops.push(Op::SetFont {
             font: PdfFontHandle::External(font.clone()),
             size: Pt(FONT_PT),
         });
         page_ops.push(Op::SetLineHeight { lh: Pt(LINE_H_PT) });
 
-        if matches!(line.kind, LineKind::Bold) {
+        if matches!(line.kind, LineKind::Bold | LineKind::BoldCentered) {
             page_ops.push(Op::SetTextRenderingMode {
                 mode: printpdf::TextRenderingMode::FillStroke,
             });
@@ -279,7 +330,7 @@ fn build_pdf(mla: &MlaDocument) -> Result<Vec<u8>, String> {
             items: vec![PdfTextItem::Text(line.text.clone())],
         });
 
-        if matches!(line.kind, LineKind::Bold) {
+        if matches!(line.kind, LineKind::Bold | LineKind::BoldCentered) {
             page_ops.push(Op::SetTextRenderingMode {
                 mode: printpdf::TextRenderingMode::Fill,
             });
@@ -402,7 +453,8 @@ fn rebuild_lines(mla: &MlaDocument, sorted_wc: &[crate::model::WorksCitedEntry])
                 let cleaned = typographical_clean(t);
                 match level {
                     1 => lines.push(DocLine::bold(cleaned)),
-                    _ => lines.push(DocLine::centered(cleaned)),
+                    2 => lines.push(DocLine::italic(cleaned)),
+                    _ => lines.push(DocLine::bold_centered(cleaned)),
                 }
             }
         }

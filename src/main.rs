@@ -11,35 +11,109 @@ mod mla_rules;
 mod model;
 mod theme;
 mod ui;
+mod writing_editor;
 
-use export::{export_to_docx, export_to_pdf, export_to_text};
+use export::{
+    export_to_docx_with_font, export_to_html_with_font, export_to_pdf_with_font, export_to_text,
+};
 use history::HistoryManager;
 use keybinds::{Action, KeybindConfig};
 use model::{to_mla_title_case, MlaBlock, MlaDocument};
 use theme::ThemeConfig;
 use ui::{
     render_calendar_popup, render_citation_modal, render_compliance_modal, render_editor_page,
-    render_settings_modal, render_status_bar, render_toolbar, render_unsaved_dialog,
-    render_works_cited_modal, CalendarModalState, CitationModalState, ComplianceModalState,
-    EditorAction, SettingsModalState, StatusBarEvent, ToolbarEvent, UnsavedDialogResponse,
-    UnsavedDialogState, WorksCitedModalState,
+    render_settings_modal_with_editor, render_status_bar, render_toolbar, render_unsaved_dialog,
+    render_works_cited_modal, render_writing_editor_modal, CalendarModalState, CitationModalState,
+    ComplianceModalState, EditorAction, SettingsModalState, SettingsTab, StatusBarEvent,
+    ToolbarEvent, UnsavedDialogResponse, UnsavedDialogState, WorksCitedModalState,
+    WritingEditorModalEvent, WritingEditorModalState,
 };
+use writing_editor::{EditorSettings, WritingEditor};
+
+const EMBEDDED_APP_ICO: &[u8] = include_bytes!("../assets/scholia-mla.ico");
+
+fn load_app_icon() -> Option<std::sync::Arc<egui::IconData>> {
+    // Parse 64x64 32-bit BGRA DIB entry from embedded ICO
+    if EMBEDDED_APP_ICO.len() < 6 {
+        return None;
+    }
+    let count = u16::from_le_bytes([EMBEDDED_APP_ICO[4], EMBEDDED_APP_ICO[5]]) as usize;
+    let mut chosen_entry = None;
+    for i in 0..count {
+        let off = 6 + i * 16;
+        if off + 16 > EMBEDDED_APP_ICO.len() {
+            break;
+        }
+        let w = match EMBEDDED_APP_ICO[off] {
+            0 => 256usize,
+            v => v as usize,
+        };
+        let h = match EMBEDDED_APP_ICO[off + 1] {
+            0 => 256usize,
+            v => v as usize,
+        };
+        let bpp = u16::from_le_bytes([EMBEDDED_APP_ICO[off + 6], EMBEDDED_APP_ICO[off + 7]]);
+        let size = u32::from_le_bytes([
+            EMBEDDED_APP_ICO[off + 8],
+            EMBEDDED_APP_ICO[off + 9],
+            EMBEDDED_APP_ICO[off + 10],
+            EMBEDDED_APP_ICO[off + 11],
+        ]) as usize;
+        let data_off = u32::from_le_bytes([
+            EMBEDDED_APP_ICO[off + 12],
+            EMBEDDED_APP_ICO[off + 13],
+            EMBEDDED_APP_ICO[off + 14],
+            EMBEDDED_APP_ICO[off + 15],
+        ]) as usize;
+        if bpp == 32 && data_off + size <= EMBEDDED_APP_ICO.len() && size >= 40 + w * h * 4 {
+            chosen_entry = Some((w, h, data_off));
+            if w == 64 {
+                break;
+            }
+        }
+    }
+    let (w, h, data_off) = chosen_entry?;
+    let pixel_start = data_off + 40;
+    let mut rgba = vec![0u8; w * h * 4];
+    for y in 0..h {
+        let src_row = h - 1 - y;
+        for x in 0..w {
+            let src_idx = pixel_start + (src_row * w + x) * 4;
+            let dst_idx = (y * w + x) * 4;
+            rgba[dst_idx] = EMBEDDED_APP_ICO[src_idx + 2]; // R
+            rgba[dst_idx + 1] = EMBEDDED_APP_ICO[src_idx + 1]; // G
+            rgba[dst_idx + 2] = EMBEDDED_APP_ICO[src_idx]; // B
+            rgba[dst_idx + 3] = EMBEDDED_APP_ICO[src_idx + 3]; // A
+        }
+    }
+    Some(std::sync::Arc::new(egui::IconData {
+        rgba,
+        width: w as u32,
+        height: h as u32,
+    }))
+}
 
 fn main() -> eframe::Result<()> {
-    // Windows/Linux: frameless + in-app window controls.
+    // Windows/Linux: frameless + in-app window controls + custom resize borders.
     // macOS: native traffic lights over the toolbar (no extra title-bar strip).
     let is_macos = cfg!(target_os = "macos");
+    let mut viewport = egui::ViewportBuilder::default()
+        .with_transparent(true)
+        .with_decorations(is_macos)
+        .with_fullsize_content_view(is_macos)
+        .with_titlebar_shown(false)
+        .with_title_shown(false)
+        .with_titlebar_buttons_shown(is_macos)
+        .with_inner_size([1120.0, 860.0])
+        .with_min_inner_size([720.0, 500.0])
+        .with_title("Scholia");
+
+    if let Some(icon) = load_app_icon() {
+        viewport = viewport.with_icon(icon);
+    }
+
     let native_options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_transparent(cfg!(any(target_os = "windows", target_os = "macos")))
-            .with_decorations(is_macos)
-            .with_fullsize_content_view(is_macos)
-            .with_titlebar_shown(false)
-            .with_title_shown(false)
-            .with_titlebar_buttons_shown(is_macos)
-            .with_inner_size([1120.0, 860.0])
-            .with_min_inner_size([720.0, 500.0])
-            .with_title("Scholia"),
+        viewport,
         ..Default::default()
     };
 
@@ -60,15 +134,19 @@ struct MlaApp {
     history: HistoryManager,
     theme: ThemeConfig,
     keybinds: KeybindConfig,
+    editor_settings: EditorSettings,
 
     // Modal states
     works_cited_state: WorksCitedModalState,
     citation_state: CitationModalState,
     compliance_state: ComplianceModalState,
+    writing_editor_state: WritingEditorModalState,
     settings_state: SettingsModalState,
     calendar_state: CalendarModalState,
     unsaved_changes_state: UnsavedDialogState,
 
+    cached_editor_hash: u64,
+    cached_editor_count: usize,
     confirmed_exit: bool,
     focus_mode: bool,
     vibrancy_dirty: bool,
@@ -79,9 +157,10 @@ impl MlaApp {
     pub fn new() -> Self {
         // Ensure default custom themes exist in themes/ folder
         theme::ensure_sample_themes();
+        writing_editor::prewarm_editor();
 
-        // Load saved theme & keybinds & undo history limit if present
-        let (theme, keybinds, undo_limit) = load_config();
+        // Load saved theme & keybinds & editor settings & undo history limit if present
+        let (theme, keybinds, editor_settings, undo_limit) = load_config();
         let mut doc = MlaDocument::default();
         if let Some(arg_path) = std::env::args().nth(1) {
             let path = PathBuf::from(&arg_path);
@@ -103,12 +182,16 @@ impl MlaApp {
             history,
             theme,
             keybinds,
+            editor_settings,
             works_cited_state: WorksCitedModalState::default(),
             citation_state: CitationModalState::default(),
             compliance_state: ComplianceModalState::default(),
+            writing_editor_state: WritingEditorModalState::default(),
             settings_state: SettingsModalState::default(),
             calendar_state: CalendarModalState::default(),
             unsaved_changes_state: UnsavedDialogState::default(),
+            cached_editor_hash: 0,
+            cached_editor_count: 0,
             confirmed_exit: false,
             focus_mode: false,
             vibrancy_dirty: true, // Apply vibrancy on first frame
@@ -123,7 +206,7 @@ impl MlaApp {
     pub fn save_current_document(&mut self) -> bool {
         let target_path = self.doc.file_path.clone().map(PathBuf::from).or_else(|| {
             rfd::FileDialog::new()
-                .set_file_name(&default_document_filename(&self.doc, "mla"))
+                .set_file_name(default_document_filename(&self.doc, "mla"))
                 .add_filter("MLA Document (*.mla)", &["mla", "mladoc"])
                 .save_file()
         });
@@ -187,11 +270,11 @@ impl MlaApp {
             }
             Action::ExportDocx => {
                 if let Some(path) = rfd::FileDialog::new()
-                    .set_file_name(&default_document_filename(&self.doc, "docx"))
+                    .set_file_name(default_document_filename(&self.doc, "docx"))
                     .add_filter("Word Document (*.docx)", &["docx"])
                     .save_file()
                 {
-                    match export_to_docx(&self.doc, &path) {
+                    match export_to_docx_with_font(&self.doc, &path, self.theme.font_choice) {
                         Ok(_) => {
                             self.set_notification(format!("Exported to Word: {}", path.display()))
                         }
@@ -201,11 +284,11 @@ impl MlaApp {
             }
             Action::ExportHtmlPdf => {
                 if let Some(path) = rfd::FileDialog::new()
-                    .set_file_name(&default_document_filename(&self.doc, "pdf"))
+                    .set_file_name(default_document_filename(&self.doc, "pdf"))
                     .add_filter("PDF Document (*.pdf)", &["pdf"])
                     .save_file()
                 {
-                    match export_to_pdf(&self.doc, &path) {
+                    match export_to_pdf_with_font(&self.doc, &path, self.theme.font_choice) {
                         Ok(_) => self.set_notification(format!("Exported PDF: {}", path.display())),
                         Err(e) => self.set_notification(format!("PDF export error: {}", e)),
                     }
@@ -288,7 +371,12 @@ impl MlaApp {
                 self.set_notification("Inserted Level 3 Heading (Centered).");
             }
             Action::InsertCitation => {
-                self.citation_state.open(None);
+                let target = if self.doc.blocks.is_empty() {
+                    None
+                } else {
+                    Some(self.doc.active_block_idx.min(self.doc.blocks.len() - 1))
+                };
+                self.citation_state.open(target);
             }
             Action::DeleteBlock => {
                 if self.doc.blocks.len() > 1 {
@@ -354,8 +442,12 @@ impl MlaApp {
                 self.compliance_state.is_open = true;
             }
             Action::ToggleFocusMode => {
-                self.focus_mode = true;
-                self.set_notification("Entered Zen Mode (Press Esc to exit).");
+                self.focus_mode = !self.focus_mode;
+                if self.focus_mode {
+                    self.set_notification("Entered Zen Mode (Press Esc or F11 to exit).");
+                } else {
+                    self.set_notification("Exited Zen Mode.");
+                }
             }
         }
     }
@@ -484,17 +576,8 @@ impl MlaApp {
 
 impl eframe::App for MlaApp {
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
-        #[cfg(any(target_os = "windows", target_os = "macos"))]
-        {
-            // Transparent clear color lets OS acrylic / mica / vibrancy show through
-            [0.0, 0.0, 0.0, 0.0]
-        }
-        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-        {
-            // Linux: opaque clear so Wayland / X11 surfaces render without compositor drops
-            let [r, g, b] = self.theme.window_tint_rgb;
-            [r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, 1.0]
-        }
+        // Transparent clear color lets OS acrylic / mica / vibrancy / compositor transparency show through
+        [0.0, 0.0, 0.0, 0.0]
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
@@ -510,6 +593,15 @@ impl eframe::App for MlaApp {
         let screen_rect = ui.max_rect();
         ui.painter()
             .rect_filled(screen_rect, 0.0, self.theme.window_fill_color());
+
+        // Interactive frameless window edge/corner resize handles on Windows and Linux
+        #[cfg(not(target_os = "macos"))]
+        {
+            let is_max = ui.input(|i| i.viewport().maximized.unwrap_or(false));
+            if !is_max && !self.focus_mode {
+                handle_frameless_resize(ui.ctx(), screen_rect);
+            }
+        }
 
         // Handle vibrancy application
         if self.vibrancy_dirty {
@@ -599,14 +691,40 @@ impl eframe::App for MlaApp {
                             ToolbarEvent::ExportHtml => {
                                 self.handle_action(Action::ExportHtmlPdf, ui.ctx())
                             }
+                            ToolbarEvent::ExportHtmlFile => {
+                                if let Some(path) = rfd::FileDialog::new()
+                                    .set_file_name(default_document_filename(&self.doc, "html"))
+                                    .add_filter("HTML Document (*.html)", &["html", "htm"])
+                                    .save_file()
+                                {
+                                    match export_to_html_with_font(
+                                        &self.doc,
+                                        &path,
+                                        self.theme.font_choice,
+                                    ) {
+                                        Ok(_) => self.set_notification(format!(
+                                            "Exported HTML: {}",
+                                            path.display()
+                                        )),
+                                        Err(e) => self
+                                            .set_notification(format!("HTML export error: {}", e)),
+                                    }
+                                }
+                            }
                             ToolbarEvent::ExportText => {
                                 if let Some(path) = rfd::FileDialog::new()
-                                    .set_file_name("MLA_Paper.txt")
+                                    .set_file_name(default_document_filename(&self.doc, "txt"))
                                     .add_filter("Text File (*.txt)", &["txt"])
                                     .save_file()
                                 {
-                                    let _ = export_to_text(&self.doc, &path);
-                                    self.set_notification("Exported plain text.");
+                                    match export_to_text(&self.doc, &path) {
+                                        Ok(_) => self.set_notification(format!(
+                                            "Exported plain text: {}",
+                                            path.display()
+                                        )),
+                                        Err(e) => self
+                                            .set_notification(format!("Text export error: {}", e)),
+                                    }
                                 }
                             }
                             ToolbarEvent::AddBlockquote => {
@@ -641,7 +759,12 @@ impl eframe::App for MlaApp {
                             .send_viewport_cmd(egui::ViewportCommand::CancelClose);
                         self.unsaved_changes_state.is_open = true;
                     } else {
-                        save_config(&self.theme, &self.keybinds, self.history.max_depth);
+                        save_config(
+                            &self.theme,
+                            &self.keybinds,
+                            &self.editor_settings,
+                            self.history.max_depth,
+                        );
                         ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                     }
                 }
@@ -682,10 +805,22 @@ impl eframe::App for MlaApp {
 
                 // Bottom Status Bar (no grey separator line, flush to bottom)
                 if !self.focus_mode {
-                    if let Some(StatusBarEvent::OpenCompliance) =
-                        render_status_bar(ui, &self.doc, &self.theme)
-                    {
-                        self.compliance_state.is_open = true;
+                    let current_hash = compute_editor_state_hash(&self.doc, &self.editor_settings);
+                    if current_hash != self.cached_editor_hash {
+                        self.cached_editor_count =
+                            WritingEditor::inspect(&self.doc, &self.editor_settings)
+                                .total_suggestions();
+                        self.cached_editor_hash = current_hash;
+                    }
+
+                    match render_status_bar(ui, &self.doc, &self.theme, self.cached_editor_count) {
+                        Some(StatusBarEvent::OpenCompliance) => {
+                            self.compliance_state.is_open = true;
+                        }
+                        Some(StatusBarEvent::OpenWritingEditor) => {
+                            self.writing_editor_state.is_open = true;
+                        }
+                        None => {}
                     }
                 }
             });
@@ -779,12 +914,34 @@ impl eframe::App for MlaApp {
             self.set_notification("Citation inserted.");
         }
 
+        let pre_wc = if self.works_cited_state.is_open {
+            Some(self.doc.works_cited.clone())
+        } else {
+            None
+        };
+
         render_works_cited_modal(
             ui.ctx(),
             &mut self.works_cited_state,
             &mut self.doc.works_cited,
             &self.theme,
         );
+
+        if let Some(old_wc) = pre_wc {
+            if old_wc != self.doc.works_cited {
+                let cursor = self.get_active_block_cursor(ui.ctx());
+                let mut prev_doc = self.doc.clone();
+                prev_doc.works_cited = old_wc;
+                self.history.record_discrete_action(&prev_doc, cursor);
+                self.doc.is_dirty = true;
+            }
+        }
+
+        let pre_comp_doc = if self.compliance_state.is_open {
+            Some(self.doc.clone())
+        } else {
+            None
+        };
 
         render_compliance_modal(
             ui.ctx(),
@@ -793,14 +950,68 @@ impl eframe::App for MlaApp {
             &self.theme,
         );
 
-        render_settings_modal(
+        if let Some(old_doc) = pre_comp_doc {
+            if !old_doc.content_equals(&self.doc) {
+                let cursor = self.get_active_block_cursor(ui.ctx());
+                self.history.record_discrete_action(&old_doc, cursor);
+            }
+        }
+
+        let pre_editor_doc = if self.writing_editor_state.is_open {
+            Some(self.doc.clone())
+        } else {
+            None
+        };
+
+        if let Some(ev) = render_writing_editor_modal(
+            ui.ctx(),
+            &mut self.writing_editor_state,
+            &mut self.doc,
+            &mut self.editor_settings,
+            &self.theme,
+        ) {
+            match ev {
+                WritingEditorModalEvent::OpenEditorSettings => {
+                    self.settings_state.selected_tab = SettingsTab::EditorSettings;
+                    self.settings_state.is_open = true;
+                }
+                WritingEditorModalEvent::DictionaryModified => {
+                    save_config(
+                        &self.theme,
+                        &self.keybinds,
+                        &self.editor_settings,
+                        self.history.max_depth,
+                    );
+                    self.set_notification("Added word to custom dictionary.");
+                }
+            }
+        }
+
+        if let Some(old_doc) = pre_editor_doc {
+            if !old_doc.content_equals(&self.doc) {
+                let cursor = self.get_active_block_cursor(ui.ctx());
+                self.history.record_discrete_action(&old_doc, cursor);
+            }
+        }
+
+        let was_settings_open = self.settings_state.is_open;
+        render_settings_modal_with_editor(
             ui.ctx(),
             &mut self.settings_state,
             &mut self.theme,
             &mut self.keybinds,
+            &mut self.editor_settings,
             &mut self.history.max_depth,
             &mut self.vibrancy_dirty,
         );
+        if was_settings_open && !self.settings_state.is_open {
+            save_config(
+                &self.theme,
+                &self.keybinds,
+                &self.editor_settings,
+                self.history.max_depth,
+            );
+        }
 
         render_calendar_popup(
             ui.ctx(),
@@ -820,13 +1031,23 @@ impl eframe::App for MlaApp {
             UnsavedDialogResponse::Save => {
                 if self.save_current_document() {
                     self.confirmed_exit = true;
-                    save_config(&self.theme, &self.keybinds, self.history.max_depth);
+                    save_config(
+                        &self.theme,
+                        &self.keybinds,
+                        &self.editor_settings,
+                        self.history.max_depth,
+                    );
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                 }
             }
             UnsavedDialogResponse::Discard => {
                 self.confirmed_exit = true;
-                save_config(&self.theme, &self.keybinds, self.history.max_depth);
+                save_config(
+                    &self.theme,
+                    &self.keybinds,
+                    &self.editor_settings,
+                    self.history.max_depth,
+                );
                 ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
             }
             UnsavedDialogResponse::Cancel | UnsavedDialogResponse::None => {}
@@ -838,10 +1059,41 @@ impl eframe::App for MlaApp {
     }
 }
 
+fn compute_editor_state_hash(doc: &MlaDocument, settings: &EditorSettings) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    doc.title.hash(&mut hasher);
+    for b in &doc.blocks {
+        b.id().hash(&mut hasher);
+        b.text().hash(&mut hasher);
+    }
+    for n in &doc.notes {
+        n.text.hash(&mut hasher);
+    }
+    for w in &doc.works_cited {
+        w.author.hash(&mut hasher);
+    }
+    doc.header.student_name.hash(&mut hasher);
+    doc.header.instructor_name.hash(&mut hasher);
+    doc.header.running_header_last_name.hash(&mut hasher);
+    settings.language.hash(&mut hasher);
+    settings.enable_spell_check.hash(&mut hasher);
+    settings.enable_grammar_check.hash(&mut hasher);
+    settings.enable_style_check.hash(&mut hasher);
+    settings.flag_contractions.hash(&mut hasher);
+    settings.ignore_all_caps.hash(&mut hasher);
+    settings.ignore_words_with_numbers.hash(&mut hasher);
+    settings.custom_dictionary.hash(&mut hasher);
+    settings.ignored_issues.len().hash(&mut hasher);
+    settings.ignored_words_session.len().hash(&mut hasher);
+    hasher.finish()
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Default)]
 struct SavedConfig {
     theme: Option<ThemeConfig>,
     keybinds: Option<KeybindConfig>,
+    editor_settings: Option<EditorSettings>,
     undo_limit: Option<usize>,
 }
 
@@ -849,7 +1101,12 @@ fn config_path() -> PathBuf {
     theme::app_data_dir().join("mla_config.json")
 }
 
-fn save_config(theme: &ThemeConfig, keybinds: &KeybindConfig, undo_limit: usize) {
+fn save_config(
+    theme: &ThemeConfig,
+    keybinds: &KeybindConfig,
+    editor_settings: &EditorSettings,
+    undo_limit: usize,
+) {
     let path = config_path();
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
@@ -857,6 +1114,7 @@ fn save_config(theme: &ThemeConfig, keybinds: &KeybindConfig, undo_limit: usize)
     let cfg = SavedConfig {
         theme: Some(theme.clone()),
         keybinds: Some(keybinds.clone()),
+        editor_settings: Some(editor_settings.clone()),
         undo_limit: Some(undo_limit.clamp(16, 8192)),
     };
     if let Ok(json) = serde_json::to_string_pretty(&cfg) {
@@ -885,16 +1143,88 @@ fn default_document_filename(doc: &MlaDocument, extension: &str) -> String {
     format!("{stem}.{extension}")
 }
 
-fn load_config() -> (ThemeConfig, KeybindConfig, usize) {
+fn load_config() -> (ThemeConfig, KeybindConfig, EditorSettings, usize) {
     let path = config_path();
     if let Ok(content) = std::fs::read_to_string(&path) {
         if let Ok(cfg) = serde_json::from_str::<SavedConfig>(&content) {
             return (
                 cfg.theme.unwrap_or_default(),
                 cfg.keybinds.unwrap_or_default(),
+                cfg.editor_settings.unwrap_or_default(),
                 cfg.undo_limit.unwrap_or(512).clamp(16, 8192),
             );
         }
     }
-    (ThemeConfig::default(), KeybindConfig::default(), 512)
+    (
+        ThemeConfig::default(),
+        KeybindConfig::default(),
+        EditorSettings::default(),
+        512,
+    )
+}
+
+#[cfg(not(target_os = "macos"))]
+fn handle_frameless_resize(ctx: &egui::Context, screen_rect: egui::Rect) {
+    if ctx.egui_is_using_pointer() {
+        return;
+    }
+    let Some(pos) = ctx.input(|i| i.pointer.hover_pos()) else {
+        return;
+    };
+
+    let edge = 5.0;
+    let corner = 10.0;
+
+    let left = pos.x - screen_rect.min.x <= edge;
+    let right = screen_rect.max.x - pos.x <= edge;
+    let top = pos.y - screen_rect.min.y <= edge;
+    let bottom = screen_rect.max.y - pos.y <= edge;
+
+    if !left && !right && !top && !bottom {
+        return;
+    }
+
+    let left_c = pos.x - screen_rect.min.x <= corner;
+    let right_c = screen_rect.max.x - pos.x <= corner;
+    let top_c = pos.y - screen_rect.min.y <= corner;
+    let bottom_c = screen_rect.max.y - pos.y <= corner;
+
+    let dir_and_cursor = if top_c && left_c {
+        Some((
+            egui::ResizeDirection::NorthWest,
+            egui::CursorIcon::ResizeNorthWest,
+        ))
+    } else if top_c && right_c {
+        Some((
+            egui::ResizeDirection::NorthEast,
+            egui::CursorIcon::ResizeNorthEast,
+        ))
+    } else if bottom_c && left_c {
+        Some((
+            egui::ResizeDirection::SouthWest,
+            egui::CursorIcon::ResizeSouthWest,
+        ))
+    } else if bottom_c && right_c {
+        Some((
+            egui::ResizeDirection::SouthEast,
+            egui::CursorIcon::ResizeSouthEast,
+        ))
+    } else if left {
+        Some((egui::ResizeDirection::West, egui::CursorIcon::ResizeWest))
+    } else if right {
+        Some((egui::ResizeDirection::East, egui::CursorIcon::ResizeEast))
+    } else if top {
+        Some((egui::ResizeDirection::North, egui::CursorIcon::ResizeNorth))
+    } else if bottom {
+        Some((egui::ResizeDirection::South, egui::CursorIcon::ResizeSouth))
+    } else {
+        None
+    };
+
+    if let Some((dir, cursor)) = dir_and_cursor {
+        ctx.set_cursor_icon(cursor);
+        if ctx.input(|i| i.pointer.primary_pressed()) {
+            ctx.send_viewport_cmd(egui::ViewportCommand::BeginResize(dir));
+        }
+    }
 }

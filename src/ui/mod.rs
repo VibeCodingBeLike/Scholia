@@ -7,13 +7,17 @@ pub mod status_bar;
 pub mod toolbar;
 pub mod unsaved_dialog;
 pub mod works_cited_dialog;
+pub mod writing_editor_dialog;
 
 pub use calendar_dialog::{render_calendar_popup, CalendarModalState};
 pub use citation_dialog::{render_citation_modal, CitationModalState};
 pub use compliance_dialog::{render_compliance_modal, ComplianceModalState};
 pub use editor::{render_editor_page, EditorAction};
-pub use settings_dialog::{render_settings_modal, SettingsModalState};
+pub use settings_dialog::{render_settings_modal_with_editor, SettingsModalState, SettingsTab};
 pub use status_bar::{render_status_bar, StatusBarEvent};
 pub use toolbar::{render_toolbar, ToolbarEvent};
 pub use unsaved_dialog::{render_unsaved_dialog, UnsavedDialogResponse, UnsavedDialogState};
 pub use works_cited_dialog::{render_works_cited_modal, WorksCitedModalState};
+pub use writing_editor_dialog::{
+    render_writing_editor_modal, WritingEditorModalEvent, WritingEditorModalState,
+};

@@ -4,7 +4,7 @@ set -e
 echo "=== Building Scholia Debian (.deb) Package ==="
 
 PACKAGE_NAME="scholia"
-VERSION="0.1.0"
+VERSION=$(grep -m1 '^version' Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')
 ARCH="amd64"
 DEB_DIR="target/debian/${PACKAGE_NAME}_${VERSION}_${ARCH}"
 
@@ -14,6 +14,7 @@ rm -rf "${DEB_DIR}"
 mkdir -p "${DEB_DIR}/DEBIAN"
 mkdir -p "${DEB_DIR}/usr/bin"
 mkdir -p "${DEB_DIR}/usr/share/applications"
+mkdir -p "${DEB_DIR}/usr/share/mime/packages"
 mkdir -p "${DEB_DIR}/usr/share/icons/hicolor/scalable/apps"
 mkdir -p "${DEB_DIR}/usr/share/doc/${PACKAGE_NAME}"
 
@@ -21,6 +22,7 @@ cp "target/release/scholia" "${DEB_DIR}/usr/bin/"
 chmod 755 "${DEB_DIR}/usr/bin/scholia"
 
 cp "installers/linux/scholia.desktop" "${DEB_DIR}/usr/share/applications/"
+cp "installers/linux/scholia.xml" "${DEB_DIR}/usr/share/mime/packages/scholia.xml"
 cp "assets/scholia-mla.svg" "${DEB_DIR}/usr/share/icons/hicolor/scalable/apps/scholia.svg"
 cp "README.md" "${DEB_DIR}/usr/share/doc/${PACKAGE_NAME}/"
 cp "LICENSE" "${DEB_DIR}/usr/share/doc/${PACKAGE_NAME}/copyright"

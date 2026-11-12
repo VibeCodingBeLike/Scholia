@@ -44,7 +44,13 @@ if (Test-Path "assets") {
 
 # 3. Create zip archive
 Write-Host "`n[3/3] Creating portable ZIP package..." -ForegroundColor Yellow
-$ZipTarget = "dist\Scholia-v0.1.0-portable-windows-x64.zip"
+$CargoToml = Get-Content "Cargo.toml" -Raw
+if ($CargoToml -match 'version\s*=\s*"([^"]+)"') {
+    $Version = $Matches[1]
+} else {
+    $Version = "0.1.0"
+}
+$ZipTarget = "dist\Scholia-v$Version-portable-windows-x64.zip"
 if (Test-Path $ZipTarget) {
     Remove-Item -Force $ZipTarget
 }

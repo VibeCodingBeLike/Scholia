@@ -1,5 +1,6 @@
 use crate::keybinds::{Action, KeyName, KeybindConfig};
 use crate::theme::{BlurMode, MlaFontChoice, ThemeConfig, ThemePreset};
+use crate::writing_editor::{EditorSettings, EnglishLanguage};
 use egui::{Color32, RichText, Window};
 
 pub struct SettingsModalState {
@@ -8,11 +9,15 @@ pub struct SettingsModalState {
     pub editing_action: Option<Action>,
     pub new_theme_name: String,
     pub theme_message: Option<(String, bool)>,
+    pub new_dict_word: String,
+    pub dict_search_query: String,
+    pub dict_message: Option<(String, bool)>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingsTab {
     TransparencyAndTheme,
+    EditorSettings,
     Keybindings,
 }
 
@@ -24,6 +29,9 @@ impl Default for SettingsModalState {
             editing_action: None,
             new_theme_name: String::new(),
             theme_message: None,
+            new_dict_word: String::new(),
+            dict_search_query: String::new(),
+            dict_message: None,
         }
     }
 }
@@ -33,6 +41,27 @@ pub fn render_settings_modal(
     state: &mut SettingsModalState,
     theme: &mut ThemeConfig,
     keybinds: &mut KeybindConfig,
+    undo_limit: &mut usize,
+    vibrancy_dirty: &mut bool,
+) {
+    let mut dummy_editor_settings = EditorSettings::default();
+    render_settings_modal_with_editor(
+        ctx,
+        state,
+        theme,
+        keybinds,
+        &mut dummy_editor_settings,
+        undo_limit,
+        vibrancy_dirty,
+    );
+}
+
+pub fn render_settings_modal_with_editor(
+    ctx: &egui::Context,
+    state: &mut SettingsModalState,
+    theme: &mut ThemeConfig,
+    keybinds: &mut KeybindConfig,
+    editor_settings: &mut EditorSettings,
     undo_limit: &mut usize,
     vibrancy_dirty: &mut bool,
 ) {
@@ -50,7 +79,7 @@ pub fn render_settings_modal(
         .open(&mut open)
         .resizable(true)
         .frame(theme.modal_frame())
-        .default_width(650.0)
+        .default_width(660.0)
         .default_height(default_h)
         .max_height(default_h)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
@@ -61,6 +90,11 @@ pub fn render_settings_modal(
                     &mut state.selected_tab,
                     SettingsTab::TransparencyAndTheme,
                     "🎨 Transparency & Themes",
+                );
+                ui.selectable_value(
+                    &mut state.selected_tab,
+                    SettingsTab::EditorSettings,
+                    "📝 Editor Settings",
                 );
                 ui.selectable_value(
                     &mut state.selected_tab,
@@ -83,6 +117,9 @@ pub fn render_settings_modal(
             match state.selected_tab {
                 SettingsTab::TransparencyAndTheme => {
                     render_transparency_tab(ui, state, theme, undo_limit, vibrancy_dirty);
+                }
+                SettingsTab::EditorSettings => {
+                    render_editor_settings_tab(ui, state, editor_settings, theme);
                 }
                 SettingsTab::Keybindings => {
                     render_keybindings_tab(ui, keybinds, theme);
@@ -298,6 +335,9 @@ fn render_transparency_tab(
                         // Custom themes have a delete button
                         if ui.button("🗑 Delete").clicked() {
                             let _ = std::fs::remove_file(&path);
+                            if is_current {
+                                theme.custom_name = None;
+                            }
                             state.theme_message = Some((format!("Deleted theme: {}", name), false));
                         }
                         ui.end_row();
@@ -351,6 +391,16 @@ fn render_transparency_tab(
                         .text(page_label),
                 );
             });
+
+            let border_label = format!("{:.0}%", theme.page_border_alpha * 100.0);
+            ui.horizontal(|ui| {
+                ui.label("Page Border Opacity:");
+                ui.add(
+                    egui::Slider::new(&mut theme.page_border_alpha, 0.0..=1.0)
+                        .text(border_label),
+                );
+            });
+
             ui.label(
                 RichText::new("Tip: Lower the Page Sheet Opacity to make the paper you write on completely translucent with your desktop shining through!")
                     .size(11.0)
@@ -368,7 +418,9 @@ fn render_transparency_tab(
                 .spacing([14.0, 8.0])
                 .show(ui, |ui| {
                     ui.label("Window Tint Color:");
-                    color_picker_rgb(ui, &mut theme.window_tint_rgb);
+                    if color_picker_rgb(ui, &mut theme.window_tint_rgb) {
+                        *vibrancy_dirty = true;
+                    }
                     ui.end_row();
 
                     ui.label("Page Sheet Tint Color:");
@@ -377,6 +429,10 @@ fn render_transparency_tab(
 
                     ui.label("Text Color:");
                     color_picker_rgb(ui, &mut theme.text_rgb);
+                    ui.end_row();
+
+                    ui.label("Muted / Secondary Text Color:");
+                    color_picker_rgb(ui, &mut theme.muted_text_rgb);
                     ui.end_row();
 
                     ui.label("Accent / Highlight Color:");
@@ -462,12 +518,15 @@ fn render_transparency_tab(
     });
 }
 
-fn color_picker_rgb(ui: &mut egui::Ui, rgb: &mut [u8; 3]) {
+fn color_picker_rgb(ui: &mut egui::Ui, rgb: &mut [u8; 3]) -> bool {
     let mut color = Color32::from_rgb(rgb[0], rgb[1], rgb[2]);
     if ui.color_edit_button_srgba(&mut color).changed() {
         rgb[0] = color.r();
         rgb[1] = color.g();
         rgb[2] = color.b();
+        true
+    } else {
+        false
     }
 }
 
@@ -486,6 +545,17 @@ fn render_keybindings_tab(ui: &mut egui::Ui, keybinds: &mut KeybindConfig, theme
     }
 
     ui.add_space(8.0);
+
+    let ctrl_label = if cfg!(target_os = "macos") {
+        "Cmd"
+    } else {
+        "Ctrl"
+    };
+    let alt_label = if cfg!(target_os = "macos") {
+        "Option"
+    } else {
+        "Alt"
+    };
 
     egui::ScrollArea::vertical().show(ui, |ui| {
         egui::Grid::new("keybindings_grid")
@@ -520,16 +590,18 @@ fn render_keybindings_tab(ui: &mut egui::Ui, keybinds: &mut KeybindConfig, theme
                         let mut changed = false;
 
                         ui.horizontal(|ui| {
-                            changed |= ui.checkbox(&mut sc.ctrl, "Ctrl").changed();
+                            changed |= ui.checkbox(&mut sc.ctrl, ctrl_label).changed();
                             changed |= ui.checkbox(&mut sc.shift, "Shift").changed();
-                            changed |= ui.checkbox(&mut sc.alt, "Alt").changed();
+                            changed |= ui.checkbox(&mut sc.alt, alt_label).changed();
 
                             egui::ComboBox::from_id_salt(format!("kb_{:?}", action))
                                 .selected_text(sc.key.label())
                                 .width(60.0)
                                 .show_ui(ui, |ui| {
                                     for &key in KeyName::all() {
-                                        ui.selectable_value(&mut sc.key, key, key.label());
+                                        changed |= ui
+                                            .selectable_value(&mut sc.key, key, key.label())
+                                            .changed();
                                     }
                                 });
                         });
@@ -542,5 +614,322 @@ fn render_keybindings_tab(ui: &mut egui::Ui, keybinds: &mut KeybindConfig, theme
                     ui.end_row();
                 }
             });
+    });
+}
+
+fn render_editor_settings_tab(
+    ui: &mut egui::Ui,
+    state: &mut SettingsModalState,
+    editor_settings: &mut EditorSettings,
+    theme: &ThemeConfig,
+) {
+    egui::ScrollArea::vertical().show(ui, |ui| {
+        ui.spacing_mut().item_spacing.y = 12.0;
+
+        // 1. Language & Dialect Selection
+        ui.group(|ui| {
+            ui.label(RichText::new("🌐 Proofing Language & Regional Spelling:").strong());
+            ui.label(
+                RichText::new(
+                    "Select the English regional dialect used for spell checking and grammar suggestions.",
+                )
+                .size(11.5)
+                .color(theme.muted_text_color()),
+            );
+
+            ui.add_space(4.0);
+
+            egui::ComboBox::from_id_salt("editor_language_cb")
+                .selected_text(editor_settings.language.display_name())
+                .width(300.0)
+                .show_ui(ui, |ui| {
+                    for &lang in EnglishLanguage::all() {
+                        ui.selectable_value(
+                            &mut editor_settings.language,
+                            lang,
+                            lang.display_name(),
+                        );
+                    }
+                });
+
+            ui.add_space(4.0);
+            ui.label(
+                RichText::new(editor_settings.language.description())
+                    .size(11.5)
+                    .italics()
+                    .color(theme.accent_color()),
+            );
+        });
+
+        // 2. Spell Check, Grammar & Style Rules
+        ui.group(|ui| {
+            ui.label(RichText::new("🔍 Writing Editor Categories & Rules:").strong());
+            ui.label(
+                RichText::new(
+                    "Choose which categories of suggestions are counted in the bottom bar and shown in the Editor.",
+                )
+                .size(11.5)
+                .color(theme.muted_text_color()),
+            );
+
+            ui.add_space(4.0);
+
+            ui.checkbox(
+                &mut editor_settings.enable_spell_check,
+                "Check Spelling (flag misspelled words and dialect mismatches)",
+            );
+            ui.checkbox(
+                &mut editor_settings.enable_grammar_check,
+                "Check Grammar & Punctuation (agreement, articles, confused words, punctuation)",
+            );
+            ui.checkbox(
+                &mut editor_settings.enable_style_check,
+                "Check Clarity, Conciseness & Readability (wordiness, redundancy, phrasing)",
+            );
+            ui.checkbox(
+                &mut editor_settings.flag_contractions,
+                "Flag Contractions in Academic Prose (suggest expanding don't → do not, can't → cannot, etc.)",
+            );
+
+            ui.separator();
+
+            ui.checkbox(
+                &mut editor_settings.ignore_all_caps,
+                "Ignore words in ALL CAPS (e.g., MLA, NASA, UNESCO, ISBN)",
+            );
+            ui.checkbox(
+                &mut editor_settings.ignore_words_with_numbers,
+                "Ignore words containing numbers (e.g., COVID19, B12, MP3)",
+            );
+        });
+
+        // 3. Custom Dictionary Manager
+        ui.group(|ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("📖 Custom Dictionary:").strong());
+                ui.label(
+                    RichText::new(format!(
+                        "({} word{})",
+                        editor_settings.custom_dictionary.len(),
+                        if editor_settings.custom_dictionary.len() == 1 {
+                            ""
+                        } else {
+                            "s"
+                        }
+                    ))
+                    .size(11.5)
+                    .color(theme.muted_text_color()),
+                );
+            });
+
+            ui.label(
+                RichText::new(
+                    "Words added to your custom dictionary are never flagged as spelling mistakes.",
+                )
+                .size(11.5)
+                .color(theme.muted_text_color()),
+            );
+
+            ui.add_space(4.0);
+
+            // Add new word row
+            ui.horizontal(|ui| {
+                ui.label("Add word:");
+                let edit_resp = ui.add(
+                    egui::TextEdit::singleline(&mut state.new_dict_word)
+                        .hint_text("e.g., Bildungsroman")
+                        .desired_width(180.0),
+                );
+                let enter_pressed =
+                    edit_resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                if ui.button("➕ Add to Dictionary").clicked() || enter_pressed {
+                    let trimmed = state.new_dict_word.trim().to_string();
+                    if trimmed.is_empty() {
+                        state.dict_message =
+                            Some(("Please enter a word to add.".to_string(), true));
+                    } else if editor_settings.add_to_dictionary(&trimmed) {
+                        state.dict_message = Some((
+                            format!("Added \"{}\" to custom dictionary.", trimmed),
+                            false,
+                        ));
+                        state.new_dict_word.clear();
+                    } else {
+                        state.dict_message = Some((
+                            format!("\"{}\" is already in your dictionary.", trimmed),
+                            true,
+                        ));
+                    }
+                }
+            });
+
+            // Import / Export / Clear row
+            ui.horizontal(|ui| {
+                if ui
+                    .button("📥 Import Word List (.txt)...")
+                    .on_hover_text("Import newline- or whitespace-separated words from a text file")
+                    .clicked()
+                {
+                    if let Some(path) = rfd::FileDialog::new()
+                        .add_filter("Text Dictionary (*.txt)", &["txt"])
+                        .pick_file()
+                    {
+                        match std::fs::read_to_string(&path) {
+                            Ok(content) => {
+                                let mut added = 0usize;
+                                for token in content.split_whitespace() {
+                                    if editor_settings.add_to_dictionary(token) {
+                                        added += 1;
+                                    }
+                                }
+                                state.dict_message = Some((
+                                    format!("Imported {} new word(s) into custom dictionary.", added),
+                                    false,
+                                ));
+                            }
+                            Err(e) => {
+                                state.dict_message =
+                                    Some((format!("Failed to read file: {}", e), true));
+                            }
+                        }
+                    }
+                }
+
+                if ui
+                    .button("📤 Export Dictionary (.txt)...")
+                    .on_hover_text("Save your custom dictionary words to a text file")
+                    .clicked()
+                {
+                    if let Some(path) = rfd::FileDialog::new()
+                        .set_file_name("scholia_custom_dictionary.txt")
+                        .add_filter("Text Dictionary (*.txt)", &["txt"])
+                        .save_file()
+                    {
+                        let body: String = editor_settings
+                            .custom_dictionary
+                            .iter()
+                            .cloned()
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        match std::fs::write(&path, body) {
+                            Ok(_) => {
+                                state.dict_message = Some((
+                                    format!(
+                                        "Exported {} word(s) to {}",
+                                        editor_settings.custom_dictionary.len(),
+                                        path.file_name().unwrap_or_default().to_string_lossy()
+                                    ),
+                                    false,
+                                ));
+                            }
+                            Err(e) => {
+                                state.dict_message =
+                                    Some((format!("Failed to export dictionary: {}", e), true));
+                            }
+                        }
+                    }
+                }
+
+                if !editor_settings.custom_dictionary.is_empty()
+                    && ui
+                        .button("🗑 Clear All")
+                        .on_hover_text("Remove all words from your custom dictionary")
+                        .clicked()
+                {
+                    editor_settings.custom_dictionary.clear();
+                    state.dict_message =
+                        Some(("Cleared all words from custom dictionary.".to_string(), false));
+                }
+            });
+
+            if let Some((msg, is_err)) = &state.dict_message {
+                let col = if *is_err {
+                    Color32::from_rgb(230, 80, 80)
+                } else {
+                    Color32::from_rgb(80, 200, 120)
+                };
+                ui.label(RichText::new(msg).color(col).size(11.5).strong());
+            }
+
+            ui.separator();
+
+            if editor_settings.custom_dictionary.is_empty() {
+                ui.label(
+                    RichText::new(
+                        "Your custom dictionary is currently empty. Add words above or click '📖 + Add to Dictionary' in the Writing Editor.",
+                    )
+                    .size(11.5)
+                    .italics()
+                    .color(theme.muted_text_color()),
+                );
+            } else {
+                ui.horizontal(|ui| {
+                    ui.label("Filter dictionary:");
+                    ui.add(
+                        egui::TextEdit::singleline(&mut state.dict_search_query)
+                            .hint_text("Search words...")
+                            .desired_width(180.0),
+                    );
+                    if !state.dict_search_query.is_empty() && ui.small_button("✕").clicked() {
+                        state.dict_search_query.clear();
+                    }
+                });
+
+                let query = state.dict_search_query.trim().to_lowercase();
+                let words: Vec<String> = editor_settings
+                    .custom_dictionary
+                    .iter()
+                    .filter(|w| query.is_empty() || w.contains(&query))
+                    .cloned()
+                    .collect();
+
+                let mut word_to_remove: Option<String> = None;
+
+                egui::ScrollArea::vertical()
+                    .id_salt("custom_dict_scroll")
+                    .max_height(180.0)
+                    .show(ui, |ui| {
+                        egui::Grid::new("custom_dict_grid")
+                            .num_columns(2)
+                            .spacing([24.0, 6.0])
+                            .striped(true)
+                            .show(ui, |ui| {
+                                for w in &words {
+                                    ui.label(RichText::new(w).strong().color(theme.text_color()));
+                                    if ui.small_button("🗑 Remove").clicked() {
+                                        word_to_remove = Some(w.clone());
+                                    }
+                                    ui.end_row();
+                                }
+                            });
+                    });
+
+                if let Some(rem) = word_to_remove {
+                    editor_settings.remove_from_dictionary(&rem);
+                    state.dict_message = Some((
+                        format!("Removed \"{}\" from custom dictionary.", rem),
+                        false,
+                    ));
+                }
+            }
+
+            let ignored_count =
+                editor_settings.ignored_issues.len() + editor_settings.ignored_words_session.len();
+            if ignored_count > 0 {
+                ui.separator();
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new(format!(
+                            "Ignored in current session: {} item(s)",
+                            ignored_count
+                        ))
+                        .size(11.5)
+                        .color(theme.muted_text_color()),
+                    );
+                    if ui.button("↺ Reset Ignored Suggestions").clicked() {
+                        editor_settings.clear_ignored();
+                    }
+                });
+            }
+        });
     });
 }

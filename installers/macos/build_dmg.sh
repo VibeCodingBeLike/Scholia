@@ -5,7 +5,7 @@ set -e
 echo "=== Building Scholia for macOS ==="
 
 APP_NAME="Scholia"
-VERSION="0.1.0"
+VERSION=$(grep -m1 '^version' Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')
 BUNDLE_DIR="target/release/bundle/osx/${APP_NAME}.app"
 CONTENTS_DIR="${BUNDLE_DIR}/Contents"
 MACOS_DIR="${CONTENTS_DIR}/MacOS"
@@ -18,10 +18,15 @@ rm -rf "${BUNDLE_DIR}"
 mkdir -p "${MACOS_DIR}"
 mkdir -p "${RESOURCES_DIR}"
 
-cp "target/release/scholia" "${MACOS_DIR}/${APP_NAME}"
-chmod +x "${MACOS_DIR}/${APP_NAME}"
+cp "target/release/scholia" "${MACOS_DIR}/scholia"
+chmod +x "${MACOS_DIR}/scholia"
 
-cp "installers/macos/Info.plist" "${CONTENTS_DIR}/Info.plist"
+sed "s/0.1.0/${VERSION}/g" "installers/macos/Info.plist" > "${CONTENTS_DIR}/Info.plist"
+cp "assets/scholia-mla.svg" "${RESOURCES_DIR}/scholia.svg"
+
+if command -v codesign &> /dev/null; then
+    codesign --force --deep --sign - "${BUNDLE_DIR}" || true
+fi
 
 echo "=== App Bundle created at ${BUNDLE_DIR} ==="
 

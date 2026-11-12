@@ -19,6 +19,25 @@ fn test_mla_title_case_capitalization() {
         to_mla_title_case("the bird is in the sky and it is singing"),
         "The Bird is in the Sky and it is Singing"
     );
+    // Dotted initials like J.S. Bach, W.E.B. Du Bois, and U.S. must preserve capital initials
+    assert_eq!(to_mla_title_case("J.S. Bach"), "J.S. Bach");
+    assert_eq!(to_mla_title_case("j.s. bach"), "J.S. Bach");
+    assert_eq!(
+        to_mla_title_case("counterpoint in the fugues of J.S. Bach"),
+        "Counterpoint in the Fugues of J.S. Bach"
+    );
+    assert_eq!(
+        to_mla_title_case("the souls of black folk by w.e.b. du bois"),
+        "The Souls of Black Folk by W.E.B. Du Bois"
+    );
+
+    let mut doc = MlaDocument::sample_template();
+    doc.title = "Counterpoint in the Fugues of J.S. Bach".to_string();
+    let report = MlaLinter::inspect(&doc);
+    assert!(
+        !report.issues.iter().any(|i| i.rule_id == "TITLE_CASE"),
+        "Title with 'J.S. Bach' must not trigger TITLE_CASE linter warning"
+    );
 }
 
 #[test]
@@ -1264,6 +1283,412 @@ fn test_shortcuts_panel_dynamic_width_no_overlap() {
 
             let action = scholia::ui::render_editor_page(ui, &mut doc, &theme, &keybinds, false);
             assert!(action.is_none());
+        },
+    );
+    out.textures_delta.clear();
+}
+
+#[test]
+fn test_theme_muted_text_and_page_border_alpha_customization() {
+    use scholia::keybinds::KeybindConfig;
+    use scholia::theme::{load_theme_file, save_custom_theme, ThemeConfig};
+    use scholia::ui::settings_dialog::render_settings_modal;
+    use scholia::ui::SettingsModalState;
+
+    let mut theme = ThemeConfig {
+        muted_text_rgb: [101, 112, 123],
+        page_border_alpha: 0.77,
+        page_border_rgb: [50, 60, 70],
+        ..Default::default()
+    };
+
+    assert_eq!(
+        theme.muted_text_color(),
+        egui::Color32::from_rgb(101, 112, 123)
+    );
+    let expected_alpha = (0.77_f32 * 255.0) as u8;
+    assert_eq!(theme.page_stroke().color.a(), expected_alpha);
+
+    let theme_name = "Full Fields Theme Test";
+    let saved_path = save_custom_theme(&theme, theme_name).expect("Save custom theme");
+    let loaded = load_theme_file(&saved_path).expect("Load custom theme");
+    assert_eq!(loaded.muted_text_rgb, [101, 112, 123]);
+    assert!((loaded.page_border_alpha - 0.77).abs() < 0.001);
+    let _ = std::fs::remove_file(saved_path);
+
+    // Ensure settings modal renders cleanly with both Appearance and Keybindings tabs
+    let ctx = egui::Context::default();
+    scholia::fonts::configure_fonts(&ctx);
+    let mut state = SettingsModalState {
+        is_open: true,
+        ..Default::default()
+    };
+    let mut keybinds = KeybindConfig::default();
+    let mut undo_limit = 512;
+    let mut vibrancy_dirty = false;
+
+    let mut out = ctx.run_ui(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::pos2(0.0, 0.0),
+                egui::vec2(1280.0, 800.0),
+            )),
+            ..Default::default()
+        },
+        |ui| {
+            render_settings_modal(
+                ui.ctx(),
+                &mut state,
+                &mut theme,
+                &mut keybinds,
+                &mut undo_limit,
+                &mut vibrancy_dirty,
+            );
+        },
+    );
+    out.textures_delta.clear();
+}
+
+#[test]
+fn test_mla_font_choice_in_editor_and_exporters() {
+    use scholia::export::{
+        export_to_docx_with_font, export_to_pdf_with_font, generate_mla_html_with_font,
+    };
+    use scholia::fonts::{configure_fonts, doc_font_for};
+    use scholia::model::{MlaBlock, MlaDocument};
+    use scholia::theme::MlaFontChoice;
+
+    let ctx = egui::Context::default();
+    configure_fonts(&ctx);
+
+    let mut doc = MlaDocument::sample_template();
+    doc.blocks.push(MlaBlock::SectionHeading {
+        id: "h2".to_string(),
+        level: 2,
+        text: "Italicized Subsection".to_string(),
+    });
+    doc.blocks.push(MlaBlock::SectionHeading {
+        id: "h3".to_string(),
+        level: 3,
+        text: "Centered Bold Subsection".to_string(),
+    });
+
+    let temp_dir = std::env::temp_dir();
+
+    for &choice in MlaFontChoice::all() {
+        let font_id = doc_font_for(choice, 16.0);
+        assert_eq!(font_id.size, 16.0);
+
+        let html = generate_mla_html_with_font(&doc, choice);
+        assert!(html.contains(choice.css_font_family()));
+
+        let docx_path = temp_dir.join(format!("test_font_{:?}.docx", choice));
+        assert!(export_to_docx_with_font(&doc, &docx_path, choice).is_ok());
+        let _ = std::fs::remove_file(&docx_path);
+
+        let pdf_path = temp_dir.join(format!("test_font_{:?}.pdf", choice));
+        assert!(export_to_pdf_with_font(&doc, &pdf_path, choice).is_ok());
+        let _ = std::fs::remove_file(&pdf_path);
+    }
+}
+
+#[test]
+fn test_mla_linter_full_auto_fix() {
+    use scholia::mla_rules::MlaLinter;
+    use scholia::model::{MlaBlock, MlaDocument, WorksCitedEntry};
+
+    let mut doc = MlaDocument::new_blank();
+    doc.header.student_name = "Jane Doe".to_string();
+    doc.header.instructor_name = "Dr. Smith".to_string();
+    doc.header.course = "ENG 101".to_string();
+    doc.header.date = "09/21/2026".to_string();
+    doc.title = "my essay title.".to_string();
+    doc.blocks[0] = MlaBlock::Paragraph {
+        id: "p1".to_string(),
+        text: "According to the study. (Doe 42)".to_string(),
+        note_tags: Vec::new(),
+    };
+
+    let mut c1 = WorksCitedEntry::new_empty();
+    c1.author = "Zimmerman, Carl".to_string();
+    c1.title_of_source = "Zeta Study".to_string();
+    let mut c2 = WorksCitedEntry::new_empty();
+    c2.author = "Adams, Abigail".to_string();
+    c2.title_of_source = "Alpha Letters".to_string();
+    doc.works_cited.push(c1);
+    doc.works_cited.push(c2);
+
+    MlaLinter::auto_fix(&mut doc, "ALL");
+
+    assert_eq!(doc.header.date, "21 September 2026");
+    assert_eq!(doc.title, "My Essay Title");
+    assert_eq!(doc.blocks[0].text(), "According to the study (Doe 42).");
+    assert_eq!(doc.works_cited[0].author, "Adams, Abigail");
+    assert_eq!(doc.works_cited[1].author, "Zimmerman, Carl");
+}
+
+#[test]
+fn test_mid_paragraph_word_boundary_undo_grouping() {
+    use scholia::history::HistoryManager;
+    use scholia::model::{MlaBlock, MlaDocument};
+
+    let mut doc = MlaDocument::new_blank();
+    if let MlaBlock::Paragraph { text, .. } = &mut doc.blocks[0] {
+        *text = "Hello world.".to_string();
+    }
+    let mut history = HistoryManager::new(&doc);
+
+    // Insert "brave " in the middle of a paragraph that ends with '.'
+    let intermediate_states = [
+        ("Hello bworld.", 7),
+        ("Hello brworld.", 8),
+        ("Hello braworld.", 9),
+        ("Hello bravworld.", 10),
+        ("Hello braveworld.", 11),
+        ("Hello brave world.", 12),
+    ];
+
+    for (s, cursor) in intermediate_states {
+        if let MlaBlock::Paragraph { text, .. } = &mut doc.blocks[0] {
+            *text = s.to_string();
+        }
+        history.on_frame_end(&doc, cursor);
+    }
+
+    // Because 'b', 'r', 'a', 'v', 'e' did not insert whitespace/punctuation in the diff,
+    // they should be grouped into a single undo step!
+    let undone = history.undo(&doc, 12).expect("Should undo 'brave '");
+    assert_eq!(undone.doc.blocks[0].text(), "Hello world.");
+}
+
+#[test]
+fn test_plain_text_export_includes_notes() {
+    use scholia::export::export_to_text;
+    use scholia::model::MlaDocument;
+
+    let mut doc = MlaDocument::sample_template();
+    doc.add_explanatory_note("Clarification of terminology.".to_string());
+
+    let temp_dir = std::env::temp_dir();
+    let txt_path = temp_dir.join("test_export_with_notes.txt");
+    export_to_text(&doc, &txt_path).expect("Text export should succeed");
+
+    let content = std::fs::read_to_string(&txt_path).expect("Read exported text");
+    assert!(content.contains("1. Clarification of terminology."));
+    let _ = std::fs::remove_file(&txt_path);
+}
+
+#[test]
+fn test_writing_editor_spell_and_grammar_check() {
+    use scholia::model::{MlaBlock, MlaDocument};
+    use scholia::writing_editor::{EditorSettings, SuggestionCategory, WritingEditor};
+
+    let mut doc = MlaDocument::new_blank();
+    doc.title = "A Study of Modern Literature".to_string();
+    doc.blocks[0] = MlaBlock::Paragraph {
+        id: "p1".to_string(),
+        text: "We recieve a apple and don't know why Zyxwvut occurred.".to_string(),
+        note_tags: Vec::new(),
+    };
+
+    let mut settings = EditorSettings::default();
+    let report = WritingEditor::inspect(&doc, &settings);
+
+    assert!(
+        report.total_suggestions() >= 3,
+        "Expected spelling, grammar, and contraction suggestions, got {}",
+        report.total_suggestions()
+    );
+    assert!(
+        report.spelling_count >= 2,
+        "Expected 'recieve' and 'Zyxwvut' flagged"
+    );
+    assert!(report
+        .issues
+        .iter()
+        .any(|i| i.flagged_text == "recieve" && i.category == SuggestionCategory::Spelling));
+    assert!(report
+        .issues
+        .iter()
+        .any(|i| i.flagged_text == "Zyxwvut" && i.can_add_to_dictionary));
+
+    // 1. Add "Zyxwvut" to custom dictionary -> no longer flagged
+    assert!(settings.add_to_dictionary("Zyxwvut"));
+    let report_after_dict = WritingEditor::inspect(&doc, &settings);
+    assert!(
+        !report_after_dict
+            .issues
+            .iter()
+            .any(|i| i.flagged_text.eq_ignore_ascii_case("zyxwvut")),
+        "Custom dictionary word must not be flagged"
+    );
+
+    // 2. Accept suggestion for "recieve" -> "receive"
+    let recieve_issue = report_after_dict
+        .issues
+        .iter()
+        .find(|i| i.flagged_text == "recieve")
+        .expect("Should find recieve issue")
+        .clone();
+    let first_sug = recieve_issue
+        .suggestions
+        .first()
+        .expect("Should have suggestion for recieve");
+    assert!(WritingEditor::apply_suggestion(
+        &mut doc,
+        &recieve_issue,
+        first_sug
+    ));
+    assert!(doc.blocks[0].text().contains("receive"));
+
+    // 3. Apply all remaining top suggestions
+    let applied = WritingEditor::apply_all_top_suggestions(&mut doc, &settings);
+    assert!(applied >= 1);
+    assert!(
+        doc.blocks[0].text().contains("do not"),
+        "Contraction don't should expand to do not: {}",
+        doc.blocks[0].text()
+    );
+}
+
+#[test]
+fn test_writing_editor_english_us_ca_uk_dialects() {
+    use scholia::model::{MlaBlock, MlaDocument};
+    use scholia::writing_editor::{
+        EditorSettings, EnglishLanguage, SuggestionCategory, WritingEditor,
+    };
+
+    let mut doc = MlaDocument::new_blank();
+    doc.title = "Regional Spelling Variants".to_string();
+    doc.blocks[0] = MlaBlock::Paragraph {
+        id: "p1".to_string(),
+        text: "The color and colour of the center and centre help analyze and analyse defense and defence."
+            .to_string(),
+        note_tags: Vec::new(),
+    };
+
+    // 1. English (US): accepts US spellings ("color", "center"), flags UK spellings ("colour", "centre")
+    let us_settings = EditorSettings {
+        language: EnglishLanguage::EnglishUS,
+        ..Default::default()
+    };
+    let us_report = WritingEditor::inspect(&doc, &us_settings);
+    let us_flagged: Vec<&str> = us_report
+        .issues
+        .iter()
+        .filter(|i| i.category == SuggestionCategory::Spelling)
+        .map(|i| i.flagged_text.as_str())
+        .collect();
+    assert!(
+        us_flagged.contains(&"colour"),
+        "en-US should flag 'colour', got: {:?}",
+        us_flagged
+    );
+    assert!(
+        !us_flagged.contains(&"color"),
+        "en-US must accept 'color', got: {:?}",
+        us_flagged
+    );
+
+    // 2. English (UK): accepts UK spellings ("colour", "centre"), flags US spellings ("color", "center")
+    let uk_settings = EditorSettings {
+        language: EnglishLanguage::EnglishUK,
+        ..Default::default()
+    };
+    let uk_report = WritingEditor::inspect(&doc, &uk_settings);
+    let uk_flagged: Vec<&str> = uk_report
+        .issues
+        .iter()
+        .filter(|i| i.category == SuggestionCategory::Spelling)
+        .map(|i| i.flagged_text.as_str())
+        .collect();
+    assert!(
+        uk_flagged.contains(&"color"),
+        "en-UK should flag 'color', got: {:?}",
+        uk_flagged
+    );
+    assert!(
+        !uk_flagged.contains(&"colour"),
+        "en-UK must accept 'colour', got: {:?}",
+        uk_flagged
+    );
+
+    // 3. English (CA): accepts BOTH US and UK spellings!
+    let ca_settings = EditorSettings {
+        language: EnglishLanguage::EnglishCA,
+        ..Default::default()
+    };
+    let ca_report = WritingEditor::inspect(&doc, &ca_settings);
+    let ca_flagged: Vec<&str> = ca_report
+        .issues
+        .iter()
+        .filter(|i| i.category == SuggestionCategory::Spelling)
+        .map(|i| i.flagged_text.as_str())
+        .collect();
+    assert!(
+        ca_flagged.is_empty(),
+        "en-CA must allow both US and UK spellings, but flagged: {:?}",
+        ca_flagged
+    );
+}
+
+#[test]
+fn test_writing_editor_modal_and_status_bar_ui() {
+    use scholia::keybinds::KeybindConfig;
+    use scholia::model::MlaDocument;
+    use scholia::theme::ThemeConfig;
+    use scholia::ui::{
+        render_settings_modal_with_editor, render_status_bar, render_writing_editor_modal,
+        SettingsModalState, SettingsTab, WritingEditorModalState,
+    };
+    use scholia::writing_editor::EditorSettings;
+
+    let ctx = egui::Context::default();
+    scholia::fonts::configure_fonts(&ctx);
+
+    let mut doc = MlaDocument::sample_template();
+    let mut theme = ThemeConfig::default();
+    let mut keybinds = KeybindConfig::default();
+    let mut editor_settings = EditorSettings::default();
+    editor_settings.add_to_dictionary("Scholia");
+    let mut editor_modal_state = WritingEditorModalState {
+        is_open: true,
+        ..Default::default()
+    };
+    let mut settings_state = SettingsModalState {
+        is_open: true,
+        selected_tab: SettingsTab::EditorSettings,
+        ..Default::default()
+    };
+    let mut undo_limit = 512;
+    let mut vibrancy_dirty = false;
+
+    let mut out = ctx.run_ui(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::pos2(0.0, 0.0),
+                egui::vec2(1280.0, 800.0),
+            )),
+            ..Default::default()
+        },
+        |ui| {
+            let _ = render_status_bar(ui, &doc, &theme, 3);
+            let _ = render_writing_editor_modal(
+                ui.ctx(),
+                &mut editor_modal_state,
+                &mut doc,
+                &mut editor_settings,
+                &theme,
+            );
+            render_settings_modal_with_editor(
+                ui.ctx(),
+                &mut settings_state,
+                &mut theme,
+                &mut keybinds,
+                &mut editor_settings,
+                &mut undo_limit,
+                &mut vibrancy_dirty,
+            );
         },
     );
     out.textures_delta.clear();

@@ -1,4 +1,4 @@
-use crate::fonts::{doc_font, icons};
+use crate::fonts::{doc_font_for, icons};
 use crate::keybinds::{Action, KeybindConfig};
 use crate::model::format_current_mla_date;
 use crate::model::{num_to_superscript, MlaBlock, MlaDocument};
@@ -25,13 +25,19 @@ pub fn render_editor_page(
     let text_col = theme.text_color();
     let muted_col = theme.muted_text_color();
     let accent_col = theme.accent_color();
+    let font_choice = theme.font_choice;
+    let doc_font = |size: f32| doc_font_for(font_choice, size);
 
     // Ensure blocks and body are properly populated
     doc.ensure_blocks_initialized();
     doc.ensure_body_synced();
 
     // Provide a document-wide copy command even though blocks use separate editors.
-    if ui.input(|i| i.modifiers.command && i.modifiers.shift && i.key_pressed(egui::Key::C)) {
+    if ui.input(|i| {
+        (i.modifiers.command || i.modifiers.ctrl)
+            && i.modifiers.shift
+            && i.key_pressed(egui::Key::C)
+    }) {
         let all_text = doc
             .blocks
             .iter()
@@ -40,6 +46,25 @@ pub fn render_editor_page(
             .collect::<Vec<_>>()
             .join("\n\n");
         ui.ctx().copy_text(all_text);
+    }
+
+    if focus_mode {
+        egui::Area::new(egui::Id::new("zen_mode_exit_btn"))
+            .anchor(egui::Align2::RIGHT_TOP, [-16.0, 12.0])
+            .order(egui::Order::Foreground)
+            .show(ui.ctx(), |ui| {
+                let btn = egui::Button::new(
+                    RichText::new(format!("{} Exit Zen Mode (Esc)", icons::FOCUS_MODE))
+                        .size(11.5)
+                        .color(muted_col),
+                )
+                .fill(theme.card_fill_color())
+                .stroke(theme.page_stroke())
+                .corner_radius(6.0);
+                if ui.add(btn).clicked() {
+                    action = Some(EditorAction::TriggerAction(Action::ToggleFocusMode));
+                }
+            });
     }
 
     let avail_h = ui.available_height();
@@ -338,7 +363,7 @@ pub fn render_editor_page(
                                             .map(|r| r.primary.index.0)
                                             .unwrap_or(0);
                                         let is_at_top = cursor_idx == 0 || text.is_empty();
-                                        let is_at_bottom = cursor_idx >= text.len() || text.is_empty();
+                                        let is_at_bottom = cursor_idx >= text.chars().count() || text.is_empty();
 
                                         if ui.input(|i| i.key_pressed(egui::Key::ArrowUp)) && is_at_top && b_idx > 0 {
                                             focus_navigate = Some((b_idx - 1, true));
@@ -438,7 +463,7 @@ pub fn render_editor_page(
                                                     .map(|r| r.primary.index.0)
                                                     .unwrap_or(0);
                                                 let is_at_top = cursor_idx == 0 || text.is_empty();
-                                                let is_at_bottom = cursor_idx >= text.len() || text.is_empty();
+                                                let is_at_bottom = cursor_idx >= text.chars().count() || text.is_empty();
 
                                                 if ui.input(|i| i.key_pressed(egui::Key::ArrowUp)) && is_at_top && b_idx > 0 {
                                                     focus_navigate = Some((b_idx - 1, true));
@@ -508,11 +533,18 @@ pub fn render_editor_page(
                                                 ),
                                             };
 
-                                            ui.label(
-                                                RichText::new(level_title)
-                                                    .size(11.5)
-                                                    .color(muted_col),
-                                            );
+                                            ui.horizontal(|ui| {
+                                                ui.label(
+                                                    RichText::new(level_title)
+                                                        .size(11.5)
+                                                        .color(muted_col),
+                                                );
+                                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                    if ui.small_button("Convert to Paragraph").clicked() {
+                                                        block_to_toggle = Some(b_idx);
+                                                    }
+                                                });
+                                            });
 
                                             let align = if *level == 3 {
                                                 egui::Align::Center
@@ -550,7 +582,7 @@ pub fn render_editor_page(
                                                     .map(|r| r.primary.index.0)
                                                     .unwrap_or(0);
                                                 let is_at_top = cursor_idx == 0 || text.is_empty();
-                                                let is_at_bottom = cursor_idx >= text.len() || text.is_empty();
+                                                let is_at_bottom = cursor_idx >= text.chars().count() || text.is_empty();
 
                                                 if ui.input(|i| i.key_pressed(egui::Key::ArrowUp)) && is_at_top && b_idx > 0 {
                                                     focus_navigate = Some((b_idx - 1, true));
@@ -567,9 +599,9 @@ pub fn render_editor_page(
                         if let Some((target_idx, to_bottom)) = focus_navigate {
                             if let Some(target_block) = doc.blocks.get(target_idx) {
                                 let (target_id, text_len) = match target_block {
-                                    MlaBlock::Paragraph { id, text, .. } => (egui::Id::new("p_block").with(id), text.len()),
-                                    MlaBlock::BlockQuote { id, text, .. } => (egui::Id::new("bq_block").with(id), text.len()),
-                                    MlaBlock::SectionHeading { id, text, .. } => (egui::Id::new("h_block").with(id), text.len()),
+                                    MlaBlock::Paragraph { id, text, .. } => (egui::Id::new("p_block").with(id), text.chars().count()),
+                                    MlaBlock::BlockQuote { id, text, .. } => (egui::Id::new("bq_block").with(id), text.chars().count()),
+                                    MlaBlock::SectionHeading { id, text, .. } => (egui::Id::new("h_block").with(id), text.chars().count()),
                                 };
                                 let mut state = egui::text_edit::TextEditState::load(ui.ctx(), target_id).unwrap_or_default();
                                 let target_cursor = if to_bottom { text_len } else { 0 };
@@ -739,7 +771,7 @@ pub fn render_editor_page(
                             }
 
                             ui.add_space(8.0);
-                            let fn_sc = keybinds.get_shortcut(Action::AddFootnote).display_string();
+                            let fn_sc = Action::AddFootnote.in_text_hint().unwrap_or("^N");
                             if ui.small_button(format!("+ Add Note / Definition [{}]", fn_sc)).clicked() {
                                 action = Some(EditorAction::TriggerAction(Action::AddFootnote));
                             }

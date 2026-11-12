@@ -1,10 +1,19 @@
 use crate::model::{MlaBlock, MlaDocument};
+use crate::theme::MlaFontChoice;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 
 pub fn export_to_html(doc: &MlaDocument, path: &Path) -> Result<(), String> {
-    let html_content = generate_mla_html(doc);
+    export_to_html_with_font(doc, path, MlaFontChoice::TimesNewRoman)
+}
+
+pub fn export_to_html_with_font(
+    doc: &MlaDocument,
+    path: &Path,
+    font_choice: MlaFontChoice,
+) -> Result<(), String> {
+    let html_content = generate_mla_html_with_font(doc, font_choice);
     let mut file = File::create(path).map_err(|e| format!("Failed to create HTML file: {}", e))?;
     file.write_all(html_content.as_bytes())
         .map_err(|e| format!("Failed to write HTML: {}", e))?;
@@ -12,6 +21,11 @@ pub fn export_to_html(doc: &MlaDocument, path: &Path) -> Result<(), String> {
 }
 
 pub fn generate_mla_html(doc: &MlaDocument) -> String {
+    generate_mla_html_with_font(doc, MlaFontChoice::TimesNewRoman)
+}
+
+pub fn generate_mla_html_with_font(doc: &MlaDocument, font_choice: MlaFontChoice) -> String {
+    let css_font = font_choice.css_font_family();
     let last_name = doc.header.derived_last_name();
     let mut sorted_wc = doc.works_cited.clone();
     sorted_wc.sort_by_key(|a| a.sort_key());
@@ -118,10 +132,10 @@ pub fn generate_mla_html(doc: &MlaDocument) -> String {
     }
 
     // Works Cited
-    body_html.push_str(&format!(
+    body_html.push_str(
         r#"<div class="mla-works-cited-section">
-    <h2 class="mla-works-cited-title">Works Cited</h2>"#
-    ));
+    <h2 class="mla-works-cited-title">Works Cited</h2>"#,
+    );
 
     if sorted_wc.is_empty() {
         body_html.push_str(r#"    <p class="mla-works-cited-entry" style="text-align: center; text-indent: 0;">No entries yet.</p>"#);
@@ -152,13 +166,13 @@ pub fn generate_mla_html(doc: &MlaDocument) -> String {
             margin: 1in;
             @top-right {{
                 content: "{last_name} " counter(page);
-                font-family: 'Times New Roman', Times, serif;
+                font-family: {css_font};
                 font-size: 12pt;
             }}
         }}
 
         body {{
-            font-family: 'Times New Roman', Times, serif;
+            font-family: {css_font};
             font-size: 12pt;
             line-height: 2.0; /* Strict MLA double spacing */
             color: #000;

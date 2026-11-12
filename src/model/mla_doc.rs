@@ -892,12 +892,14 @@ pub fn to_mla_title_case(input: &str) -> String {
         "than", "is", "if", "it", "its", "are", "be", "am", "was", "were", "per", "en",
     ];
 
+    // Check if the entire title was typed in ALL CAPS (so we know whether to preserve acronyms/mixed-case)
+    let title_has_lowercase = input.chars().any(|c| c.is_lowercase());
+
     let total = words.len();
     let result: Vec<String> = words
         .iter()
         .enumerate()
         .map(|(i, &word)| {
-            let lower = word.to_lowercase();
             let is_after_colon = if i > 0 {
                 let prev = words[i - 1];
                 prev.ends_with(':') || prev.ends_with(';')
@@ -905,34 +907,123 @@ pub fn to_mla_title_case(input: &str) -> String {
                 false
             };
 
-            let clean = lower.trim_matches(|c: char| !c.is_alphanumeric());
+            let force_cap = i == 0 || i == total - 1 || is_after_colon;
 
             // Check if hyphenated
-            if lower.contains('-') {
-                let parts: Vec<String> = lower
+            if word.contains('-') {
+                let parts: Vec<String> = word
                     .split('-')
                     .enumerate()
                     .map(|(pi, p)| {
-                        let p_clean = p.trim_matches(|c: char| !c.is_alphanumeric());
-                        if pi > 0 && lowercase_words.contains(&p_clean) {
-                            p.to_string()
-                        } else {
-                            capitalize_first(p)
-                        }
+                        format_title_token(
+                            p,
+                            force_cap || pi == 0,
+                            title_has_lowercase,
+                            &lowercase_words,
+                        )
                     })
                     .collect();
                 parts.join("-")
-            } else if (i == 0 || i == total - 1 || is_after_colon)
-                || !lowercase_words.contains(&clean)
-            {
-                capitalize_first(&lower)
             } else {
-                lower
+                format_title_token(word, force_cap, title_has_lowercase, &lowercase_words)
             }
         })
         .collect();
 
     result.join(" ")
+}
+
+fn format_title_token(
+    word: &str,
+    force_cap: bool,
+    title_has_lowercase: bool,
+    lowercase_words: &[&str],
+) -> String {
+    let lower = word.to_lowercase();
+    let clean = lower.trim_matches(|c: char| !c.is_alphanumeric());
+
+    // 1. Dotted initials or abbreviations (e.g., "J.S.", "j.s.", "W.E.B.", "U.S.", "Ph.D.")
+    // When a token contains '.' and has alphabetic segments (not just a trailing period on a normal word),
+    // capitalize each dot-separated segment!
+    let trimmed_trailing_dot = word.trim_end_matches(|c: char| !c.is_alphanumeric());
+    if trimmed_trailing_dot.contains('.') {
+        let segments: Vec<String> = word
+            .split('.')
+            .map(|seg| {
+                if seg.is_empty() {
+                    String::new()
+                } else {
+                    capitalize_first(&seg.to_lowercase())
+                }
+            })
+            .collect();
+        return segments.join(".");
+    }
+
+    // 2. Roman numerals (e.g., II, III, IV, VI, VII, VIII, IX, XI, XII, XIII, XIV, XV, XVI, XVII, XVIII, XIX, XX, XXI)
+    if is_roman_numeral(clean) {
+        return word
+            .chars()
+            .map(|c| c.to_uppercase().next().unwrap_or(c))
+            .collect();
+    }
+
+    // 3. Preserve intentional ALL-CAPS acronyms (e.g., NASA, WWII, DNA, MLA) when the title is not all-caps
+    let alpha_count = word.chars().filter(|c| c.is_alphabetic()).count();
+    let all_upper = alpha_count >= 2
+        && word
+            .chars()
+            .filter(|c| c.is_alphabetic())
+            .all(|c| c.is_uppercase());
+    if title_has_lowercase && all_upper && !lowercase_words.contains(&clean) {
+        return word.to_string();
+    }
+
+    // 4. Preserve intentional internal capitalization (e.g., McCarthy, MacDonald, O'Connor, DeLillo)
+    let first_alpha_upper = word
+        .chars()
+        .find(|c| c.is_alphabetic())
+        .map(|c| c.is_uppercase())
+        .unwrap_or(false);
+    let has_later_upper = word
+        .chars()
+        .skip_while(|c| !c.is_alphabetic())
+        .skip(1)
+        .any(|c| c.is_uppercase());
+    let has_lower = word.chars().any(|c| c.is_lowercase());
+    if first_alpha_upper && has_later_upper && has_lower {
+        return word.to_string();
+    }
+
+    // 5. Standard MLA Title Case rules
+    if force_cap || !lowercase_words.contains(&clean) {
+        capitalize_first(&lower)
+    } else {
+        lower
+    }
+}
+
+fn is_roman_numeral(clean_lower: &str) -> bool {
+    matches!(
+        clean_lower,
+        "ii" | "iii"
+            | "iv"
+            | "vi"
+            | "vii"
+            | "viii"
+            | "ix"
+            | "xi"
+            | "xii"
+            | "xiii"
+            | "xiv"
+            | "xv"
+            | "xvi"
+            | "xvii"
+            | "xviii"
+            | "xix"
+            | "xx"
+            | "xxi"
+    )
 }
 
 fn capitalize_first(s: &str) -> String {
@@ -1216,7 +1307,8 @@ pub fn split_sentences(text: &str) -> (String, Vec<SentenceSpan>) {
                     }
                     if w_start < i {
                         let word: String = chars[w_start..i].iter().collect();
-                        if is_abbreviation(&word) {
+                        let is_dotted_initial = w_start > curr_start && chars[w_start - 1] == '.';
+                        if is_abbreviation(&word) || is_dotted_initial {
                             is_boundary = false;
                         }
                     }

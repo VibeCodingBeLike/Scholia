@@ -1,4 +1,6 @@
+use crate::theme::MlaFontChoice;
 use egui::{FontData, FontDefinitions, FontFamily, FontId};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 pub mod icons {
@@ -52,7 +54,100 @@ pub fn doc_font(size: f32) -> FontId {
     FontId::new(size, doc_font_family())
 }
 
-/// Load packaged Nerd Font and Times New Roman into egui
+pub fn doc_font_family_for(choice: MlaFontChoice) -> FontFamily {
+    FontFamily::Name(Arc::from(choice.family_name()))
+}
+
+pub fn doc_font_for(choice: MlaFontChoice, size: f32) -> FontId {
+    FontId::new(size, doc_font_family_for(choice))
+}
+
+/// Searches standard cross-platform OS font directories for an optional system serif font.
+pub fn find_system_font_bytes(choice: MlaFontChoice) -> Option<Vec<u8>> {
+    if choice == MlaFontChoice::TimesNewRoman {
+        return None;
+    }
+
+    let candidate_filenames: &[&str] = match choice {
+        MlaFontChoice::TimesNewRoman => &[],
+        MlaFontChoice::Georgia => &["georgia.ttf", "Georgia.ttf"],
+        MlaFontChoice::Palatino => &[
+            "pala.ttf",
+            "Palatino.ttf",
+            "Palatino Linotype.ttf",
+            "P052-Regular.otf",
+            "URWPalladioL-Roma.ttf",
+        ],
+        MlaFontChoice::LiberationSerif => &["LiberationSerif-Regular.ttf", "LiberationSerif.ttf"],
+    };
+
+    let mut search_dirs: Vec<PathBuf> = Vec::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(windir) = std::env::var_os("WINDIR") {
+            search_dirs.push(PathBuf::from(windir).join("Fonts"));
+        } else {
+            search_dirs.push(PathBuf::from(r"C:\Windows\Fonts"));
+        }
+        if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+            search_dirs.push(
+                PathBuf::from(local)
+                    .join("Microsoft")
+                    .join("Windows")
+                    .join("Fonts"),
+            );
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        search_dirs.push(PathBuf::from("/System/Library/Fonts/Supplemental"));
+        search_dirs.push(PathBuf::from("/System/Library/Fonts"));
+        search_dirs.push(PathBuf::from("/Library/Fonts"));
+        if let Some(home) = std::env::var_os("HOME") {
+            search_dirs.push(PathBuf::from(home).join("Library").join("Fonts"));
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        search_dirs.push(PathBuf::from("/usr/share/fonts/truetype/liberation"));
+        search_dirs.push(PathBuf::from("/usr/share/fonts/truetype/liberation2"));
+        search_dirs.push(PathBuf::from("/usr/share/fonts/liberation"));
+        search_dirs.push(PathBuf::from("/usr/share/fonts/liberation-serif"));
+        search_dirs.push(PathBuf::from("/usr/share/fonts/truetype/msttcorefonts"));
+        search_dirs.push(PathBuf::from("/usr/share/fonts/TTF"));
+        search_dirs.push(PathBuf::from("/usr/share/fonts/opentype/urw-base35"));
+        search_dirs.push(PathBuf::from("/usr/share/fonts"));
+        search_dirs.push(PathBuf::from("/usr/local/share/fonts"));
+        if let Some(home) = std::env::var_os("HOME") {
+            let h = PathBuf::from(home);
+            search_dirs.push(h.join(".local/share/fonts"));
+            search_dirs.push(h.join(".fonts"));
+        }
+    }
+
+    for dir in search_dirs {
+        for &filename in candidate_filenames {
+            let candidate = dir.join(filename);
+            if candidate.is_file() {
+                if let Ok(bytes) = std::fs::read(&candidate) {
+                    return Some(bytes);
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Returns font bytes for PDF export for the selected `MlaFontChoice`, falling back to bundled Times New Roman.
+pub fn load_font_bytes_for(choice: MlaFontChoice) -> Vec<u8> {
+    find_system_font_bytes(choice).unwrap_or_else(|| EMBEDDED_TIMES_NEW_ROMAN.to_vec())
+}
+
+/// Load packaged Nerd Font, bundled Times New Roman, and optional system MLA serif fonts into egui
 pub fn configure_fonts(ctx: &egui::Context) {
     let mut fonts = FontDefinitions::default();
 
@@ -76,9 +171,22 @@ pub fn configure_fonts(ctx: &egui::Context) {
         mono.insert(0, "NerdFont".to_string());
     }
 
-    // 4. Register MLA Document Family: bundled Times New Roman + NerdFont for icon fallback
-    let doc_family_list = vec![MLA_DOC_FONT.to_string(), "NerdFont".to_string()];
-    fonts.families.insert(doc_font_family(), doc_family_list);
+    // 4. Register MLA Document Families for all 4 approved MLA typefaces (with bundled TimesNewRoman + NerdFont fallback)
+    for &choice in MlaFontChoice::all() {
+        let fam_name = choice.family_name().to_string();
+        let mut chain = Vec::new();
+        if choice != MlaFontChoice::TimesNewRoman {
+            if let Some(bytes) = find_system_font_bytes(choice) {
+                fonts
+                    .font_data
+                    .insert(fam_name.clone(), Arc::new(FontData::from_owned(bytes)));
+                chain.push(fam_name);
+            }
+        }
+        chain.push(MLA_DOC_FONT.to_string());
+        chain.push("NerdFont".to_string());
+        fonts.families.insert(doc_font_family_for(choice), chain);
+    }
 
     ctx.set_fonts(fonts);
 }

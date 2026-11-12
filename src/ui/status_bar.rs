@@ -6,12 +6,14 @@ use egui::{Color32, RichText, Ui};
 
 pub enum StatusBarEvent {
     OpenCompliance,
+    OpenWritingEditor,
 }
 
 pub fn render_status_bar(
     ui: &mut Ui,
     doc: &MlaDocument,
     theme: &ThemeConfig,
+    editor_suggestion_count: usize,
 ) -> Option<StatusBarEvent> {
     let mut event = None;
     let word_count = doc.total_word_count();
@@ -68,10 +70,36 @@ pub fn render_status_bar(
                     )
                     .frame(false),
                 )
-                .on_hover_text("Open MLA 9 Compliance Inspector (Ctrl+Shift+C)")
+                .on_hover_text("Open MLA 9 Compliance Inspector")
                 .clicked()
             {
                 event = Some(StatusBarEvent::OpenCompliance);
+            }
+
+            ui.separator();
+
+            // Writing Editor Suggestions pill on the footer
+            let (ed_col, ed_icon) = if editor_suggestion_count == 0 {
+                (Color32::from_rgb(50, 200, 100), icons::CHECK)
+            } else {
+                (Color32::from_rgb(240, 170, 40), icons::EDIT)
+            };
+
+            let ed_label = format!(
+                "{} Editor Suggestions: {}",
+                ed_icon, editor_suggestion_count
+            );
+            if ui
+                .add(
+                    egui::Button::new(RichText::new(ed_label).strong().size(11.5).color(ed_col))
+                        .frame(false),
+                )
+                .on_hover_text(
+                    "Open Writing Editor — Review spelling, grammar, and style suggestions",
+                )
+                .clicked()
+            {
+                event = Some(StatusBarEvent::OpenWritingEditor);
             }
 
             ui.separator();

@@ -88,6 +88,19 @@ pub fn generate_mla_text(doc: &MlaDocument) -> String {
         }
     }
 
+    // Explanatory Notes / Footnotes
+    if !doc.notes.is_empty() {
+        out.push_str("\n______________________\n");
+        for note in &doc.notes {
+            out.push_str(&format!(
+                "     {}. {}\n",
+                note.index,
+                crate::model::typographical_clean(&note.text)
+            ));
+        }
+        out.push('\n');
+    }
+
     // Works Cited
     if !doc.works_cited.is_empty() {
         out.push_str(

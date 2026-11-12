@@ -232,70 +232,58 @@ impl HistoryManager {
             let old_text = old_b.text();
             let new_text = new_b.text();
 
-            if old_text != new_text {
-                if new_text.len() > old_text.len() {
-                    let diff_len = new_text.len() - old_text.len();
-                    if diff_len > 4 {
-                        return true; // Large change (paste/replace)
-                    }
-                    if new_text
-                        .chars()
-                        .rev()
-                        .take(diff_len)
-                        .any(is_word_boundary_char)
-                    {
-                        return true;
-                    }
-                } else if new_text.len() < old_text.len() {
-                    let diff_len = old_text.len() - new_text.len();
-                    if diff_len > 4 {
-                        return true; // Large deletion
-                    }
-                    if old_text
-                        .chars()
-                        .rev()
-                        .take(diff_len)
-                        .any(is_word_boundary_char)
-                    {
-                        return true;
-                    }
-                }
+            if old_text != new_text && has_boundary_change(old_text, new_text) {
+                return true;
             }
         }
 
         // Header or title changes
-        if old_doc.title != new_doc.title
-            && new_doc
-                .title
-                .chars()
-                .last()
-                .is_some_and(is_word_boundary_char)
-        {
+        if old_doc.title != new_doc.title && has_boundary_change(&old_doc.title, &new_doc.title) {
             return true;
         }
         if old_doc.header != new_doc.header
-            && (new_doc
-                .header
-                .student_name
-                .chars()
-                .last()
-                .is_some_and(is_word_boundary_char)
-                || new_doc
-                    .header
-                    .instructor_name
-                    .chars()
-                    .last()
-                    .is_some_and(is_word_boundary_char)
-                || new_doc
-                    .header
-                    .course
-                    .chars()
-                    .last()
-                    .is_some_and(is_word_boundary_char))
+            && (has_boundary_change(&old_doc.header.student_name, &new_doc.header.student_name)
+                || has_boundary_change(
+                    &old_doc.header.instructor_name,
+                    &new_doc.header.instructor_name,
+                )
+                || has_boundary_change(&old_doc.header.course, &new_doc.header.course)
+                || has_boundary_change(&old_doc.header.date, &new_doc.header.date))
         {
             return true;
         }
 
         false
     }
+}
+
+fn has_boundary_change(old_text: &str, new_text: &str) -> bool {
+    if old_text == new_text {
+        return false;
+    }
+    let old_chars: Vec<char> = old_text.chars().collect();
+    let new_chars: Vec<char> = new_text.chars().collect();
+
+    let mut prefix = 0;
+    let min_len = old_chars.len().min(new_chars.len());
+    while prefix < min_len && old_chars[prefix] == new_chars[prefix] {
+        prefix += 1;
+    }
+
+    let mut old_end = old_chars.len();
+    let mut new_end = new_chars.len();
+    while old_end > prefix && new_end > prefix && old_chars[old_end - 1] == new_chars[new_end - 1] {
+        old_end -= 1;
+        new_end -= 1;
+    }
+
+    let old_diff = &old_chars[prefix..old_end];
+    let new_diff = &new_chars[prefix..new_end];
+
+    if old_diff.len() > 4 || new_diff.len() > 4 {
+        return true; // Paste / bulk edit
+    }
+
+    old_diff.iter().copied().any(is_word_boundary_char)
+        || new_diff.iter().copied().any(is_word_boundary_char)
 }

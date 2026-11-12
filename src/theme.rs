@@ -165,12 +165,39 @@ pub enum MlaFontChoice {
 }
 
 impl MlaFontChoice {
+    pub fn all() -> &'static [MlaFontChoice] {
+        &[
+            MlaFontChoice::TimesNewRoman,
+            MlaFontChoice::Georgia,
+            MlaFontChoice::Palatino,
+            MlaFontChoice::LiberationSerif,
+        ]
+    }
+
     pub fn display_name(&self) -> &'static str {
         match self {
             MlaFontChoice::TimesNewRoman => "Times New Roman (Standard MLA)",
             MlaFontChoice::Georgia => "Georgia (Approved Modern Serif)",
             MlaFontChoice::Palatino => "Palatino Linotype (Classic Serif)",
             MlaFontChoice::LiberationSerif => "Liberation Serif (Cross-platform Serif)",
+        }
+    }
+
+    pub fn family_name(&self) -> &'static str {
+        match self {
+            MlaFontChoice::TimesNewRoman => "TimesNewRoman",
+            MlaFontChoice::Georgia => "Georgia",
+            MlaFontChoice::Palatino => "Palatino",
+            MlaFontChoice::LiberationSerif => "LiberationSerif",
+        }
+    }
+
+    pub fn docx_font_name(&self) -> &'static str {
+        match self {
+            MlaFontChoice::TimesNewRoman => "Times New Roman",
+            MlaFontChoice::Georgia => "Georgia",
+            MlaFontChoice::Palatino => "Palatino Linotype",
+            MlaFontChoice::LiberationSerif => "Liberation Serif",
         }
     }
 
@@ -455,9 +482,14 @@ impl ThemeConfig {
 
         #[cfg(target_os = "windows")]
         {
+            // Clear existing effects first so switching between Mica, Acrylic, Blur, and TransparentOnly works cleanly
+            let _ = window_vibrancy::clear_acrylic(window);
+            let _ = window_vibrancy::clear_blur(window);
+            let _ = window_vibrancy::clear_mica(window);
+
             match self.blur_mode {
                 BlurMode::Mica => {
-                    let _ = window_vibrancy::apply_mica(window, None)
+                    let _ = window_vibrancy::apply_mica(window, Some(self.is_dark()))
                         .or_else(|_| window_vibrancy::apply_acrylic(window, tint_tuple))
                         .or_else(|_| window_vibrancy::apply_blur(window, tint_tuple));
                 }
@@ -468,11 +500,7 @@ impl ThemeConfig {
                 BlurMode::SystemBlur => {
                     let _ = window_vibrancy::apply_blur(window, tint_tuple);
                 }
-                BlurMode::TransparentOnly => {
-                    let _ = window_vibrancy::clear_acrylic(window);
-                    let _ = window_vibrancy::clear_blur(window);
-                    let _ = window_vibrancy::clear_mica(window);
-                }
+                BlurMode::TransparentOnly => {}
             }
         }
 
@@ -481,12 +509,14 @@ impl ThemeConfig {
             // Place the NSVisualEffectView behind the Metal layer (BehindWindow blending).
             // Combined with a transparent wgpu clear color, this restores frosted glass.
             use window_vibrancy::{NSVisualEffectMaterial, NSVisualEffectState};
+            let _ = tint_tuple;
             let _ = window_vibrancy::clear_vibrancy(window);
             if self.blur_mode != BlurMode::TransparentOnly {
-                let material = if self.blur_mode == BlurMode::Mica {
-                    NSVisualEffectMaterial::HudWindow
-                } else {
-                    NSVisualEffectMaterial::UnderWindowBackground
+                let material = match self.blur_mode {
+                    BlurMode::Mica => NSVisualEffectMaterial::HudWindow,
+                    BlurMode::Acrylic => NSVisualEffectMaterial::UnderWindowBackground,
+                    BlurMode::SystemBlur => NSVisualEffectMaterial::WindowBackground,
+                    BlurMode::TransparentOnly => NSVisualEffectMaterial::UnderWindowBackground,
                 };
                 let _ = window_vibrancy::apply_vibrancy(
                     window,
@@ -495,6 +525,11 @@ impl ThemeConfig {
                     None,
                 );
             }
+        }
+
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        {
+            let _ = (window, tint_tuple);
         }
     }
 

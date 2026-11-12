@@ -108,7 +108,7 @@ impl MlaLinter {
                 description: "MLA requires the date of submission in Day Month Year order."
                     .to_string(),
                 severity: RuleSeverity::Error,
-                can_auto_fix: false,
+                can_auto_fix: true,
             });
         } else if !is_valid_mla_date(date_str) {
             issues.push(RuleIssue {
@@ -119,7 +119,7 @@ impl MlaLinter {
                     date_str
                 ),
                 severity: RuleSeverity::Warning,
-                can_auto_fix: false,
+                can_auto_fix: true,
             });
         } else {
             passed += 1;
@@ -157,7 +157,7 @@ impl MlaLinter {
                     title: "Period at End of Title",
                     description: "MLA paper titles should not end with a period.".to_string(),
                     severity: RuleSeverity::Warning,
-                    can_auto_fix: false,
+                    can_auto_fix: true,
                 });
             }
             let expected_title_case = crate::model::to_mla_title_case(title_trim);
@@ -219,7 +219,7 @@ impl MlaLinter {
                 title: "Period Placed Before Parenthetical Citation",
                 description: "In MLA format, for standard inline quotes, the period belongs after the parenthetical citation: e.g., \"quotation\" (Smith 42). Not \"quotation.\" (Smith 42).".to_string(),
                 severity: RuleSeverity::Warning,
-                can_auto_fix: false,
+                can_auto_fix: true,
             });
         } else {
             passed += 1;
@@ -241,7 +241,7 @@ impl MlaLinter {
                     title: "Works Cited Not Alphabetized",
                     description: "MLA 9 requires Works Cited entries to be alphabetized by author's last name or primary title.".to_string(),
                     severity: RuleSeverity::Warning,
-                    can_auto_fix: false,
+                    can_auto_fix: true,
                 });
             } else {
                 passed += 1;
@@ -281,9 +281,92 @@ impl MlaLinter {
                 doc.title = crate::model::to_mla_title_case(&doc.title);
                 doc.is_dirty = true;
             }
+            "TITLE_PERIOD" => {
+                doc.title = doc.title.trim().trim_end_matches('.').to_string();
+                doc.is_dirty = true;
+            }
+            "HDR_DATE_MISSING" | "HDR_DATE_FORMAT" => {
+                doc.header.date = normalize_to_mla_date(&doc.header.date);
+                doc.is_dirty = true;
+            }
+            "CITATION_PUNCTUATION" => {
+                for block in &mut doc.blocks {
+                    if let MlaBlock::Paragraph { text, .. } = block {
+                        *text = fix_citation_punctuation(text);
+                    }
+                }
+                doc.sync_body_from_blocks();
+                doc.is_dirty = true;
+            }
+            "WORKS_CITED_UNSORTED" => {
+                doc.sort_works_cited();
+            }
+            "ALL" => {
+                let report = Self::inspect(doc);
+                for issue in report.issues {
+                    if issue.can_auto_fix {
+                        Self::auto_fix(doc, issue.rule_id);
+                    }
+                }
+            }
             _ => {}
         }
     }
+}
+
+fn normalize_to_mla_date(s: &str) -> String {
+    let trimmed = s.trim();
+    if trimmed.is_empty() {
+        return crate::model::format_current_mla_date();
+    }
+    // Try YYYY-MM-DD
+    if let Ok(d) = chrono::NaiveDate::parse_from_str(trimmed, "%Y-%m-%d") {
+        return d.format("%-d %B %Y").to_string();
+    }
+    // Try MM/DD/YYYY or M/D/YYYY
+    for fmt in [
+        "%m/%d/%Y",
+        "%m-%d-%Y",
+        "%d/%m/%Y",
+        "%B %d, %Y",
+        "%b %d, %Y",
+        "%B %d %Y",
+        "%b %d %Y",
+    ] {
+        if let Ok(d) = chrono::NaiveDate::parse_from_str(trimmed, fmt) {
+            return d.format("%-d %B %Y").to_string();
+        }
+    }
+    crate::model::format_current_mla_date()
+}
+
+fn fix_citation_punctuation(text: &str) -> String {
+    let mut out = text.to_string();
+    for pattern in [".\" (", ". ("] {
+        let replacement_prefix = if pattern.starts_with(".\"") {
+            "\" ("
+        } else {
+            " ("
+        };
+        while let Some(pos) = out.find(pattern) {
+            let after_open = pos + pattern.len();
+            if let Some(close_rel) = out[after_open..].find(')') {
+                let close_idx = after_open + close_rel;
+                let inside = out[after_open..close_idx].to_string();
+                let after_close = &out[close_idx + 1..];
+                let trailing_dot = if after_close.starts_with('.') {
+                    ""
+                } else {
+                    "."
+                };
+                let fixed = format!("{replacement_prefix}{inside}){trailing_dot}");
+                out.replace_range(pos..=close_idx, &fixed);
+            } else {
+                break;
+            }
+        }
+    }
+    out
 }
 
 fn is_valid_mla_date(s: &str) -> bool {
